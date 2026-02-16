@@ -8,10 +8,10 @@ import { useI18n } from '@/lib/i18n/context'
 import { MobileNav } from '@/components/app/mobile-nav'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Briefcase, DollarSign, TrendingUp, Percent, Plus, ChevronRight } from 'lucide-react'
+import { Briefcase, DollarSign, TrendingUp, Percent, Plus, ChevronRight, AlertCircle, Package, CalendarCheck, FileText } from 'lucide-react'
 import { STATUS_CONFIG } from '@/lib/templates'
 import type { Job } from '@/lib/types'
-import { format, startOfMonth, endOfMonth } from 'date-fns'
+import { format, startOfMonth, endOfMonth, addDays, isToday, isTomorrow } from 'date-fns'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 function formatMoney(n: number) {
@@ -151,6 +151,89 @@ export default function DashboardPage() {
             <p className="text-[11px] text-slate-400 mt-0.5">{t('dashboard.avgMargin')}</p>
           </div>
         </div>
+
+        {/* Action Center - Smart Alerts */}
+        {(() => {
+          interface ActionAlert { id: string; icon: React.ReactNode; color: string; message: string; action?: { label: string; href: string } }
+          const alerts: ActionAlert[] = []
+
+          jobs.forEach(job => {
+            // Approved but materials not ordered
+            if ((job.status === 'approved' || job.workflow_stage === 'approved') && !job.materials_ordered) {
+              alerts.push({
+                id: `mat-${job.id}`,
+                icon: <Package className="h-4 w-4" />,
+                color: 'bg-amber-50 border-amber-200 text-amber-700',
+                message: lang === 'es'
+                  ? `Falta pedir materiales para ${job.client_name}`
+                  : `Materials pending for ${job.client_name}`,
+                action: { label: lang === 'es' ? 'Ver trabajo' : 'View job', href: `/jobs/${job.id}` },
+              })
+            }
+
+            // Start date is tomorrow
+            if (job.start_date) {
+              const start = new Date(job.start_date + 'T12:00')
+              if (isTomorrow(start) && job.status !== 'completed') {
+                alerts.push({
+                  id: `start-${job.id}`,
+                  icon: <CalendarCheck className="h-4 w-4" />,
+                  color: 'bg-[#78BE20]/10 border-[#78BE20]/30 text-[#3D7A00]',
+                  message: lang === 'es'
+                    ? `Mañana arranca ${job.client_name}. ¿Todo listo?`
+                    : `${job.client_name} starts tomorrow. Ready?`,
+                  action: { label: lang === 'es' ? 'Ver' : 'View', href: `/jobs/${job.id}` },
+                })
+              }
+              if (isToday(start) && job.status !== 'completed') {
+                alerts.push({
+                  id: `today-${job.id}`,
+                  icon: <AlertCircle className="h-4 w-4" />,
+                  color: 'bg-[#008B99]/10 border-[#008B99]/30 text-[#008B99]',
+                  message: lang === 'es'
+                    ? `HOY arranca ${job.client_name}`
+                    : `${job.client_name} starts TODAY`,
+                  action: { label: lang === 'es' ? 'Ver' : 'View', href: `/jobs/${job.id}` },
+                })
+              }
+            }
+
+            // Completed but not invoiced/paid
+            if (job.status === 'completed' && job.workflow_stage !== 'invoiced' && job.workflow_stage !== 'paid') {
+              alerts.push({
+                id: `inv-${job.id}`,
+                icon: <FileText className="h-4 w-4" />,
+                color: 'bg-blue-50 border-blue-200 text-blue-700',
+                message: lang === 'es'
+                  ? `Trabajo terminado. Enviar factura a ${job.client_name}`
+                  : `Job complete. Send invoice to ${job.client_name}`,
+                action: { label: lang === 'es' ? 'Ver' : 'View', href: `/jobs/${job.id}` },
+              })
+            }
+          })
+
+          if (alerts.length === 0) return null
+
+          return (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-[#008B99]" />
+                {lang === 'es' ? 'Centro de Acción' : 'Action Center'}
+              </h3>
+              {alerts.slice(0, 5).map(alert => (
+                <div key={alert.id} className={`flex items-center gap-3 p-3 rounded-xl border ${alert.color}`}>
+                  {alert.icon}
+                  <span className="flex-1 text-sm font-medium">{alert.message}</span>
+                  {alert.action && (
+                    <Link href={alert.action.href} className="text-xs font-semibold underline whitespace-nowrap">
+                      {alert.action.label}
+                    </Link>
+                  )}
+                </div>
+              ))}
+            </div>
+          )
+        })()}
 
         {/* New Job Button */}
         <Link href="/jobs/new">

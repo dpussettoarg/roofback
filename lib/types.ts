@@ -39,11 +39,29 @@ export interface Job {
   client_status: 'pending' | 'approved' | 'rejected'
   client_signature: string
   approved_at: string | null
+  // Workflow & scheduling
+  start_date: string | null
+  duration_days: number
+  deadline_date: string | null
+  payment_terms: string
+  workflow_stage: WorkflowStage
+  photos: string[]
+  materials_ordered: boolean
+  language_output: 'es' | 'en'
 }
 
 export type JobType = 'repair' | 'reroof' | 'new_roof' | 'gutters' | 'waterproofing' | 'other'
 export type RoofType = 'shingle' | 'tile' | 'metal' | 'flat' | 'other'
 export type JobStatus = 'estimate' | 'approved' | 'in_progress' | 'completed'
+export type WorkflowStage = 'draft' | 'sent' | 'approved' | 'materials_ordered' | 'in_progress' | 'completed' | 'invoiced' | 'paid'
+
+export const PAYMENT_TERMS_OPTIONS = [
+  { value: '50/50', label_es: '50% anticipo, 50% al terminar', label_en: '50% upfront, 50% upon completion' },
+  { value: 'full_upfront', label_es: '100% anticipo', label_en: '100% upfront' },
+  { value: 'full_completion', label_es: '100% al terminar', label_en: '100% upon completion' },
+  { value: 'net30', label_es: 'Net 30 días', label_en: 'Net 30 days' },
+  { value: '30/70', label_es: '30% anticipo, 70% al terminar', label_en: '30% upfront, 70% upon completion' },
+]
 
 export interface EstimateItem {
   id: string
@@ -94,4 +112,61 @@ export interface Expense {
   date: string
   notes: string
   created_at: string
+}
+
+// Simple translation map for Español → English
+export const TRANSLATE_LABELS: Record<string, string> = {
+  'Presupuesto': 'Estimate',
+  'Materiales': 'Materials',
+  'Mano de obra': 'Labor',
+  'Otros': 'Other',
+  'Subtotal': 'Subtotal',
+  'Total': 'Total',
+  'Descripción': 'Description',
+  'Cantidad': 'Quantity',
+  'Precio': 'Price',
+  'Condiciones de pago': 'Payment Terms',
+  'Fecha de inicio': 'Start Date',
+  'Duración': 'Duration',
+  'días': 'days',
+  'Alcance del trabajo': 'Scope of Work',
+  'Fotos del trabajo': 'Job Photos',
+}
+
+// Simple material name translations
+export const MATERIAL_TRANSLATIONS: Record<string, string> = {
+  'Tejas asfálticas': 'Asphalt Shingles',
+  'Tejas arquitectónicas': 'Architectural Shingles',
+  'Underlayment sintético': 'Synthetic Underlayment',
+  'Underlayment 30 lb felt': '30 lb Felt Underlayment',
+  'Drip edge': 'Drip Edge',
+  'Flashing de aluminio': 'Aluminum Flashing',
+  'Clavos para techo': 'Roofing Nails',
+  'Ridge cap': 'Ridge Cap',
+  'Ice & water shield': 'Ice & Water Shield',
+  'Sellador de techo': 'Roof Sealant',
+  'Cemento para techo': 'Roofing Cement',
+  'Ventilación de cumbrera': 'Ridge Ventilation',
+  'Pipe boots': 'Pipe Boots',
+  'Step flashing': 'Step Flashing',
+  'Plywood/OSB': 'Plywood/OSB',
+  'Starter strip': 'Starter Strip',
+  'Canaleta': 'Gutter',
+  'Bajante': 'Downspout',
+  'Membrana asfáltica': 'Asphalt Membrane',
+  'Mano de obra - Techista jefe': 'Labor - Lead Roofer',
+  'Mano de obra - Techista': 'Labor - Roofer',
+  'Mano de obra - Ayudante': 'Labor - Helper',
+  'Mano de obra': 'Labor',
+  'Dump fee': 'Dump Fee',
+  'Material genérico': 'Generic Material',
+}
+
+export function translateMaterialName(name: string): string {
+  for (const [es, en] of Object.entries(MATERIAL_TRANSLATIONS)) {
+    if (name.toLowerCase().includes(es.toLowerCase())) {
+      return name.replace(new RegExp(es, 'i'), en)
+    }
+  }
+  return name
 }

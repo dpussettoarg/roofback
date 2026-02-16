@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { useI18n } from '@/lib/i18n/context'
 import { MobileNav } from '@/components/app/mobile-nav'
@@ -14,14 +15,22 @@ import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import {
   ArrowLeft, Plus, Trash2, Download, CheckCircle, Loader2,
-  Send, Zap, List, Sparkles
+  Send, Zap, List, Sparkles, CalendarDays, Clock, CreditCard,
+  Globe, Camera, X, ImageIcon
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { JOB_TEMPLATES, scaleTemplateItems } from '@/lib/templates'
+import { PAYMENT_TERMS_OPTIONS, translateMaterialName } from '@/lib/types'
 import type { Job, EstimateItem, JobType } from '@/lib/types'
 
 function formatMoney(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(n)
+}
+
+function addDays(date: string, days: number): string {
+  const d = new Date(date)
+  d.setDate(d.getDate() + days)
+  return d.toISOString().split('T')[0]
 }
 
 interface LocalItem {
@@ -39,6 +48,7 @@ export default function EstimatePage() {
   const router = useRouter()
   const { t, lang } = useI18n()
   const supabase = createClient()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [job, setJob] = useState<Job | null>(null)
   const [mode, setMode] = useState<'simple' | 'itemized'>('simple')
@@ -52,6 +62,16 @@ export default function EstimatePage() {
   const [showSendDialog, setShowSendDialog] = useState(false)
   const [clientEmail, setClientEmail] = useState('')
 
+  // New fields
+  const [startDate, setStartDate] = useState('')
+  const [durationDays, setDurationDays] = useState(1)
+  const [paymentTerms, setPaymentTerms] = useState('50/50')
+  const [languageOutput, setLanguageOutput] = useState<'es' | 'en'>('es')
+  const [photos, setPhotos] = useState<string[]>([])
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+
+  const deadlineDate = startDate ? addDays(startDate, durationDays) : ''
+
   useEffect(() => {
     async function load() {
       const { data: jobData } = await supabase.from('jobs').select('*').eq('id', id).single()
@@ -64,6 +84,11 @@ export default function EstimatePage() {
       setSimpleTotal(Number(j.estimated_total) || 0)
       setSimpleDescription(j.simple_description || '')
       setClientEmail(j.client_email || '')
+      setStartDate(j.start_date || '')
+      setDurationDays(j.duration_days || 1)
+      setPaymentTerms(j.payment_terms || '50/50')
+      setLanguageOutput(j.language_output || 'es')
+      setPhotos(j.photos || [])
 
       const { data: existingItems } = await supabase
         .from('estimate_items')
@@ -74,13 +99,9 @@ export default function EstimatePage() {
       if (existingItems && existingItems.length > 0) {
         setItems(
           existingItems.map((ei: EstimateItem) => ({
-            id: ei.id,
-            category: ei.category,
-            name: ei.name,
-            quantity: Number(ei.quantity),
-            unit: ei.unit,
-            unit_price: Number(ei.unit_price),
-            sort_order: ei.sort_order,
+            id: ei.id, category: ei.category, name: ei.name,
+            quantity: Number(ei.quantity), unit: ei.unit,
+            unit_price: Number(ei.unit_price), sort_order: ei.sort_order,
           }))
         )
       } else if (j.estimate_mode !== 'simple') {
@@ -96,16 +117,10 @@ export default function EstimatePage() {
     const template = JOB_TEMPLATES[jobType]
     if (!template) return
     const scaled = scaleTemplateItems(template.items, sqft)
-    setItems(
-      scaled.map((ti, idx) => ({
-        category: ti.category,
-        name: ti.name,
-        quantity: ti.quantity,
-        unit: ti.unit,
-        unit_price: ti.unit_price,
-        sort_order: idx,
-      }))
-    )
+    setItems(scaled.map((ti, idx) => ({
+      category: ti.category, name: ti.name, quantity: ti.quantity,
+      unit: ti.unit, unit_price: ti.unit_price, sort_order: idx,
+    })))
   }
 
   const updateItem = useCallback((index: number, field: string, value: string | number) => {
@@ -117,10 +132,7 @@ export default function EstimatePage() {
   }, [])
 
   const addItem = useCallback((category: 'material' | 'labor' | 'other') => {
-    setItems((prev) => [
-      ...prev,
-      { category, name: '', quantity: 1, unit: category === 'labor' ? 'horas' : 'each', unit_price: 0, sort_order: prev.length },
-    ])
+    setItems((prev) => [...prev, { category, name: '', quantity: 1, unit: category === 'labor' ? 'horas' : 'each', unit_price: 0, sort_order: prev.length }])
   }, [])
 
   const calc = useMemo(() => {
@@ -137,6 +149,35 @@ export default function EstimatePage() {
 
   const finalTotal = mode === 'simple' ? simpleTotal : calc.total
 
+  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    setUploadingPhoto(true)
+
+    try {
+      const newUrls: string[] = []
+      for (const file of Array.from(files)) {
+        const ext = file.name.split('.').pop()
+        const path = `${id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+        const { error } = await supabase.storage.from('job-photos').upload(path, file)
+        if (error) throw error
+        const { data: urlData } = supabase.storage.from('job-photos').getPublicUrl(path)
+        newUrls.push(urlData.publicUrl)
+      }
+      setPhotos(prev => [...prev, ...newUrls])
+      toast.success(lang === 'es' ? 'Foto(s) subida(s)' : 'Photo(s) uploaded')
+    } catch {
+      toast.error(lang === 'es' ? 'Error subiendo foto. Creá el bucket "job-photos" en Supabase Storage.' : 'Error uploading. Create "job-photos" bucket in Supabase Storage.')
+    } finally {
+      setUploadingPhoto(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  function removePhoto(idx: number) {
+    setPhotos(prev => prev.filter((_, i) => i !== idx))
+  }
+
   async function handleSave() {
     setSaving(true)
     try {
@@ -144,14 +185,9 @@ export default function EstimatePage() {
         await supabase.from('estimate_items').delete().eq('job_id', id)
         if (items.length > 0) {
           const rows = items.map((item, idx) => ({
-            job_id: id,
-            category: item.category,
-            name: item.name,
-            quantity: item.quantity,
-            unit: item.unit,
-            unit_price: item.unit_price,
-            total_price: item.quantity * item.unit_price,
-            sort_order: idx,
+            job_id: id, category: item.category, name: item.name,
+            quantity: item.quantity, unit: item.unit, unit_price: item.unit_price,
+            total_price: item.quantity * item.unit_price, sort_order: idx,
           }))
           const { error } = await supabase.from('estimate_items').insert(rows)
           if (error) throw error
@@ -164,6 +200,12 @@ export default function EstimatePage() {
         simple_description: mode === 'simple' ? simpleDescription : '',
         overhead_pct: overheadPct,
         margin_pct: marginPct,
+        start_date: startDate || null,
+        duration_days: durationDays,
+        deadline_date: deadlineDate || null,
+        payment_terms: paymentTerms,
+        language_output: languageOutput,
+        photos,
         updated_at: new Date().toISOString(),
       }).eq('id', id)
 
@@ -178,81 +220,84 @@ export default function EstimatePage() {
   async function handleAccepted() {
     await handleSave()
     await supabase.from('jobs').update({
-      status: 'approved',
+      status: 'approved', workflow_stage: 'approved',
       updated_at: new Date().toISOString(),
     }).eq('id', id)
-    toast.success(lang === 'es' ? '¡Arrancamos! Trabajo aceptado.' : "Let's go! Job accepted.")
+    toast.success(lang === 'es' ? '¡Arrancamos!' : "Let's go!")
     router.push(`/jobs/${id}`)
   }
 
   function handleSendToClient() {
     const proposalUrl = `${window.location.origin}/proposal/${job?.public_token}`
-    const subject = encodeURIComponent(
-      lang === 'es'
-        ? `Presupuesto de ${job?.client_name} - RoofBack`
-        : `Estimate for ${job?.client_name} - RoofBack`
-    )
-    const body = encodeURIComponent(
-      lang === 'es'
-        ? `Hola ${job?.client_name},\n\nAcá podés ver y aprobar tu presupuesto:\n${proposalUrl}\n\nGracias,\nRoofBack`
-        : `Hi ${job?.client_name},\n\nYou can view and approve your estimate here:\n${proposalUrl}\n\nThanks,\nRoofBack`
-    )
+    const isEn = languageOutput === 'en'
+    const subject = encodeURIComponent(isEn ? `Estimate for ${job?.client_name} - RoofBack` : `Presupuesto - ${job?.client_name}`)
+    const body = encodeURIComponent(isEn
+      ? `Hi ${job?.client_name},\n\nYou can view and approve your estimate here:\n${proposalUrl}\n\nThanks!`
+      : `Hola ${job?.client_name},\n\nAcá podés ver y aprobar tu presupuesto:\n${proposalUrl}\n\nGracias!`)
     window.open(`mailto:${clientEmail}?subject=${subject}&body=${body}`, '_blank')
     setShowSendDialog(false)
-    toast.success(lang === 'es' ? 'Se abrió tu app de email' : 'Email app opened')
   }
 
   function handleCopyLink() {
-    const url = `${window.location.origin}/proposal/${job?.public_token}`
-    navigator.clipboard.writeText(url)
+    navigator.clipboard.writeText(`${window.location.origin}/proposal/${job?.public_token}`)
     toast.success(lang === 'es' ? '¡Link copiado!' : 'Link copied!')
   }
 
   function handleGeneratePdf() {
     const w = window.open('', '_blank')
     if (!w) return
+    const isEn = languageOutput === 'en'
+    const ptLabel = PAYMENT_TERMS_OPTIONS.find(p => p.value === paymentTerms)
+    const ptText = isEn ? ptLabel?.label_en : ptLabel?.label_es
+
+    const scheduleHtml = startDate ? `<div style="display:flex;gap:24px;margin:16px 0;padding:16px;background:#f8fafc;border-radius:8px">
+      <div><strong style="color:#64748b;font-size:12px">${isEn ? 'START DATE' : 'INICIO'}</strong><br/>${new Date(startDate + 'T12:00').toLocaleDateString(isEn ? 'en-US' : 'es', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+      <div><strong style="color:#64748b;font-size:12px">${isEn ? 'DURATION' : 'DURACIÓN'}</strong><br/>${durationDays} ${isEn ? 'days' : 'días'}</div>
+      ${ptText ? `<div><strong style="color:#64748b;font-size:12px">${isEn ? 'PAYMENT' : 'PAGO'}</strong><br/>${ptText}</div>` : ''}
+    </div>` : ''
+
+    const photosHtml = photos.length > 0 ? `<h3 style="color:#64748b;font-size:14px;text-transform:uppercase;letter-spacing:1px">${isEn ? 'Job Photos' : 'Fotos'}</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0">${photos.map(p => `<img src="${p}" style="width:100%;border-radius:8px;aspect-ratio:4/3;object-fit:cover"/>`).join('')}</div>` : ''
 
     if (mode === 'simple') {
-      w.document.write(`<!DOCTYPE html><html><head><title>Presupuesto - ${job?.client_name}</title>
+      w.document.write(`<!DOCTYPE html><html><head><title>${isEn ? 'Estimate' : 'Presupuesto'} - ${job?.client_name}</title>
       <style>body{font-family:system-ui,sans-serif;max-width:700px;margin:0 auto;padding:40px;color:#333}
-      .total{font-size:32px;font-weight:700;color:#008B99;text-align:center;margin:32px 0;padding:24px;border-radius:16px;background:linear-gradient(135deg,rgba(0,139,153,0.06),rgba(120,190,32,0.06))}
+      .total{font-size:32px;font-weight:700;color:#008B99;text-align:center;margin:24px 0;padding:24px;border-radius:16px;background:linear-gradient(135deg,rgba(0,139,153,0.06),rgba(120,190,32,0.06))}
       @media print{body{padding:0}}</style></head><body>
-      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:32px">
-        <div><h1 style="background:linear-gradient(90deg,#008B99,#78BE20);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0">RoofBack</h1></div>
+      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:24px">
+        <h1 style="background:linear-gradient(90deg,#008B99,#78BE20);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0">RoofBack</h1>
         <div style="text-align:right"><p style="margin:0;font-weight:600">${job?.client_name}</p>
-        <p style="margin:2px 0;color:#666;font-size:14px">${job?.client_address || ''}</p>
-        <p style="margin:2px 0;color:#999;font-size:12px">${new Date().toLocaleDateString()}</p></div></div>
-      <h2>${lang === 'es' ? 'Presupuesto' : 'Estimate'}</h2>
-      ${simpleDescription ? `<div style="white-space:pre-wrap;padding:16px;background:#f8fafc;border-radius:8px;margin:16px 0;line-height:1.6">${simpleDescription}</div>` : ''}
+        <p style="margin:2px 0;color:#666;font-size:14px">${job?.client_address || ''}</p></div></div>
+      ${scheduleHtml}
+      ${simpleDescription ? `<h3 style="color:#64748b;font-size:14px;text-transform:uppercase">${isEn ? 'Scope of Work' : 'Alcance'}</h3><div style="white-space:pre-wrap;padding:16px;background:#f8fafc;border-radius:8px;line-height:1.6">${simpleDescription}</div>` : ''}
+      ${photosHtml}
       <div class="total">${formatMoney(simpleTotal)}</div>
-      <p style="text-align:center;color:#999;font-size:12px;margin-top:32px">Generado con RoofBack</p>
       <script>setTimeout(()=>window.print(),500)</script></body></html>`)
     } else {
+      const getName = (name: string) => isEn ? translateMaterialName(name) : name
+      const renderRows = (rows: LocalItem[]) => rows.map(i =>
+        `<tr><td style="padding:8px;border-bottom:1px solid #f1f5f9">${getName(i.name)}</td>
+         <td style="padding:8px;border-bottom:1px solid #f1f5f9;text-align:center">${i.quantity} ${i.unit}</td>
+         <td style="padding:8px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:600">${formatMoney(i.quantity * i.unit_price)}</td></tr>`).join('')
+
       const materialRows = items.filter(i => i.category === 'material')
       const laborRows = items.filter(i => i.category === 'labor')
       const otherRows = items.filter(i => i.category === 'other')
-      const renderRows = (rows: LocalItem[]) => rows.map(i =>
-        `<tr><td style="padding:8px;border-bottom:1px solid #f1f5f9">${i.name}</td>
-         <td style="padding:8px;border-bottom:1px solid #f1f5f9;text-align:center">${i.quantity} ${i.unit}</td>
-         <td style="padding:8px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:600">${formatMoney(i.quantity * i.unit_price)}</td></tr>`
-      ).join('')
 
-      w.document.write(`<!DOCTYPE html><html><head><title>Presupuesto - ${job?.client_name}</title>
+      w.document.write(`<!DOCTYPE html><html><head><title>${isEn ? 'Estimate' : 'Presupuesto'} - ${job?.client_name}</title>
       <style>body{font-family:system-ui,sans-serif;max-width:700px;margin:0 auto;padding:40px;color:#333}
       table{width:100%;border-collapse:collapse;margin:12px 0}th{background:#f8fafc;padding:8px;text-align:left;font-size:13px;color:#64748b}
       .total-row{font-size:24px;font-weight:700;color:#008B99;text-align:right;padding:16px;border-radius:12px;background:linear-gradient(135deg,rgba(0,139,153,0.06),rgba(120,190,32,0.06))}
       @media print{body{padding:0}}</style></head><body>
-      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:32px">
-        <div><h1 style="background:linear-gradient(90deg,#008B99,#78BE20);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0">RoofBack</h1></div>
+      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:24px">
+        <h1 style="background:linear-gradient(90deg,#008B99,#78BE20);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0">RoofBack</h1>
         <div style="text-align:right"><p style="margin:0;font-weight:600">${job?.client_name}</p>
-        <p style="margin:2px 0;color:#666;font-size:14px">${job?.client_address || ''}</p>
-        <p style="margin:2px 0;color:#666;font-size:14px">${job?.client_phone || ''}</p>
-        <p style="margin:2px 0;color:#999;font-size:12px">${new Date().toLocaleDateString()}</p></div></div>
-      ${materialRows.length > 0 ? `<h3 style="color:#64748b;font-size:14px;text-transform:uppercase;letter-spacing:1px">${lang === 'es' ? 'Materiales' : 'Materials'}</h3><table><thead><tr><th>Item</th><th style="text-align:center">${lang === 'es' ? 'Cantidad' : 'Qty'}</th><th style="text-align:right">Total</th></tr></thead><tbody>${renderRows(materialRows)}</tbody></table>` : ''}
-      ${laborRows.length > 0 ? `<h3 style="color:#64748b;font-size:14px;text-transform:uppercase;letter-spacing:1px">${lang === 'es' ? 'Mano de obra' : 'Labor'}</h3><table><thead><tr><th>Item</th><th style="text-align:center">${lang === 'es' ? 'Cantidad' : 'Qty'}</th><th style="text-align:right">Total</th></tr></thead><tbody>${renderRows(laborRows)}</tbody></table>` : ''}
-      ${otherRows.length > 0 ? `<h3 style="color:#64748b;font-size:14px;text-transform:uppercase;letter-spacing:1px">${lang === 'es' ? 'Otros' : 'Other'}</h3><table><thead><tr><th>Item</th><th style="text-align:center">${lang === 'es' ? 'Cantidad' : 'Qty'}</th><th style="text-align:right">Total</th></tr></thead><tbody>${renderRows(otherRows)}</tbody></table>` : ''}
+        <p style="margin:2px 0;color:#666;font-size:14px">${job?.client_address || ''}</p></div></div>
+      ${scheduleHtml}${photosHtml}
+      ${materialRows.length > 0 ? `<h3 style="color:#64748b;font-size:14px;text-transform:uppercase">${isEn ? 'Materials' : 'Materiales'}</h3><table><thead><tr><th>Item</th><th style="text-align:center">${isEn ? 'Qty' : 'Cant.'}</th><th style="text-align:right">Total</th></tr></thead><tbody>${renderRows(materialRows)}</tbody></table>` : ''}
+      ${laborRows.length > 0 ? `<h3 style="color:#64748b;font-size:14px;text-transform:uppercase">${isEn ? 'Labor' : 'Mano de Obra'}</h3><table><thead><tr><th>Item</th><th style="text-align:center">${isEn ? 'Qty' : 'Cant.'}</th><th style="text-align:right">Total</th></tr></thead><tbody>${renderRows(laborRows)}</tbody></table>` : ''}
+      ${otherRows.length > 0 ? `<h3 style="color:#64748b;font-size:14px;text-transform:uppercase">${isEn ? 'Other' : 'Otros'}</h3><table><thead><tr><th>Item</th><th style="text-align:center">${isEn ? 'Qty' : 'Cant.'}</th><th style="text-align:right">Total</th></tr></thead><tbody>${renderRows(otherRows)}</tbody></table>` : ''}
       <div class="total-row" style="margin-top:24px">TOTAL: ${formatMoney(calc.total)}</div>
-      <p style="text-align:center;color:#999;font-size:12px;margin-top:32px">Generado con RoofBack</p>
       <script>setTimeout(()=>window.print(),500)</script></body></html>`)
     }
     w.document.close()
@@ -267,92 +312,45 @@ export default function EstimatePage() {
   }
 
   const renderSection = (category: 'material' | 'labor' | 'other', title: string) => {
-    const sectionItems = items
-      .map((item, idx) => ({ ...item, originalIndex: idx }))
-      .filter((i) => i.category === category)
-
+    const sectionItems = items.map((item, idx) => ({ ...item, originalIndex: idx })).filter((i) => i.category === category)
     return (
       <Card className="border-0 shadow-sm bg-white rounded-2xl">
         <CardContent className="p-4">
           <h3 className="font-semibold text-slate-700 mb-3 text-sm uppercase tracking-wider">{title}</h3>
-
           {category === 'material' && sectionItems.length > 0 && (
             <div className="mb-3 p-3 rounded-xl bg-gradient-brand-subtle border border-slate-100">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-3.5 w-3.5 text-[#008B99]" />
-                <span className="text-xs text-slate-600">
-                  {lang === 'es'
-                    ? 'Marcas sugeridas: GAF / Owens Corning / CertainTeed'
-                    : 'Suggested brands: GAF / Owens Corning / CertainTeed'}
-                </span>
+                <span className="text-xs text-slate-600">{lang === 'es' ? 'Marcas sugeridas: GAF / Owens Corning / CertainTeed' : 'Suggested brands: GAF / Owens Corning / CertainTeed'}</span>
               </div>
             </div>
           )}
-
           <div className="space-y-3">
             {sectionItems.map((item) => (
               <div key={item.originalIndex} className="flex items-start gap-2 pb-3 border-b border-slate-100 last:border-0">
                 <div className="flex-1 space-y-2">
-                  <Input
-                    value={item.name}
-                    onChange={(e) => updateItem(item.originalIndex, 'name', e.target.value)}
-                    placeholder={lang === 'es' ? 'Nombre del item' : 'Item name'}
-                    className="h-10 text-sm font-medium bg-slate-50/50 border-slate-200 rounded-xl"
-                  />
+                  <Input value={item.name} onChange={(e) => updateItem(item.originalIndex, 'name', e.target.value)} placeholder={lang === 'es' ? 'Nombre' : 'Name'} className="h-10 text-sm font-medium bg-slate-50/50 border-slate-200 rounded-xl" />
                   <div className="grid grid-cols-3 gap-2">
                     <div>
                       <Label className="text-[11px] text-slate-400">{t('estimate.qty')}</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.5"
-                        value={item.quantity}
-                        onChange={(e) => updateItem(item.originalIndex, 'quantity', parseFloat(e.target.value) || 0)}
-                        className="h-9 text-sm bg-slate-50/50 border-slate-200 rounded-lg"
-                      />
+                      <Input type="number" min="0" step="0.5" value={item.quantity} onChange={(e) => updateItem(item.originalIndex, 'quantity', parseFloat(e.target.value) || 0)} className="h-9 text-sm bg-slate-50/50 border-slate-200 rounded-lg" />
                     </div>
                     <div>
                       <Label className="text-[11px] text-slate-400">{t('estimate.unit')}</Label>
-                      <Input
-                        value={item.unit}
-                        onChange={(e) => updateItem(item.originalIndex, 'unit', e.target.value)}
-                        className="h-9 text-sm bg-slate-50/50 border-slate-200 rounded-lg"
-                      />
+                      <Input value={item.unit} onChange={(e) => updateItem(item.originalIndex, 'unit', e.target.value)} className="h-9 text-sm bg-slate-50/50 border-slate-200 rounded-lg" />
                     </div>
                     <div>
                       <Label className="text-[11px] text-slate-400">$/u</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.unit_price}
-                        onChange={(e) => updateItem(item.originalIndex, 'unit_price', parseFloat(e.target.value) || 0)}
-                        className="h-9 text-sm bg-slate-50/50 border-slate-200 rounded-lg"
-                      />
+                      <Input type="number" min="0" step="0.01" value={item.unit_price} onChange={(e) => updateItem(item.originalIndex, 'unit_price', parseFloat(e.target.value) || 0)} className="h-9 text-sm bg-slate-50/50 border-slate-200 rounded-lg" />
                     </div>
                   </div>
-                  <p className="text-right text-sm font-semibold text-slate-700 tabular-nums">
-                    = {formatMoney(item.quantity * item.unit_price)}
-                  </p>
+                  <p className="text-right text-sm font-semibold text-slate-700 tabular-nums">= {formatMoney(item.quantity * item.unit_price)}</p>
                 </div>
-                <button
-                  onClick={() => removeItem(item.originalIndex)}
-                  className="p-2 text-red-400 hover:text-red-600 mt-1"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                <button onClick={() => removeItem(item.originalIndex)} className="p-2 text-red-400 hover:text-red-600 mt-1"><Trash2 className="h-4 w-4" /></button>
               </div>
             ))}
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full mt-2 text-[#008B99] hover:text-[#006d78] hover:bg-[#008B99]/5"
-            onClick={() => addItem(category)}
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            {t('estimate.addItem')}
-          </Button>
+          <Button variant="ghost" size="sm" className="w-full mt-2 text-[#008B99] hover:text-[#006d78]" onClick={() => addItem(category)}><Plus className="h-4 w-4 mr-1" />{t('estimate.addItem')}</Button>
         </CardContent>
       </Card>
     )
@@ -360,11 +358,9 @@ export default function EstimatePage() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-24">
-      {/* Header */}
       <div className="bg-white border-b border-slate-100 px-5 pt-12 pb-4">
         <Link href={`/jobs/${id}`} className="inline-flex items-center text-sm text-slate-400 mb-2">
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          {job?.client_name}
+          <ArrowLeft className="h-4 w-4 mr-1" />{job?.client_name}
         </Link>
         <h1 className="text-2xl font-bold text-slate-900">{t('estimate.title')}</h1>
       </div>
@@ -372,234 +368,173 @@ export default function EstimatePage() {
       <div className="px-5 py-5 space-y-4">
         {/* Mode Toggle */}
         <div className="flex bg-white rounded-2xl border border-slate-100 p-1.5 shadow-sm">
-          <button
-            onClick={() => setMode('simple')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium transition-all ${
-              mode === 'simple'
-                ? 'bg-gradient-brand text-white shadow-md'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <Zap className="h-4 w-4" />
-            {lang === 'es' ? 'Simple' : 'Simple'}
+          <button onClick={() => setMode('simple')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium transition-all ${mode === 'simple' ? 'bg-gradient-brand text-white shadow-md' : 'text-slate-500'}`}>
+            <Zap className="h-4 w-4" />Simple
           </button>
-          <button
-            onClick={() => {
-              setMode('itemized')
-              if (items.length === 0 && job) {
-                loadTemplate(job.job_type as JobType, Number(job.square_footage) || 1000)
-              }
-            }}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium transition-all ${
-              mode === 'itemized'
-                ? 'bg-gradient-brand text-white shadow-md'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <List className="h-4 w-4" />
-            {lang === 'es' ? 'Detallado' : 'Itemized'}
+          <button onClick={() => { setMode('itemized'); if (items.length === 0 && job) loadTemplate(job.job_type as JobType, Number(job.square_footage) || 1000) }} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium transition-all ${mode === 'itemized' ? 'bg-gradient-brand text-white shadow-md' : 'text-slate-500'}`}>
+            <List className="h-4 w-4" />{lang === 'es' ? 'Detallado' : 'Itemized'}
           </button>
         </div>
 
-        {/* ===== SIMPLE MODE ===== */}
-        {mode === 'simple' && (
-          <>
-            <Card className="border-0 shadow-sm bg-white rounded-2xl">
-              <CardContent className="p-5 space-y-5">
-                <div className="text-center space-y-2">
-                  <Label className="text-slate-500 text-sm">
-                    {lang === 'es' ? 'Precio total del trabajo' : 'Total job price'}
-                  </Label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-slate-400 font-light">$</span>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="100"
-                      value={simpleTotal || ''}
-                      onChange={(e) => setSimpleTotal(parseFloat(e.target.value) || 0)}
-                      placeholder="5,000"
-                      className="h-16 text-3xl font-bold text-center tabular-nums bg-slate-50/50 border-slate-200 rounded-2xl pl-10"
-                    />
-                  </div>
-                </div>
+        {/* Schedule & Payment Section */}
+        <Card className="border-0 shadow-sm bg-white rounded-2xl">
+          <CardContent className="p-4 space-y-4">
+            <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-[#008B99]" />
+              {lang === 'es' ? 'Fechas y condiciones' : 'Schedule & Terms'}
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-[11px] text-slate-400">{lang === 'es' ? 'Fecha de inicio' : 'Start date'}</Label>
+                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-10 bg-slate-50/50 border-slate-200 rounded-xl text-sm" />
+              </div>
+              <div>
+                <Label className="text-[11px] text-slate-400">{lang === 'es' ? 'Duración (días)' : 'Duration (days)'}</Label>
+                <Input type="number" min="1" value={durationDays} onChange={(e) => setDurationDays(parseInt(e.target.value) || 1)} className="h-10 bg-slate-50/50 border-slate-200 rounded-xl text-sm" />
+              </div>
+            </div>
+            {startDate && (
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-gradient-brand-subtle">
+                <Clock className="h-4 w-4 text-[#008B99]" />
+                <span className="text-sm text-slate-700">
+                  {lang === 'es' ? 'Fecha prometida: ' : 'Deadline: '}
+                  <strong>{new Date(deadlineDate + 'T12:00').toLocaleDateString(lang === 'es' ? 'es' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</strong>
+                </span>
+              </div>
+            )}
+            <div>
+              <Label className="text-[11px] text-slate-400 flex items-center gap-1"><CreditCard className="h-3 w-3" />{lang === 'es' ? 'Condiciones de pago' : 'Payment terms'}</Label>
+              <select value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} className="w-full h-10 bg-slate-50/50 border border-slate-200 rounded-xl text-sm px-3 mt-1">
+                {PAYMENT_TERMS_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{lang === 'es' ? opt.label_es : opt.label_en}</option>
+                ))}
+              </select>
+            </div>
+          </CardContent>
+        </Card>
 
-                <div className="space-y-2">
-                  <Label className="text-slate-500 text-sm">
-                    {lang === 'es' ? 'Descripción / Alcance del trabajo' : 'Description / Scope of work'}
-                  </Label>
-                  <Textarea
-                    value={simpleDescription}
-                    onChange={(e) => setSimpleDescription(e.target.value)}
-                    placeholder={lang === 'es'
-                      ? 'Ej: Retecho completo de 2,000 sqft. Incluye remoción de tejas viejas, instalación de underlayment nuevo, tejas arquitectónicas GAF Timberline, ventilación de cumbrera...'
-                      : 'Ex: Full reroof of 2,000 sqft. Includes removal of old shingles, new underlayment installation, GAF Timberline architectural shingles, ridge ventilation...'}
-                    className="min-h-[140px] text-base bg-slate-50/50 border-slate-200 rounded-xl resize-none"
-                  />
+        {/* Language Output Toggle */}
+        <div className="flex items-center justify-between bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
+          <div className="flex items-center gap-2">
+            <Globe className="h-4 w-4 text-[#008B99]" />
+            <span className="text-sm font-medium text-slate-700">{lang === 'es' ? 'Generar en Inglés' : 'Generate in English'}</span>
+          </div>
+          <button
+            onClick={() => setLanguageOutput(languageOutput === 'es' ? 'en' : 'es')}
+            className={`w-12 h-7 rounded-full transition-colors relative ${languageOutput === 'en' ? 'bg-[#008B99]' : 'bg-slate-200'}`}
+          >
+            <div className={`w-5 h-5 bg-white rounded-full absolute top-1 transition-transform shadow-sm ${languageOutput === 'en' ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
+        </div>
+
+        {/* Photos Section */}
+        <Card className="border-0 shadow-sm bg-white rounded-2xl">
+          <CardContent className="p-4 space-y-3">
+            <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+              <Camera className="h-4 w-4 text-[#008B99]" />
+              {lang === 'es' ? 'Fotos del trabajo' : 'Job Photos'}
+            </h3>
+            {photos.length > 0 && (
+              <div className="grid grid-cols-3 gap-2">
+                {photos.map((url, i) => (
+                  <div key={i} className="relative group rounded-xl overflow-hidden aspect-square bg-slate-100">
+                    <Image src={url} alt="" fill className="object-cover" sizes="120px" />
+                    <button onClick={() => removePhoto(i)} className="absolute top-1 right-1 p-1 bg-black/50 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handlePhotoUpload} className="hidden" />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingPhoto}
+              className="w-full h-20 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 hover:border-[#008B99] hover:text-[#008B99] transition-colors flex flex-col items-center justify-center gap-1"
+            >
+              {uploadingPhoto ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImageIcon className="h-5 w-5" />}
+              <span className="text-xs">{uploadingPhoto ? (lang === 'es' ? 'Subiendo...' : 'Uploading...') : (lang === 'es' ? 'Subir fotos' : 'Upload photos')}</span>
+            </button>
+          </CardContent>
+        </Card>
+
+        {/* SIMPLE MODE */}
+        {mode === 'simple' && (
+          <Card className="border-0 shadow-sm bg-white rounded-2xl">
+            <CardContent className="p-5 space-y-5">
+              <div className="text-center space-y-2">
+                <Label className="text-slate-500 text-sm">{lang === 'es' ? 'Precio total' : 'Total price'}</Label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-slate-400">$</span>
+                  <Input type="number" min="0" step="100" value={simpleTotal || ''} onChange={(e) => setSimpleTotal(parseFloat(e.target.value) || 0)} placeholder="5,000" className="h-16 text-3xl font-bold text-center tabular-nums bg-slate-50/50 border-slate-200 rounded-2xl pl-10" />
                 </div>
-              </CardContent>
-            </Card>
-          </>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-slate-500 text-sm">{lang === 'es' ? 'Descripción / Alcance' : 'Description / Scope'}</Label>
+                <Textarea value={simpleDescription} onChange={(e) => setSimpleDescription(e.target.value)} placeholder={lang === 'es' ? 'Retecho completo de 2,000 sqft...' : 'Full reroof of 2,000 sqft...'} className="min-h-[120px] text-base bg-slate-50/50 border-slate-200 rounded-xl resize-none" />
+              </div>
+            </CardContent>
+          </Card>
         )}
 
-        {/* ===== ITEMIZED MODE ===== */}
+        {/* ITEMIZED MODE */}
         {mode === 'itemized' && (
           <>
             {renderSection('material', lang === 'es' ? 'Materiales' : 'Materials')}
             {renderSection('labor', lang === 'es' ? 'Mano de obra' : 'Labor')}
             {renderSection('other', lang === 'es' ? 'Otros' : 'Other')}
-
-            {/* Totals Card */}
             <Card className="border-t-gradient border-0 shadow-sm bg-white rounded-2xl overflow-hidden">
               <CardContent className="p-5 space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-[11px] text-slate-400">{t('estimate.overheadPct')}</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={overheadPct}
-                      onChange={(e) => setOverheadPct(parseFloat(e.target.value) || 0)}
-                      className="h-10 bg-slate-50/50 border-slate-200 rounded-xl"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-[11px] text-slate-400">{t('estimate.marginPct')}</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={marginPct}
-                      onChange={(e) => setMarginPct(parseFloat(e.target.value) || 0)}
-                      className="h-10 bg-slate-50/50 border-slate-200 rounded-xl"
-                    />
-                  </div>
+                  <div><Label className="text-[11px] text-slate-400">{t('estimate.overheadPct')}</Label><Input type="number" min="0" max="100" value={overheadPct} onChange={(e) => setOverheadPct(parseFloat(e.target.value) || 0)} className="h-10 bg-slate-50/50 border-slate-200 rounded-xl" /></div>
+                  <div><Label className="text-[11px] text-slate-400">{t('estimate.marginPct')}</Label><Input type="number" min="0" max="100" value={marginPct} onChange={(e) => setMarginPct(parseFloat(e.target.value) || 0)} className="h-10 bg-slate-50/50 border-slate-200 rounded-xl" /></div>
                 </div>
-
                 <Separator className="bg-slate-100" />
-
                 <div className="space-y-1.5 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">{t('estimate.subtotalMaterials')}</span>
-                    <span className="tabular-nums">{formatMoney(calc.materials)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">{t('estimate.subtotalLabor')}</span>
-                    <span className="tabular-nums">{formatMoney(calc.labor)}</span>
-                  </div>
-                  {calc.other > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">{t('estimate.subtotalOther')}</span>
-                      <span className="tabular-nums">{formatMoney(calc.other)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">{t('estimate.overhead')} ({overheadPct}%)</span>
-                    <span className="tabular-nums">{formatMoney(calc.overhead)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">{t('estimate.margin')} ({marginPct}%)</span>
-                    <span className="tabular-nums">{formatMoney(calc.margin)}</span>
-                  </div>
+                  <div className="flex justify-between"><span className="text-slate-500">{t('estimate.subtotalMaterials')}</span><span className="tabular-nums">{formatMoney(calc.materials)}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">{t('estimate.subtotalLabor')}</span><span className="tabular-nums">{formatMoney(calc.labor)}</span></div>
+                  {calc.other > 0 && <div className="flex justify-between"><span className="text-slate-500">{t('estimate.subtotalOther')}</span><span className="tabular-nums">{formatMoney(calc.other)}</span></div>}
+                  <div className="flex justify-between"><span className="text-slate-500">{t('estimate.overhead')} ({overheadPct}%)</span><span className="tabular-nums">{formatMoney(calc.overhead)}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">{t('estimate.margin')} ({marginPct}%)</span><span className="tabular-nums">{formatMoney(calc.margin)}</span></div>
                   <Separator className="bg-slate-100" />
-                  <div className="flex justify-between text-lg font-bold pt-1">
-                    <span className="text-gradient-brand">{t('estimate.grandTotal')}</span>
-                    <span className="text-gradient-brand tabular-nums">{formatMoney(calc.total)}</span>
-                  </div>
+                  <div className="flex justify-between text-lg font-bold pt-1"><span className="text-gradient-brand">{t('estimate.grandTotal')}</span><span className="text-gradient-brand tabular-nums">{formatMoney(calc.total)}</span></div>
                 </div>
               </CardContent>
             </Card>
           </>
         )}
 
-        {/* ===== ACTIONS ===== */}
+        {/* ACTIONS */}
         <div className="space-y-3">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full h-12 text-base font-medium rounded-2xl btn-gradient flex items-center justify-center gap-2"
-          >
+          <button onClick={handleSave} disabled={saving} className="w-full h-12 text-base font-medium rounded-2xl btn-gradient flex items-center justify-center gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {saving ? t('estimate.saving') : t('estimate.save')}
           </button>
-
           <div className="grid grid-cols-3 gap-2">
-            <Button
-              variant="outline"
-              onClick={handleGeneratePdf}
-              className="h-12 rounded-xl border-slate-200"
-            >
-              <Download className="h-4 w-4 mr-1" />
-              PDF
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setShowSendDialog(true)}
-              className="h-12 rounded-xl border-slate-200 text-[#008B99]"
-            >
-              <Send className="h-4 w-4 mr-1" />
-              {lang === 'es' ? 'Enviar' : 'Send'}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handleAccepted}
-              className="h-12 rounded-xl border-[#78BE20]/30 text-[#3D7A00] hover:bg-[#78BE20]/5"
-            >
-              <CheckCircle className="h-4 w-4 mr-1" />
-              {lang === 'es' ? 'Aceptar' : 'Accept'}
-            </Button>
+            <Button variant="outline" onClick={handleGeneratePdf} className="h-12 rounded-xl border-slate-200"><Download className="h-4 w-4 mr-1" />PDF</Button>
+            <Button variant="outline" onClick={() => setShowSendDialog(true)} className="h-12 rounded-xl border-slate-200 text-[#008B99]"><Send className="h-4 w-4 mr-1" />{lang === 'es' ? 'Enviar' : 'Send'}</Button>
+            <Button variant="outline" onClick={handleAccepted} className="h-12 rounded-xl border-[#78BE20]/30 text-[#3D7A00]"><CheckCircle className="h-4 w-4 mr-1" />{lang === 'es' ? 'Aceptar' : 'Accept'}</Button>
           </div>
         </div>
       </div>
 
-      {/* Send to Client Dialog */}
+      {/* Send Dialog */}
       {showSendDialog && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowSendDialog(false)} />
           <div className="relative bg-white rounded-t-3xl sm:rounded-2xl w-full sm:max-w-md p-6 pb-8 space-y-4 shadow-xl">
-            <h3 className="text-lg font-semibold text-slate-900">
-              {lang === 'es' ? 'Enviar presupuesto al cliente' : 'Send estimate to client'}
-            </h3>
+            <h3 className="text-lg font-semibold text-slate-900">{lang === 'es' ? 'Enviar presupuesto' : 'Send estimate'}</h3>
             <div className="space-y-2">
-              <Label className="text-slate-600 text-sm">{lang === 'es' ? 'Email del cliente' : 'Client email'}</Label>
-              <Input
-                type="email"
-                value={clientEmail}
-                onChange={(e) => setClientEmail(e.target.value)}
-                placeholder="cliente@email.com"
-                className="h-12 rounded-xl bg-slate-50/50 border-slate-200"
-              />
+              <Label className="text-slate-600 text-sm">Email</Label>
+              <Input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="client@email.com" className="h-12 rounded-xl" />
             </div>
-            <div className="space-y-2">
-              <Label className="text-slate-600 text-sm">{lang === 'es' ? 'Link de propuesta' : 'Proposal link'}</Label>
-              <div className="flex gap-2">
-                <Input
-                  readOnly
-                  value={`${typeof window !== 'undefined' ? window.location.origin : ''}/proposal/${job?.public_token}`}
-                  className="h-10 text-xs bg-slate-50 border-slate-200 rounded-lg flex-1"
-                />
-                <Button variant="outline" size="sm" onClick={handleCopyLink} className="h-10 rounded-lg px-3">
-                  {lang === 'es' ? 'Copiar' : 'Copy'}
-                </Button>
-              </div>
+            <div className="flex gap-2">
+              <Input readOnly value={`${typeof window !== 'undefined' ? window.location.origin : ''}/proposal/${job?.public_token}`} className="h-10 text-xs bg-slate-50 rounded-lg flex-1" />
+              <Button variant="outline" size="sm" onClick={handleCopyLink} className="h-10 rounded-lg px-3">{lang === 'es' ? 'Copiar' : 'Copy'}</Button>
             </div>
             <div className="flex gap-2 pt-2">
-              <Button
-                variant="outline"
-                className="flex-1 h-12 rounded-xl"
-                onClick={() => setShowSendDialog(false)}
-              >
-                {lang === 'es' ? 'Cancelar' : 'Cancel'}
-              </Button>
-              <button
-                onClick={handleSendToClient}
-                disabled={!clientEmail}
-                className="flex-1 h-12 rounded-xl btn-gradient flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-50"
-              >
-                <Send className="h-4 w-4" />
-                {lang === 'es' ? 'Enviar email' : 'Send email'}
-              </button>
+              <Button variant="outline" className="flex-1 h-12 rounded-xl" onClick={() => setShowSendDialog(false)}>{lang === 'es' ? 'Cancelar' : 'Cancel'}</Button>
+              <button onClick={handleSendToClient} disabled={!clientEmail} className="flex-1 h-12 rounded-xl btn-gradient flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-50"><Send className="h-4 w-4" />{lang === 'es' ? 'Enviar' : 'Send'}</button>
             </div>
           </div>
         </div>
