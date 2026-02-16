@@ -21,7 +21,9 @@ import {
 import { toast } from 'sonner'
 import { JOB_TEMPLATES, scaleTemplateItems } from '@/lib/templates'
 import { PAYMENT_TERMS_OPTIONS, translateMaterialName } from '@/lib/types'
-import type { Job, EstimateItem, JobType } from '@/lib/types'
+import type { Job, EstimateItem, JobType, Profile } from '@/lib/types'
+import { pdf } from '@react-pdf/renderer'
+import { EstimatePDF } from '@/components/pdf/estimate-pdf'
 
 function formatMoney(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(n)
@@ -51,6 +53,7 @@ export default function EstimatePage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [job, setJob] = useState<Job | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [mode, setMode] = useState<'simple' | 'itemized'>('simple')
   const [items, setItems] = useState<LocalItem[]>([])
   const [overheadPct, setOverheadPct] = useState(15)
@@ -59,6 +62,7 @@ export default function EstimatePage() {
   const [simpleDescription, setSimpleDescription] = useState('')
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [generatingPdf, setGeneratingPdf] = useState(false)
   const [showSendDialog, setShowSendDialog] = useState(false)
   const [clientEmail, setClientEmail] = useState('')
 
@@ -74,6 +78,12 @@ export default function EstimatePage() {
 
   useEffect(() => {
     async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+        if (profileData) setProfile(profileData as Profile)
+      }
+
       const { data: jobData } = await supabase.from('jobs').select('*').eq('id', id).single()
       if (!jobData) return
       const j = jobData as Job
@@ -243,64 +253,62 @@ export default function EstimatePage() {
     toast.success(lang === 'es' ? '¡Link copiado!' : 'Link copied!')
   }
 
-  function handleGeneratePdf() {
-    const w = window.open('', '_blank')
-    if (!w) return
-    const isEn = languageOutput === 'en'
-    const ptLabel = PAYMENT_TERMS_OPTIONS.find(p => p.value === paymentTerms)
-    const ptText = isEn ? ptLabel?.label_en : ptLabel?.label_es
-
-    const scheduleHtml = startDate ? `<div style="display:flex;gap:24px;margin:16px 0;padding:16px;background:#f8fafc;border-radius:8px">
-      <div><strong style="color:#64748b;font-size:12px">${isEn ? 'START DATE' : 'INICIO'}</strong><br/>${new Date(startDate + 'T12:00').toLocaleDateString(isEn ? 'en-US' : 'es', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
-      <div><strong style="color:#64748b;font-size:12px">${isEn ? 'DURATION' : 'DURACIÓN'}</strong><br/>${durationDays} ${isEn ? 'days' : 'días'}</div>
-      ${ptText ? `<div><strong style="color:#64748b;font-size:12px">${isEn ? 'PAYMENT' : 'PAGO'}</strong><br/>${ptText}</div>` : ''}
-    </div>` : ''
-
-    const photosHtml = photos.length > 0 ? `<h3 style="color:#64748b;font-size:14px;text-transform:uppercase;letter-spacing:1px">${isEn ? 'Job Photos' : 'Fotos'}</h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0">${photos.map(p => `<img src="${p}" style="width:100%;border-radius:8px;aspect-ratio:4/3;object-fit:cover"/>`).join('')}</div>` : ''
-
-    if (mode === 'simple') {
-      w.document.write(`<!DOCTYPE html><html><head><title>${isEn ? 'Estimate' : 'Presupuesto'} - ${job?.client_name}</title>
-      <style>body{font-family:system-ui,sans-serif;max-width:700px;margin:0 auto;padding:40px;color:#333}
-      .total{font-size:32px;font-weight:700;color:#008B99;text-align:center;margin:24px 0;padding:24px;border-radius:16px;background:linear-gradient(135deg,rgba(0,139,153,0.06),rgba(120,190,32,0.06))}
-      @media print{body{padding:0}}</style></head><body>
-      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:24px">
-        <h1 style="background:linear-gradient(90deg,#008B99,#78BE20);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0">RoofBack</h1>
-        <div style="text-align:right"><p style="margin:0;font-weight:600">${job?.client_name}</p>
-        <p style="margin:2px 0;color:#666;font-size:14px">${job?.client_address || ''}</p></div></div>
-      ${scheduleHtml}
-      ${simpleDescription ? `<h3 style="color:#64748b;font-size:14px;text-transform:uppercase">${isEn ? 'Scope of Work' : 'Alcance'}</h3><div style="white-space:pre-wrap;padding:16px;background:#f8fafc;border-radius:8px;line-height:1.6">${simpleDescription}</div>` : ''}
-      ${photosHtml}
-      <div class="total">${formatMoney(simpleTotal)}</div>
-      <script>setTimeout(()=>window.print(),500)</script></body></html>`)
-    } else {
-      const getName = (name: string) => isEn ? translateMaterialName(name) : name
-      const renderRows = (rows: LocalItem[]) => rows.map(i =>
-        `<tr><td style="padding:8px;border-bottom:1px solid #f1f5f9">${getName(i.name)}</td>
-         <td style="padding:8px;border-bottom:1px solid #f1f5f9;text-align:center">${i.quantity} ${i.unit}</td>
-         <td style="padding:8px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:600">${formatMoney(i.quantity * i.unit_price)}</td></tr>`).join('')
-
-      const materialRows = items.filter(i => i.category === 'material')
-      const laborRows = items.filter(i => i.category === 'labor')
-      const otherRows = items.filter(i => i.category === 'other')
-
-      w.document.write(`<!DOCTYPE html><html><head><title>${isEn ? 'Estimate' : 'Presupuesto'} - ${job?.client_name}</title>
-      <style>body{font-family:system-ui,sans-serif;max-width:700px;margin:0 auto;padding:40px;color:#333}
-      table{width:100%;border-collapse:collapse;margin:12px 0}th{background:#f8fafc;padding:8px;text-align:left;font-size:13px;color:#64748b}
-      .total-row{font-size:24px;font-weight:700;color:#008B99;text-align:right;padding:16px;border-radius:12px;background:linear-gradient(135deg,rgba(0,139,153,0.06),rgba(120,190,32,0.06))}
-      @media print{body{padding:0}}</style></head><body>
-      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:24px">
-        <h1 style="background:linear-gradient(90deg,#008B99,#78BE20);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0">RoofBack</h1>
-        <div style="text-align:right"><p style="margin:0;font-weight:600">${job?.client_name}</p>
-        <p style="margin:2px 0;color:#666;font-size:14px">${job?.client_address || ''}</p></div></div>
-      ${scheduleHtml}${photosHtml}
-      ${materialRows.length > 0 ? `<h3 style="color:#64748b;font-size:14px;text-transform:uppercase">${isEn ? 'Materials' : 'Materiales'}</h3><table><thead><tr><th>Item</th><th style="text-align:center">${isEn ? 'Qty' : 'Cant.'}</th><th style="text-align:right">Total</th></tr></thead><tbody>${renderRows(materialRows)}</tbody></table>` : ''}
-      ${laborRows.length > 0 ? `<h3 style="color:#64748b;font-size:14px;text-transform:uppercase">${isEn ? 'Labor' : 'Mano de Obra'}</h3><table><thead><tr><th>Item</th><th style="text-align:center">${isEn ? 'Qty' : 'Cant.'}</th><th style="text-align:right">Total</th></tr></thead><tbody>${renderRows(laborRows)}</tbody></table>` : ''}
-      ${otherRows.length > 0 ? `<h3 style="color:#64748b;font-size:14px;text-transform:uppercase">${isEn ? 'Other' : 'Otros'}</h3><table><thead><tr><th>Item</th><th style="text-align:center">${isEn ? 'Qty' : 'Cant.'}</th><th style="text-align:right">Total</th></tr></thead><tbody>${renderRows(otherRows)}</tbody></table>` : ''}
-      <div class="total-row" style="margin-top:24px">TOTAL: ${formatMoney(calc.total)}</div>
-      <script>setTimeout(()=>window.print(),500)</script></body></html>`)
+  async function handleGeneratePdf() {
+    if (!job) return
+    setGeneratingPdf(true)
+    try {
+      const isEn = languageOutput === 'en'
+      const pdfDoc = (
+        <EstimatePDF
+          mode={mode}
+          isEn={isEn}
+          clientName={job.client_name}
+          clientAddress={job.client_address || ''}
+          clientEmail={job.client_email || ''}
+          clientPhone={job.client_phone || ''}
+          contractorName={profile?.full_name || ''}
+          contractorCompany={profile?.company_name || ''}
+          contractorPhone={profile?.phone || ''}
+          jobId={job.id}
+          createdAt={job.created_at}
+          startDate={startDate}
+          durationDays={durationDays}
+          paymentTerms={paymentTerms}
+          simpleDescription={simpleDescription}
+          items={items.map(i => ({
+            name: i.name,
+            category: i.category,
+            quantity: i.quantity,
+            unit: i.unit,
+            unit_price: i.unit_price,
+          }))}
+          subtotalMaterials={calc.materials}
+          subtotalLabor={calc.labor}
+          subtotalOther={calc.other}
+          overhead={calc.overhead}
+          overheadPct={overheadPct}
+          margin={calc.margin}
+          marginPct={marginPct}
+          total={finalTotal}
+          photos={photos}
+        />
+      )
+      const blob = await pdf(pdfDoc).toBlob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${isEn ? 'Estimate' : 'Presupuesto'}_${job.client_name.replace(/\s+/g, '_')}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      toast.success(lang === 'es' ? 'PDF descargado' : 'PDF downloaded')
+    } catch (err) {
+      console.error('PDF generation error:', err)
+      toast.error(lang === 'es' ? 'Error generando PDF' : 'Error generating PDF')
+    } finally {
+      setGeneratingPdf(false)
     }
-    w.document.close()
   }
 
   if (loading) {
@@ -511,7 +519,7 @@ export default function EstimatePage() {
             {saving ? t('estimate.saving') : t('estimate.save')}
           </button>
           <div className="grid grid-cols-3 gap-2">
-            <Button variant="outline" onClick={handleGeneratePdf} className="h-12 rounded-xl border-slate-200"><Download className="h-4 w-4 mr-1" />PDF</Button>
+            <Button variant="outline" onClick={handleGeneratePdf} disabled={generatingPdf} className="h-12 rounded-xl border-slate-200">{generatingPdf ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}PDF</Button>
             <Button variant="outline" onClick={() => setShowSendDialog(true)} className="h-12 rounded-xl border-slate-200 text-[#008B99]"><Send className="h-4 w-4 mr-1" />{lang === 'es' ? 'Enviar' : 'Send'}</Button>
             <Button variant="outline" onClick={handleAccepted} className="h-12 rounded-xl border-[#78BE20]/30 text-[#3D7A00]"><CheckCircle className="h-4 w-4 mr-1" />{lang === 'es' ? 'Aceptar' : 'Accept'}</Button>
           </div>
