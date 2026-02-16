@@ -94,15 +94,23 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-24">
       {/* Header */}
-      <div className="bg-white px-5 pt-14 pb-6 border-b border-slate-100">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-slate-400 text-sm">{t('dashboard.welcome')}</p>
-            <h1 className="text-2xl font-bold text-slate-900 mt-0.5">{profileName || 'Techista'}</h1>
-          </div>
-          <div className="h-11 w-11 rounded-full bg-gradient-brand flex items-center justify-center text-white font-semibold text-sm">
+      <div className="bg-white px-5 pt-12 pb-5 border-b border-slate-100">
+        <div className="flex items-center justify-between mb-4">
+          <Image
+            src={lang === 'es' ? '/LOGO/3.png' : '/LOGO/4.png'}
+            alt="RoofBack"
+            width={140}
+            height={40}
+            priority
+            className="h-8 w-auto"
+          />
+          <div className="h-10 w-10 rounded-full bg-gradient-brand flex items-center justify-center text-white font-semibold text-sm">
             {(profileName || 'U').charAt(0).toUpperCase()}
           </div>
+        </div>
+        <div>
+          <p className="text-slate-400 text-sm">{t('dashboard.welcome')}</p>
+          <h1 className="text-2xl font-bold text-slate-900 mt-0.5">{profileName || 'Techista'}</h1>
         </div>
       </div>
 

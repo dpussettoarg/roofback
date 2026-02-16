@@ -67,21 +67,18 @@ export default function LoginPage() {
         {lang === 'es' ? 'EN' : 'ES'}
       </button>
 
-      {/* Logo */}
+      {/* Logo - language-aware */}
       <div className="mb-10 text-center relative z-10">
-        <div className="flex items-center justify-center mb-4">
+        <div className="flex items-center justify-center">
           <Image
-            src="/logo.svg"
+            src={lang === 'es' ? '/LOGO/3.png' : '/LOGO/4.png'}
             alt="RoofBack"
-            width={200}
-            height={50}
+            width={280}
+            height={80}
             priority
-            className="h-12 w-auto"
+            className="h-16 w-auto"
           />
         </div>
-        <p className="text-slate-500 text-sm tracking-wide">
-          {t('app.tagline')}
-        </p>
       </div>
 
       {/* Login Card */}
