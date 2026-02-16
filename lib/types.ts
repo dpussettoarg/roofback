@@ -33,6 +33,12 @@ export interface Job {
   created_at: string
   updated_at: string
   completed_at: string | null
+  estimate_mode: 'simple' | 'itemized'
+  simple_description: string
+  public_token: string
+  client_status: 'pending' | 'approved' | 'rejected'
+  client_signature: string
+  approved_at: string | null
 }
 
 export type JobType = 'repair' | 'reroof' | 'new_roof' | 'gutters' | 'waterproofing' | 'other'
