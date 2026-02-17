@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { Loader2, LogOut, Globe } from 'lucide-react'
+import { Loader2, LogOut, Globe, Building2, Mail, Phone, Link as LinkIcon, User } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Profile } from '@/lib/types'
 
@@ -57,6 +57,8 @@ export default function SettingsPage() {
           full_name: profile.full_name,
           company_name: profile.company_name,
           phone: profile.phone,
+          contact_email: profile.contact_email,
+          website: profile.website,
           default_hourly_rate: profile.default_hourly_rate,
           default_overhead_pct: profile.default_overhead_pct,
           default_margin_pct: profile.default_margin_pct,
@@ -89,82 +91,109 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen pb-24">
-      <div className="bg-white border-b px-4 pt-12 pb-4">
-        <h1 className="text-2xl font-bold text-gray-900">{t('settings.title')}</h1>
+    <div className="min-h-screen bg-[#F8FAFC] pb-24">
+      <div className="bg-white border-b border-slate-100 px-5 pt-12 pb-4">
+        <h1 className="text-2xl font-bold text-slate-900">{t('settings.title')}</h1>
+        <p className="text-sm text-slate-400 mt-0.5">{lang === 'es' ? 'Tu información aparece en los presupuestos' : 'Your info appears on estimates & quotes'}</p>
       </div>
 
-      <div className="px-4 py-4 space-y-4">
-        {/* Profile */}
-        <Card className="border-0 shadow-md">
+      <div className="px-5 py-5 space-y-4">
+        {/* Business Info */}
+        <Card className="border-0 shadow-sm bg-white rounded-2xl">
           <CardContent className="p-4 space-y-3">
-            <h3 className="font-semibold text-gray-700">{t('settings.profile')}</h3>
+            <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-[#008B99]" />
+              {lang === 'es' ? 'Información del negocio' : 'Business Information'}
+            </h3>
+            <p className="text-xs text-slate-400">{lang === 'es' ? 'Esto aparece en los PDF y presupuestos que enviás' : 'This appears on PDFs and estimates you send'}</p>
             <div className="space-y-2">
-              <Label>{t('settings.name')}</Label>
+              <Label className="text-[11px] text-slate-400 flex items-center gap-1"><User className="h-3 w-3" />{t('settings.name')}</Label>
               <Input
                 value={profile.full_name || ''}
                 onChange={(e) => update('full_name', e.target.value)}
-                className="h-12 text-base"
+                placeholder="John Pérez"
+                className="h-12 text-base bg-slate-50/50 border-slate-200 rounded-xl"
               />
             </div>
             <div className="space-y-2">
-              <Label>{t('settings.company')}</Label>
+              <Label className="text-[11px] text-slate-400 flex items-center gap-1"><Building2 className="h-3 w-3" />{t('settings.company')}</Label>
               <Input
                 value={profile.company_name || ''}
                 onChange={(e) => update('company_name', e.target.value)}
                 placeholder={lang === 'es' ? 'Ej: Techos Pérez LLC' : 'E.g.: Perez Roofing LLC'}
-                className="h-12 text-base"
+                className="h-12 text-base bg-slate-50/50 border-slate-200 rounded-xl"
               />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label className="text-[11px] text-slate-400 flex items-center gap-1"><Phone className="h-3 w-3" />{t('settings.phone')}</Label>
+                <Input
+                  value={profile.phone || ''}
+                  onChange={(e) => update('phone', e.target.value)}
+                  placeholder="(555) 123-4567"
+                  className="h-12 text-base bg-slate-50/50 border-slate-200 rounded-xl"
+                  type="tel"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[11px] text-slate-400 flex items-center gap-1"><Mail className="h-3 w-3" />{lang === 'es' ? 'Email de contacto' : 'Contact email'}</Label>
+                <Input
+                  value={profile.contact_email || ''}
+                  onChange={(e) => update('contact_email', e.target.value)}
+                  placeholder="info@myroofing.com"
+                  className="h-12 text-base bg-slate-50/50 border-slate-200 rounded-xl"
+                  type="email"
+                />
+              </div>
+            </div>
             <div className="space-y-2">
-              <Label>{t('settings.phone')}</Label>
+              <Label className="text-[11px] text-slate-400 flex items-center gap-1"><LinkIcon className="h-3 w-3" />{lang === 'es' ? 'Página web' : 'Website'}</Label>
               <Input
-                value={profile.phone || ''}
-                onChange={(e) => update('phone', e.target.value)}
-                placeholder="(555) 123-4567"
-                className="h-12 text-base"
-                type="tel"
+                value={profile.website || ''}
+                onChange={(e) => update('website', e.target.value)}
+                placeholder="www.myroofing.com"
+                className="h-12 text-base bg-slate-50/50 border-slate-200 rounded-xl"
               />
             </div>
           </CardContent>
         </Card>
 
         {/* Defaults */}
-        <Card className="border-0 shadow-md">
+        <Card className="border-0 shadow-sm bg-white rounded-2xl">
           <CardContent className="p-4 space-y-3">
-            <h3 className="font-semibold text-gray-700">{t('settings.defaults')}</h3>
+            <h3 className="text-sm font-semibold text-slate-700">{t('settings.defaults')}</h3>
             <div className="space-y-2">
-              <Label>{t('settings.hourlyRate')}</Label>
+              <Label className="text-[11px] text-slate-400">{t('settings.hourlyRate')}</Label>
               <Input
                 type="number"
                 min="0"
                 step="0.5"
                 value={profile.default_hourly_rate || 35}
                 onChange={(e) => update('default_hourly_rate', parseFloat(e.target.value) || 0)}
-                className="h-12 text-base"
+                className="h-12 text-base bg-slate-50/50 border-slate-200 rounded-xl"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>{t('settings.overheadPct')}</Label>
+                <Label className="text-[11px] text-slate-400">{t('settings.overheadPct')}</Label>
                 <Input
                   type="number"
                   min="0"
                   max="100"
                   value={profile.default_overhead_pct || 15}
                   onChange={(e) => update('default_overhead_pct', parseFloat(e.target.value) || 0)}
-                  className="h-12 text-base"
+                  className="h-12 text-base bg-slate-50/50 border-slate-200 rounded-xl"
                 />
               </div>
               <div className="space-y-2">
-                <Label>{t('settings.marginPct')}</Label>
+                <Label className="text-[11px] text-slate-400">{t('settings.marginPct')}</Label>
                 <Input
                   type="number"
                   min="0"
                   max="100"
                   value={profile.default_margin_pct || 20}
                   onChange={(e) => update('default_margin_pct', parseFloat(e.target.value) || 0)}
-                  className="h-12 text-base"
+                  className="h-12 text-base bg-slate-50/50 border-slate-200 rounded-xl"
                 />
               </div>
             </div>
@@ -172,50 +201,46 @@ export default function SettingsPage() {
         </Card>
 
         {/* Language */}
-        <Card className="border-0 shadow-md">
+        <Card className="border-0 shadow-sm bg-white rounded-2xl">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Globe className="h-5 w-5 text-gray-400" />
-                <span className="font-semibold text-gray-700">{t('settings.language')}</span>
+                <Globe className="h-4 w-4 text-[#008B99]" />
+                <span className="text-sm font-semibold text-slate-700">{t('settings.language')}</span>
               </div>
               <div className="flex gap-2">
-                <Button
-                  variant={lang === 'es' ? 'default' : 'outline'}
-                  size="sm"
+                <button
                   onClick={() => setLang('es')}
-                  className={lang === 'es' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${lang === 'es' ? 'bg-gradient-brand text-white shadow-md' : 'bg-slate-100 text-slate-500'}`}
                 >
                   Español
-                </Button>
-                <Button
-                  variant={lang === 'en' ? 'default' : 'outline'}
-                  size="sm"
+                </button>
+                <button
                   onClick={() => setLang('en')}
-                  className={lang === 'en' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${lang === 'en' ? 'bg-gradient-brand text-white shadow-md' : 'bg-slate-100 text-slate-500'}`}
                 >
                   English
-                </Button>
+                </button>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Button
+        <button
           onClick={handleSave}
           disabled={saving}
-          className="w-full h-12 bg-emerald-600 hover:bg-emerald-700"
+          className="w-full h-12 text-base font-medium rounded-2xl btn-gradient flex items-center justify-center gap-2"
         >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {saving ? t('settings.saving') : t('settings.save')}
-        </Button>
+        </button>
 
-        <Separator />
+        <Separator className="bg-slate-100" />
 
         <Button
           variant="ghost"
           onClick={handleLogout}
-          className="w-full h-12 text-red-500 hover:text-red-600 hover:bg-red-50"
+          className="w-full h-12 text-red-400 hover:text-red-500 hover:bg-red-50 rounded-xl"
         >
           <LogOut className="h-4 w-4 mr-2" />
           {t('settings.logout')}

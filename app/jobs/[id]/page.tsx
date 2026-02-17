@@ -166,9 +166,29 @@ export default function JobDetailPage() {
         <Card className="border-0 shadow-sm bg-white rounded-2xl">
           <CardContent className="p-4 space-y-2">
             {job.client_address && (
-              <div className="flex items-center gap-2 text-sm text-slate-600">
-                <MapPin className="h-4 w-4 text-slate-400" />
-                {job.client_address}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-slate-600">
+                  <MapPin className="h-4 w-4 text-slate-400" />
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.client_address)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#008B99] hover:underline"
+                  >
+                    {job.client_address}
+                  </a>
+                </div>
+                <div className="rounded-xl overflow-hidden border border-slate-100" style={{ height: 120 }}>
+                  <iframe
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(job.client_address)}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+                    width="100%"
+                    height="120"
+                    style={{ border: 0 }}
+                    allowFullScreen={false}
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                </div>
               </div>
             )}
             {job.client_phone && (

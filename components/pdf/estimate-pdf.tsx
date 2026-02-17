@@ -27,6 +27,8 @@ export interface EstimatePdfProps {
   contractorName: string
   contractorCompany: string
   contractorPhone: string
+  contractorEmail: string
+  contractorWebsite: string
   jobId: string
   createdAt: string
   startDate: string | null
@@ -393,7 +395,7 @@ function fmtDate(d: string | null, en: boolean) {
 export function EstimatePDF(props: EstimatePdfProps) {
   const {
     mode, isEn, clientName, clientAddress, clientEmail, clientPhone,
-    contractorName, contractorCompany, contractorPhone,
+    contractorName, contractorCompany, contractorPhone, contractorEmail, contractorWebsite,
     jobId, createdAt, startDate, durationDays, paymentTerms,
     simpleDescription, items, subtotalMaterials, subtotalLabor, subtotalOther,
     overhead, overheadPct, margin, marginPct, total, photos,
@@ -439,6 +441,8 @@ export function EstimatePDF(props: EstimatePdfProps) {
               <Text style={s.logoSubtext}>{isEn ? 'The way to grow.' : 'La manera de crecer.'}</Text>
             )}
             {contractorPhone && <Text style={[s.infoTextLight, { marginTop: 4 }]}>{contractorPhone}</Text>}
+            {contractorEmail && <Text style={s.infoTextLight}>{contractorEmail}</Text>}
+            {contractorWebsite && <Text style={s.infoTextLight}>{contractorWebsite}</Text>}
           </View>
           <View style={s.headerRight}>
             <Text style={s.docTitle}>{isEn ? 'ESTIMATE' : 'PRESUPUESTO'}</Text>

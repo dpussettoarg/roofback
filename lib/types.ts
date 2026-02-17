@@ -4,6 +4,8 @@ export interface Profile {
   full_name: string
   company_name: string
   phone: string
+  contact_email: string
+  website: string
   default_hourly_rate: number
   default_overhead_pct: number
   default_margin_pct: number
@@ -48,6 +50,8 @@ export interface Job {
   photos: string[]
   materials_ordered: boolean
   language_output: 'es' | 'en'
+  lat: number | null
+  lng: number | null
 }
 
 export type JobType = 'repair' | 'reroof' | 'new_roof' | 'gutters' | 'waterproofing' | 'other'
@@ -111,6 +115,16 @@ export interface Expense {
   amount: number
   date: string
   notes: string
+  created_at: string
+}
+
+export interface ActivityLog {
+  id: string
+  job_id: string
+  user_id: string
+  description: string
+  photos: string[]
+  log_type: 'progress' | 'issue' | 'delivery' | 'completion'
   created_at: string
 }
 

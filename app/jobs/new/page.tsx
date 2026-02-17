@@ -15,6 +15,7 @@ import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { JOB_TYPE_OPTIONS, ROOF_TYPE_OPTIONS, PITCH_OPTIONS } from '@/lib/templates'
 import Link from 'next/link'
+import { AddressInput } from '@/components/app/address-input'
 
 export default function NewJobPage() {
   const [form, setForm] = useState({
@@ -27,6 +28,8 @@ export default function NewJobPage() {
     square_footage: '',
     pitch: '4/12',
     notes: '',
+    lat: null as number | null,
+    lng: null as number | null,
   })
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -55,6 +58,8 @@ export default function NewJobPage() {
           client_phone: form.client_phone,
           client_email: form.client_email,
           client_address: form.client_address,
+          lat: form.lat,
+          lng: form.lng,
           job_type: form.job_type,
           roof_type: form.roof_type,
           square_footage: parseFloat(form.square_footage) || 0,
@@ -117,12 +122,12 @@ export default function NewJobPage() {
             </div>
             <div className="space-y-2">
               <Label>{t('jobs.address')} *</Label>
-              <Input
+              <AddressInput
                 value={form.client_address}
-                onChange={(e) => update('client_address', e.target.value)}
+                onChange={(address, lat, lng) => setForm(f => ({ ...f, client_address: address, lat: lat ?? null, lng: lng ?? null }))}
                 placeholder="123 Main St, City, TX"
-                className="h-12 text-base"
                 required
+                lang={lang as 'es' | 'en'}
               />
             </div>
           </CardContent>

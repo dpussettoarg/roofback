@@ -16,7 +16,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   ArrowLeft, Plus, Trash2, Download, CheckCircle, Loader2,
   Send, Zap, List, Sparkles, CalendarDays, Clock, CreditCard,
-  Globe, Camera, X, ImageIcon
+  Globe, Camera, X, ImageIcon, Wand2
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { JOB_TEMPLATES, scaleTemplateItems } from '@/lib/templates'
@@ -63,6 +63,7 @@ export default function EstimatePage() {
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [generatingPdf, setGeneratingPdf] = useState(false)
+  const [improvingDesc, setImprovingDesc] = useState(false)
   const [showSendDialog, setShowSendDialog] = useState(false)
   const [clientEmail, setClientEmail] = useState('')
 
@@ -188,6 +189,39 @@ export default function EstimatePage() {
     setPhotos(prev => prev.filter((_, i) => i !== idx))
   }
 
+  async function handleImproveDescription() {
+    if (!simpleDescription.trim() || !job) return
+    setImprovingDesc(true)
+    try {
+      const res = await fetch('/api/ai/improve-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: simpleDescription,
+          jobType: job.job_type,
+          roofType: job.roof_type,
+          squareFootage: Number(job.square_footage) || 0,
+          language: languageOutput,
+        }),
+      })
+      const data = await res.json()
+      if (data.error) {
+        toast.error(data.error)
+      } else if (data.improved) {
+        setSimpleDescription(data.improved)
+        toast.success(
+          data.source === 'ai'
+            ? (lang === 'es' ? 'Descripción mejorada con IA' : 'Description improved with AI')
+            : (lang === 'es' ? 'Descripción mejorada' : 'Description improved')
+        )
+      }
+    } catch {
+      toast.error(lang === 'es' ? 'Error mejorando descripción' : 'Error improving description')
+    } finally {
+      setImprovingDesc(false)
+    }
+  }
+
   async function handleSave() {
     setSaving(true)
     try {
@@ -269,6 +303,8 @@ export default function EstimatePage() {
           contractorName={profile?.full_name || ''}
           contractorCompany={profile?.company_name || ''}
           contractorPhone={profile?.phone || ''}
+          contractorEmail={profile?.contact_email || ''}
+          contractorWebsite={profile?.website || ''}
           jobId={job.id}
           createdAt={job.created_at}
           startDate={startDate}
@@ -478,8 +514,27 @@ export default function EstimatePage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="text-slate-500 text-sm">{lang === 'es' ? 'Descripción / Alcance' : 'Description / Scope'}</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-slate-500 text-sm">{lang === 'es' ? 'Descripción / Alcance' : 'Description / Scope'}</Label>
+                  <button
+                    type="button"
+                    onClick={handleImproveDescription}
+                    disabled={improvingDesc || !simpleDescription.trim()}
+                    className="flex items-center gap-1.5 text-xs font-medium text-[#008B99] hover:text-[#006d78] disabled:opacity-40 disabled:cursor-not-allowed transition-colors px-2 py-1 rounded-lg hover:bg-[#008B99]/5"
+                  >
+                    {improvingDesc ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+                    {improvingDesc
+                      ? (lang === 'es' ? 'Mejorando...' : 'Improving...')
+                      : (lang === 'es' ? 'Mejorar con IA' : 'Improve with AI')}
+                  </button>
+                </div>
                 <Textarea value={simpleDescription} onChange={(e) => setSimpleDescription(e.target.value)} placeholder={lang === 'es' ? 'Retecho completo de 2,000 sqft...' : 'Full reroof of 2,000 sqft...'} className="min-h-[120px] text-base bg-slate-50/50 border-slate-200 rounded-xl resize-none" />
+                {simpleDescription.trim().length > 0 && simpleDescription.trim().length < 20 && (
+                  <p className="text-xs text-slate-400 flex items-center gap-1">
+                    <Wand2 className="h-3 w-3" />
+                    {lang === 'es' ? 'Escribí más y usá "Mejorar con IA" para completar' : 'Write more and use "Improve with AI" to enhance'}
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
