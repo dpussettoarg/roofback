@@ -14,7 +14,7 @@ export default function HomePage() {
   useEffect(() => {
     const hash = window.location.hash
     if (hash && hash.includes('access_token')) {
-      window.location.href = '/auth/callback' + hash
+      window.location.href = '/login' + hash
       return
     }
     router.replace('/dashboard')

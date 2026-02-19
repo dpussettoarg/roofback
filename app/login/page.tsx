@@ -71,7 +71,7 @@ export default function LoginPage() {
           password,
           options: {
             data: { full_name: fullName },
-            emailRedirectTo: getURL('/auth/callback'),
+            emailRedirectTo: getURL('/login'), // Magic links usan hash; /login los procesa
           },
         })
         if (error) throw error
