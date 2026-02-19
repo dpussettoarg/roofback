@@ -41,7 +41,9 @@ Abrí `http://localhost:3000` en tu celular o navegador.
 
 1. En Supabase, andá a **Authentication → Providers**
 2. Verificá que **Email** esté habilitado
-3. (Opcional) En **Authentication → URL Configuration**, agregá tu URL de producción
+3. En **Authentication → URL Configuration**:
+   - **Site URL**: `https://roofback.app` (o tu dominio de producción)
+   - **Redirect URLs**: agregá `https://roofback.app/**`, `https://roofback.app/auth/callback`, `https://roofback.app/login` (y `http://localhost:3000/**` para desarrollo)
 
 ## 📱 Deploy a producción (Vercel — gratis)
 

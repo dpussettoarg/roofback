@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
@@ -20,9 +20,45 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [processingHash, setProcessingHash] = useState(false)
   const router = useRouter()
   const { t, lang, setLang } = useI18n()
   const supabase = createClient()
+
+  // Procesar hash de Supabase (#access_token, magic link) - el servidor NUNCA recibe el hash
+  useEffect(() => {
+    if (typeof window === 'undefined' || processingHash) return
+    const hash = window.location.hash
+    if (!hash || !hash.includes('access_token')) return
+
+    setProcessingHash(true)
+    const run = async () => {
+      try {
+        const params = new URLSearchParams(hash.substring(1))
+        const accessToken = params.get('access_token')
+        const refreshToken = params.get('refresh_token')
+        if (accessToken) {
+          const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken || '' })
+          if (!error) {
+            window.history.replaceState(null, '', window.location.pathname)
+            router.push('/dashboard')
+            router.refresh()
+            return
+          }
+        }
+      } catch {
+        // Fallback: let Supabase client try to recover
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          window.history.replaceState(null, '', window.location.pathname)
+          router.push('/dashboard')
+          router.refresh()
+        }
+      }
+      setProcessingHash(false)
+    }
+    run()
+  }, [supabase, router, processingHash])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

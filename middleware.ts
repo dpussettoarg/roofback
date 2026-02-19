@@ -31,6 +31,7 @@ export async function middleware(request: NextRequest) {
 
   // Public routes (no auth required)
   const isPublicRoute =
+    request.nextUrl.pathname === '/' ||
     request.nextUrl.pathname.startsWith('/login') ||
     request.nextUrl.pathname.startsWith('/auth') ||
     request.nextUrl.pathname.startsWith('/proposal') ||
