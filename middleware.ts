@@ -34,7 +34,8 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/login') ||
     request.nextUrl.pathname.startsWith('/auth') ||
     request.nextUrl.pathname.startsWith('/proposal') ||
-    request.nextUrl.pathname.startsWith('/api/webhooks/stripe')
+    request.nextUrl.pathname.startsWith('/api/webhooks/stripe') ||
+    request.nextUrl.pathname.startsWith('/debug')
 
   // OAuth callback: if user lands on / or /login with ?code=, redirect to /auth/callback
   // (Supabase may redirect to Site URL instead of redirectTo when /auth/callback isn't in allow list)

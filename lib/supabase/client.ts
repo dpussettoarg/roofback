@@ -8,11 +8,17 @@ export function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || ''
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || ''
 
-  if (!url || !key || url.includes('placeholder') || url.includes('tu-proyecto')) {
+  if (!key || key.length < 10) {
     console.error(
-      '[RoofBack] Supabase credentials missing or invalid.\n' +
-      'Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local\n' +
-      'Get them from: https://supabase.com/dashboard → Settings → API'
+      '[RoofBack] Falta la variable de entorno SUPABASE_KEY.\n' +
+      'Set NEXT_PUBLIC_SUPABASE_ANON_KEY in Netlify → Site settings → Environment variables.\n' +
+      'Get it from: https://supabase.com/dashboard → Settings → API'
+    )
+  }
+  if (!url || url.includes('placeholder') || url.includes('tu-proyecto')) {
+    console.error(
+      '[RoofBack] Supabase URL missing or invalid.\n' +
+      'Set NEXT_PUBLIC_SUPABASE_URL in Netlify → Site settings → Environment variables.'
     )
   }
 
