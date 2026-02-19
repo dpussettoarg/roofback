@@ -34,18 +34,20 @@ export default function ProposalPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: jobData } = await supabase.from('jobs').select('*').eq('public_token', token).single()
-      if (!jobData) { setState('not_found'); return }
-      const j = jobData as Job
+      const { data, error } = await supabase.rpc('get_proposal_by_token', { p_token: token })
+      if (error || !data) {
+        setState('not_found')
+        return
+      }
+      const j = data.job as Job
       setJob(j)
-      if (j.client_status === 'approved') { setState('already_approved'); return }
-
-      const { data: profile } = await supabase.from('profiles').select('full_name, company_name, phone').eq('id', j.user_id).single()
-      if (profile) setContractor(profile)
-
-      if (j.estimate_mode === 'itemized') {
-        const { data: est } = await supabase.from('estimate_items').select('*').eq('job_id', j.id).order('sort_order')
-        if (est) setItems(est as EstimateItem[])
+      if (j.client_status === 'approved') {
+        setState('already_approved')
+        return
+      }
+      if (data.profile) setContractor(data.profile as { full_name: string; company_name: string; phone: string })
+      if (data.estimate_items && Array.isArray(data.estimate_items)) {
+        setItems(data.estimate_items as EstimateItem[])
       }
       setState('proposal')
     }
@@ -85,13 +87,17 @@ export default function ProposalPage() {
     setApproving(true)
     const canvas = canvasRef.current
     const signatureData = canvas ? canvas.toDataURL('image/png') : ''
-    await supabase.from('jobs').update({
-      client_status: 'approved', client_signature: signatureName || signatureData,
-      approved_at: new Date().toISOString(), status: 'approved', workflow_stage: 'approved',
-      updated_at: new Date().toISOString(),
-    }).eq('public_token', token)
-    setState('approved')
+    const clientSignature = signatureName.trim() || signatureData
+    const { error } = await supabase.rpc('approve_proposal_by_token', {
+      p_token: token,
+      p_client_signature: clientSignature,
+    })
     setApproving(false)
+    if (error) {
+      setState('not_found')
+      return
+    }
+    setState('approved')
   }
 
   // ===== STATES =====
