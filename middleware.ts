@@ -33,7 +33,17 @@ export async function middleware(request: NextRequest) {
   const isPublicRoute =
     request.nextUrl.pathname.startsWith('/login') ||
     request.nextUrl.pathname.startsWith('/auth') ||
-    request.nextUrl.pathname.startsWith('/proposal')
+    request.nextUrl.pathname.startsWith('/proposal') ||
+    request.nextUrl.pathname.startsWith('/api/webhooks/stripe')
+
+  // OAuth callback: if user lands on / or /login with ?code=, redirect to /auth/callback
+  // (Supabase may redirect to Site URL instead of redirectTo when /auth/callback isn't in allow list)
+  const code = request.nextUrl.searchParams.get('code')
+  if (!user && code && (request.nextUrl.pathname === '/' || request.nextUrl.pathname === '/login')) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/auth/callback'
+    return NextResponse.redirect(url)
+  }
 
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone()

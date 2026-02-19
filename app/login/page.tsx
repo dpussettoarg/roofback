@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
+import { getURL } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n/context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -34,7 +35,7 @@ export default function LoginPage() {
           password,
           options: {
             data: { full_name: fullName },
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            emailRedirectTo: getURL('/auth/callback'),
           },
         })
         if (error) throw error
@@ -48,7 +49,7 @@ export default function LoginPage() {
 
       if (view === 'forgot') {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/auth/reset-password`,
+          redirectTo: getURL('/auth/reset-password'),
         })
         if (error) throw error
         toast.success(
@@ -95,7 +96,7 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: getURL('/auth/callback'),
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',

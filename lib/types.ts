@@ -12,6 +12,9 @@ export interface Profile {
   language: 'es' | 'en'
   created_at: string
   updated_at: string
+  stripe_customer_id?: string | null
+  subscription_status?: string
+  subscription_price_id?: string | null
 }
 
 export interface Job {

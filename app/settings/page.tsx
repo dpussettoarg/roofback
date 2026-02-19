@@ -10,9 +10,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { Loader2, LogOut, Globe, Building2, Mail, Phone, Link as LinkIcon, User } from 'lucide-react'
+import { Loader2, LogOut, Globe, Building2, Mail, Phone, Link as LinkIcon, User, CreditCard } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Profile } from '@/lib/types'
+import { PricingCard } from '@/components/app/pricing-card'
 
 export default function SettingsPage() {
   const { t, lang, setLang } = useI18n()
@@ -225,6 +226,42 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Subscription */}
+        {process.env.NEXT_PUBLIC_STRIPE_PRICE_ID && (
+          <Card className="border-0 shadow-sm bg-white rounded-2xl">
+            <CardContent className="p-4">
+              <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-4">
+                <CreditCard className="h-4 w-4 text-[#008B99]" />
+                {lang === 'es' ? 'Plan' : 'Plan'}
+                {profile.subscription_status === 'active' && (
+                  <span className="ml-auto text-xs font-medium px-2.5 py-0.5 rounded-full bg-[#78BE20]/10 text-[#3D7A00]">
+                    {lang === 'es' ? 'Activo' : 'Active'}
+                  </span>
+                )}
+              </h3>
+              {profile.subscription_status !== 'active' ? (
+                <PricingCard
+                  priceId={process.env.NEXT_PUBLIC_STRIPE_PRICE_ID}
+                  title={lang === 'es' ? 'Pro' : 'Pro'}
+                  price="$9"
+                  period={lang === 'es' ? '/mes' : '/month'}
+                  features={
+                    lang === 'es'
+                      ? ['Presupuestos ilimitados', 'PDF profesional', 'App móvil optimizada']
+                      : ['Unlimited estimates', 'Professional PDFs', 'Mobile-optimized app']
+                  }
+                  highlighted
+                  lang={lang as 'es' | 'en'}
+                />
+              ) : (
+                <p className="text-sm text-slate-500">
+                  {lang === 'es' ? 'Tu suscripción está activa. Gracias por elegir RoofBack.' : 'Your subscription is active. Thanks for choosing RoofBack.'}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <button
           onClick={handleSave}
