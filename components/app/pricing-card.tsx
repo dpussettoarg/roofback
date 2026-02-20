@@ -7,34 +7,45 @@ import { createCheckoutSession } from '@/app/actions/stripe'
 import { Loader2, Check } from 'lucide-react'
 import { toast } from 'sonner'
 
+const DEFAULT_PRICE_ID = 'price_TEST'
+
 interface PricingCardProps {
-  priceId: string
+  priceId?: string
   title: string
   price: string
   period?: string
   features: string[]
   highlighted?: boolean
   lang?: 'es' | 'en'
+  /** "Actualizar a Pro" | "Suscribirse" - texto del botón */
+  buttonLabel?: 'upgrade' | 'subscribe'
 }
 
 export function PricingCard({
-  priceId,
+  priceId = DEFAULT_PRICE_ID,
   title,
   price,
   period = '/month',
   features,
   highlighted = false,
   lang = 'es',
+  buttonLabel = 'subscribe',
 }: PricingCardProps) {
   const [loading, setLoading] = useState(false)
+
+  const buttonText =
+    buttonLabel === 'upgrade'
+      ? lang === 'es'
+        ? 'Actualizar a Pro'
+        : 'Upgrade to Pro'
+      : lang === 'es'
+        ? 'Suscribirse'
+        : 'Subscribe'
 
   async function handleSubscribe() {
     setLoading(true)
     try {
-      const { url, error } = await createCheckoutSession(priceId)
-      if (error) {
-        throw new Error(error)
-      }
+      const { url } = await createCheckoutSession(priceId)
       if (url) {
         window.location.href = url
         return
@@ -43,6 +54,7 @@ export function PricingCard({
     } catch (err) {
       console.error('Checkout error:', err)
       toast.error(err instanceof Error ? err.message : (lang === 'es' ? 'Error al procesar' : 'Checkout failed'))
+    } finally {
       setLoading(false)
     }
   }
@@ -81,11 +93,12 @@ export function PricingCard({
           }`}
         >
           {loading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : lang === 'es' ? (
-            'Suscribirse'
+            <>
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              {lang === 'es' ? 'Redirigiendo...' : 'Redirecting...'}
+            </>
           ) : (
-            'Subscribe'
+            buttonText
           )}
         </Button>
       </CardContent>

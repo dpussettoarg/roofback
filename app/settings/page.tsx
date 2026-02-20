@@ -228,40 +228,39 @@ export default function SettingsPage() {
         </Card>
 
         {/* Subscription */}
-        {process.env.NEXT_PUBLIC_STRIPE_PRICE_ID && (
-          <Card className="border-0 shadow-sm bg-white rounded-2xl">
-            <CardContent className="p-4">
-              <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-4">
-                <CreditCard className="h-4 w-4 text-[#008B99]" />
-                {lang === 'es' ? 'Plan' : 'Plan'}
-                {profile.subscription_status === 'active' && (
-                  <span className="ml-auto text-xs font-medium px-2.5 py-0.5 rounded-full bg-[#78BE20]/10 text-[#3D7A00]">
-                    {lang === 'es' ? 'Activo' : 'Active'}
-                  </span>
-                )}
-              </h3>
-              {profile.subscription_status !== 'active' ? (
-                <PricingCard
-                  priceId={process.env.NEXT_PUBLIC_STRIPE_PRICE_ID}
-                  title={lang === 'es' ? 'Pro' : 'Pro'}
-                  price="$9"
-                  period={lang === 'es' ? '/mes' : '/month'}
-                  features={
-                    lang === 'es'
-                      ? ['Presupuestos ilimitados', 'PDF profesional', 'App móvil optimizada']
-                      : ['Unlimited estimates', 'Professional PDFs', 'Mobile-optimized app']
-                  }
-                  highlighted
-                  lang={lang as 'es' | 'en'}
-                />
-              ) : (
-                <p className="text-sm text-slate-500">
-                  {lang === 'es' ? 'Tu suscripción está activa. Gracias por elegir RoofBack.' : 'Your subscription is active. Thanks for choosing RoofBack.'}
-                </p>
+        <Card className="border-0 shadow-sm bg-white rounded-2xl">
+          <CardContent className="p-4">
+            <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-4">
+              <CreditCard className="h-4 w-4 text-[#008B99]" />
+              {lang === 'es' ? 'Plan' : 'Plan'}
+              {profile.subscription_status === 'active' && (
+                <span className="ml-auto text-xs font-medium px-2.5 py-0.5 rounded-full bg-[#78BE20]/10 text-[#3D7A00]">
+                  {lang === 'es' ? 'Activo' : 'Active'}
+                </span>
               )}
-            </CardContent>
-          </Card>
-        )}
+            </h3>
+            {profile.subscription_status !== 'active' ? (
+              <PricingCard
+                priceId={process.env.NEXT_PUBLIC_STRIPE_PRICE_ID || 'price_TEST'}
+                title={lang === 'es' ? 'Pro' : 'Pro'}
+                price="$9"
+                period={lang === 'es' ? '/mes' : '/month'}
+                features={
+                  lang === 'es'
+                    ? ['Presupuestos ilimitados', 'PDF profesional', 'App móvil optimizada']
+                    : ['Unlimited estimates', 'Professional PDFs', 'Mobile-optimized app']
+                }
+                highlighted
+                lang={lang as 'es' | 'en'}
+                buttonLabel="subscribe"
+              />
+            ) : (
+              <p className="text-sm text-slate-500">
+                {lang === 'es' ? 'Tu suscripción está activa. Gracias por elegir RoofBack.' : 'Your subscription is active. Thanks for choosing RoofBack.'}
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
         <button
           onClick={handleSave}
