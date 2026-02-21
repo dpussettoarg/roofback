@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
+import Link from 'next/link'
 import { Loader2, Eye, EyeOff, Mail } from 'lucide-react'
 
 export default function LoginPage() {
@@ -387,7 +388,36 @@ export default function LoginPage() {
                 </Button>
               </form>
 
-              <div className="mt-5 text-center">
+              {/* Legal disclaimer */}
+              <p className="mt-5 text-center text-[11px] text-[#4B5563] leading-relaxed px-2">
+                {lang === 'es' ? (
+                  <>
+                    Al continuar, aceptás los{' '}
+                    <Link href="/terms" target="_blank" className="underline underline-offset-2 hover:text-[#A8FF3E] transition-colors">
+                      Términos de Servicio
+                    </Link>
+                    {' '}y la{' '}
+                    <Link href="/privacy" target="_blank" className="underline underline-offset-2 hover:text-[#A8FF3E] transition-colors">
+                      Política de Privacidad
+                    </Link>
+                    {' '}de RoofBack.
+                  </>
+                ) : (
+                  <>
+                    By continuing, you agree to RoofBack&apos;s{' '}
+                    <Link href="/terms" target="_blank" className="underline underline-offset-2 hover:text-[#A8FF3E] transition-colors">
+                      Terms of Service
+                    </Link>
+                    {' '}and{' '}
+                    <Link href="/privacy" target="_blank" className="underline underline-offset-2 hover:text-[#A8FF3E] transition-colors">
+                      Privacy Policy
+                    </Link>
+                    .
+                  </>
+                )}
+              </p>
+
+              <div className="mt-4 text-center">
                 <button
                   onClick={() => setView(isSignUp ? 'login' : 'signup')}
                   className="text-sm text-[#6B7280] hover:text-[#A8FF3E] transition-colors"

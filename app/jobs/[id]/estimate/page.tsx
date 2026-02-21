@@ -764,6 +764,13 @@ export default function EstimatePage() {
               {t('estimate.aiGenerate') || (lang === 'es' ? 'Generar propuesta' : 'Generate proposal')}
             </button>
 
+            {/* AI disclaimer */}
+            <p className="text-[11px] text-[#4B5563] text-center leading-relaxed">
+              {lang === 'es'
+                ? '⚠️ La IA puede cometer errores. Revisá siempre la propuesta antes de enviarla.'
+                : '⚠️ AI can make mistakes. Always review the proposal before sending it to a client.'}
+            </p>
+
             {/* AI generated proposal display */}
             {aiProposal && (
               <div className="space-y-3 pt-2">
