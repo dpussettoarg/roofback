@@ -28,12 +28,18 @@ export async function POST(request: NextRequest) {
   }
 
   switch (event.type) {
+
+    // ── New subscription created via Checkout ──────────────────────────────
     case 'checkout.session.completed': {
-      const session = event.data?.object as import('stripe').Stripe.Checkout.Session
+      const session = event.data.object as import('stripe').Stripe.Checkout.Session
 
       const userId = session.client_reference_id
-      const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id
-      const subscriptionId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id
+      const customerId =
+        typeof session.customer === 'string' ? session.customer : session.customer?.id
+      const subscriptionId =
+        typeof session.subscription === 'string'
+          ? session.subscription
+          : session.subscription?.id
 
       if (!userId) {
         console.error('[Stripe Webhook] No client_reference_id in session')
@@ -43,10 +49,10 @@ export async function POST(request: NextRequest) {
       let priceId: string | null = null
       if (subscriptionId) {
         try {
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId)
-          priceId = subscription.items.data[0]?.price?.id ?? null
+          const sub = await stripe.subscriptions.retrieve(subscriptionId)
+          priceId = sub.items.data[0]?.price?.id ?? null
         } catch {
-          // Continue without price_id
+          // Non-fatal — price_id is informational
         }
       }
 
@@ -57,6 +63,8 @@ export async function POST(request: NextRequest) {
           stripe_subscription_id: subscriptionId ?? null,
           subscription_status: 'active',
           price_id: priceId,
+          // Clear trial expiry — they are now a paying customer
+          trial_expires_at: null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', userId)
@@ -68,33 +76,54 @@ export async function POST(request: NextRequest) {
       break
     }
 
+    // ── Subscription changed (renewal, upgrade, downgrade, payment failure) ─
     case 'customer.subscription.updated': {
-      const subscription = event.data?.object as import('stripe').Stripe.Subscription
-      const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id
+      const subscription = event.data.object as import('stripe').Stripe.Subscription
+      const customerId =
+        typeof subscription.customer === 'string'
+          ? subscription.customer
+          : subscription.customer?.id
       if (!customerId) return NextResponse.json({ received: true })
 
-      const status = subscription.status
-      const subscriptionStatus = status === 'active' || status === 'trialing' ? 'active' : 'canceled'
+      const stripeStatus = subscription.status
+      // Map Stripe statuses to our simplified internal statuses
+      const subscriptionStatus =
+        stripeStatus === 'active' || stripeStatus === 'trialing'
+          ? 'active'
+          : stripeStatus === 'past_due'
+            ? 'past_due'
+            : 'canceled'
+
       const priceId = subscription.items.data[0]?.price?.id ?? null
-      const subscriptionId = subscription.id
+
+      const updatePayload: Record<string, unknown> = {
+        stripe_subscription_id: subscription.id,
+        subscription_status: subscriptionStatus,
+        price_id: priceId,
+        updated_at: new Date().toISOString(),
+      }
+
+      // If it became active, ensure trial_expires_at is cleared
+      if (subscriptionStatus === 'active') {
+        updatePayload.trial_expires_at = null
+      }
 
       const { error } = await supabaseAdmin
         .from('profiles')
-        .update({
-          stripe_subscription_id: subscriptionId,
-          subscription_status: subscriptionStatus,
-          price_id: priceId,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq('stripe_customer_id', customerId)
 
       if (error) console.error('[Stripe Webhook] Subscription update failed:', error)
       break
     }
 
+    // ── Subscription canceled / deleted ────────────────────────────────────
     case 'customer.subscription.deleted': {
-      const subscription = event.data?.object as import('stripe').Stripe.Subscription
-      const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id
+      const subscription = event.data.object as import('stripe').Stripe.Subscription
+      const customerId =
+        typeof subscription.customer === 'string'
+          ? subscription.customer
+          : subscription.customer?.id
       if (!customerId) return NextResponse.json({ received: true })
 
       const { error } = await supabaseAdmin
@@ -111,7 +140,6 @@ export async function POST(request: NextRequest) {
     }
 
     default:
-      // Eventos no manejados
       break
   }
 

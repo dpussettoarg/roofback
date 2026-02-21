@@ -29,42 +29,80 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Public routes (no auth required)
-  const isPublicRoute =
-    request.nextUrl.pathname === '/' ||
-    request.nextUrl.pathname.startsWith('/login') ||
-    request.nextUrl.pathname.startsWith('/auth') ||
-    request.nextUrl.pathname.startsWith('/proposal') ||
-    request.nextUrl.pathname.startsWith('/api/webhooks/stripe') ||
-    request.nextUrl.pathname.startsWith('/debug')
+  const { pathname } = request.nextUrl
 
-  // OAuth callback: if user lands on / or /login with ?code=, redirect to /auth/callback
-  // (Supabase may redirect to Site URL instead of redirectTo when /auth/callback isn't in allow list)
+  // ── Public routes (no auth required) ──────────────────────────────────────
+  const isPublicRoute =
+    pathname === '/' ||
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/auth') ||
+    pathname.startsWith('/proposal') ||
+    pathname.startsWith('/terms') ||
+    pathname.startsWith('/privacy') ||
+    pathname.startsWith('/api/webhooks/stripe') ||
+    pathname.startsWith('/debug')
+
+  // Billing/pricing pages are always accessible to authenticated users
+  // so they can upgrade even after trial expires
+  const isBillingRoute =
+    pathname.startsWith('/billing') ||
+    pathname.startsWith('/pricing')
+
+  // ── OAuth code forwarding ──────────────────────────────────────────────────
   const code = request.nextUrl.searchParams.get('code')
-  if (!user && code && (request.nextUrl.pathname === '/' || request.nextUrl.pathname === '/login')) {
+  if (!user && code && (pathname === '/' || pathname === '/login')) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/callback'
     return NextResponse.redirect(url)
   }
 
+  // ── Unauthenticated → login ────────────────────────────────────────────────
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  // Ya autenticado → redirigir fuera de login
-  if (user && request.nextUrl.pathname === '/login') {
+  // ── Authenticated + /login → dashboard ────────────────────────────────────
+  if (user && pathname === '/login') {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
   }
 
-  // Root → dashboard
-  if (user && request.nextUrl.pathname === '/') {
+  // ── Root → dashboard ──────────────────────────────────────────────────────
+  if (user && pathname === '/') {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
+  }
+
+  // ── Trial-expiry bouncer (only for protected non-billing routes) ───────────
+  if (user && !isPublicRoute && !isBillingRoute) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('subscription_status, trial_expires_at')
+      .eq('id', user.id)
+      .single()
+
+    if (profile) {
+      const isTrialing = profile.subscription_status === 'trialing'
+      const isActive = profile.subscription_status === 'active'
+      const trialExpired =
+        isTrialing &&
+        profile.trial_expires_at &&
+        new Date(profile.trial_expires_at) < new Date()
+
+      // Canceled plans also gate access
+      const isCanceled = profile.subscription_status === 'canceled'
+
+      if (!isActive && (trialExpired || isCanceled)) {
+        const url = request.nextUrl.clone()
+        url.pathname = '/billing'
+        url.searchParams.set('reason', trialExpired ? 'trial_expired' : 'canceled')
+        return NextResponse.redirect(url)
+      }
+    }
   }
 
   return supabaseResponse
