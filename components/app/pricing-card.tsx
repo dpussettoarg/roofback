@@ -40,12 +40,16 @@ export function PricingCard({
   async function handleSubscribe() {
     setLoading(true)
     try {
-      const { url } = await createCheckoutSession(priceId)
+      const { url, error } = await createCheckoutSession(priceId)
+      if (error) {
+        toast.error(error)
+        return
+      }
       if (url) {
         window.location.href = url
         return
       }
-      throw new Error(lang === 'es' ? 'No se pudo crear la sesion' : 'Could not create session')
+      toast.error(lang === 'es' ? 'No se pudo crear la sesión' : 'Could not create session')
     } catch (err) {
       console.error('Checkout error:', err)
       toast.error(err instanceof Error ? err.message : (lang === 'es' ? 'Error al procesar' : 'Checkout failed'))

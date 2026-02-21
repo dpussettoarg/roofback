@@ -4,7 +4,7 @@ import { stripe } from '@/lib/stripe'
 import { createClient } from '@/lib/supabase/server'
 import { getURL } from '@/lib/utils'
 
-export async function createCheckoutSession(priceId: string) {
+export async function createCheckoutSession(priceId: string): Promise<{ url: string | null; error: string | null }> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -12,11 +12,11 @@ export async function createCheckoutSession(priceId: string) {
   } = await supabase.auth.getUser()
 
   if (authError || !user) {
-    throw new Error('Unauthorized')
+    return { url: null, error: 'Unauthorized' }
   }
 
   if (!stripe) {
-    throw new Error('Stripe is not configured')
+    return { url: null, error: 'Stripe is not configured' }
   }
 
   try {
@@ -33,9 +33,10 @@ export async function createCheckoutSession(priceId: string) {
     if (session.url) {
       return { url: session.url, error: null }
     }
-    throw new Error('Failed to create checkout session')
+    return { url: null, error: 'Failed to create checkout session' }
   } catch (err) {
     console.error('Stripe checkout error:', err)
-    throw err instanceof Error ? err : new Error('Checkout failed')
+    const msg = err instanceof Error ? err.message : 'Checkout failed'
+    return { url: null, error: msg }
   }
 }
