@@ -339,10 +339,13 @@ export default function EstimatePage() {
   async function handleAccepted() {
     await handleSave()
     await supabase.from('jobs').update({
-      status: 'approved', workflow_stage: 'approved',
+      status: 'approved',
+      workflow_stage: 'approved',
+      client_status: 'approved',
+      approved_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }).eq('id', id)
-    toast.success(lang === 'es' ? '¡Arrancamos!' : "Let's go!")
+    toast.success(lang === 'es' ? '¡Presupuesto aprobado!' : 'Estimate approved!')
     router.push(`/jobs/${id}`)
   }
 
@@ -444,6 +447,141 @@ export default function EstimatePage() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#0F1117]">
         <div className="w-8 h-8 rounded-full border-2 border-[#2A2D35] border-t-[#A8FF3E] animate-spin" />
+      </div>
+    )
+  }
+
+  // --- Locked / Read-only view (approved quote) ---
+  if (job?.client_status === 'approved' || !!job?.approved_at) {
+    return (
+      <div className="min-h-screen bg-[#0F1117] pb-24 font-[Inter,sans-serif]">
+        <div className="bg-[#0F1117] border-b border-[#2A2D35] px-5 pt-12 pb-4">
+          <div className="max-w-[430px] mx-auto">
+            <Link href={`/jobs/${id}`} className="inline-flex items-center text-sm text-[#6B7280] hover:text-[#A8FF3E] transition-colors mb-3">
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              {job?.client_name}
+            </Link>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-white">{lang === 'es' ? 'Presupuesto' : 'Estimate'}</h1>
+              {job?.job_number && (
+                <span className="text-sm font-mono font-bold text-[#A8FF3E] bg-[#A8FF3E]/10 px-2 py-0.5 rounded-md">
+                  {formatEstimateNumber(job.job_number, job.estimate_version || 1)}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-[430px] mx-auto px-5 py-5 space-y-4">
+          {/* Approved badge */}
+          <div className="bg-[#A8FF3E]/10 border border-[#A8FF3E]/40 rounded-[12px] p-4 flex items-start gap-3">
+            <Lock className="h-5 w-5 text-[#A8FF3E] mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-bold text-[#A8FF3E]">
+                {lang === 'es' ? 'Presupuesto Aprobado — Solo Lectura' : 'Approved Estimate — Read Only'}
+              </p>
+              <p className="text-xs text-[#6B7280] mt-1">
+                {job?.approved_at
+                  ? `${lang === 'es' ? 'Aprobado el' : 'Approved on'} ${new Date(job.approved_at).toLocaleDateString(lang === 'es' ? 'es' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`
+                  : (lang === 'es' ? 'Este presupuesto está bloqueado.' : 'This estimate is locked.')}
+              </p>
+              {job?.client_signature && (
+                <p className="text-xs text-[#9CA3AF] mt-1">
+                  {lang === 'es' ? 'Firmado por: ' : 'Signed by: '}{job.client_signature}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Approved total */}
+          <div className="bg-[#1E2228] border border-[#2A2D35] border-t-2 border-t-[#A8FF3E] rounded-[12px] p-5 text-center space-y-1">
+            <p className="text-xs text-[#6B7280] uppercase tracking-wider">{lang === 'es' ? 'Total aprobado' : 'Approved total'}</p>
+            <p className="text-4xl font-bold text-[#A8FF3E] tabular-nums">
+              {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Number(job.estimated_total))}
+            </p>
+          </div>
+
+          {/* Scope of work (simple mode) */}
+          {job.simple_description && (
+            <div className="bg-[#1E2228] border border-[#2A2D35] rounded-[12px] p-5 space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-[#6B7280]">
+                {lang === 'es' ? 'Alcance del trabajo' : 'Scope of work'}
+              </p>
+              <p className="text-sm text-[#D1D5DB] whitespace-pre-wrap leading-relaxed">{job.simple_description}</p>
+            </div>
+          )}
+
+          {/* Line items (itemized mode) */}
+          {items.length > 0 && (
+            <div className="bg-[#1E2228] border border-[#2A2D35] rounded-[12px] p-5 space-y-3">
+              <p className="text-xs font-bold uppercase tracking-wider text-[#6B7280]">
+                {lang === 'es' ? 'Detalle del presupuesto' : 'Estimate breakdown'}
+              </p>
+              {['material', 'labor', 'other'].map((cat) => {
+                const catItems = items.filter((i) => i.category === cat)
+                if (catItems.length === 0) return null
+                const catLabel = cat === 'material' ? (lang === 'es' ? 'Materiales' : 'Materials') : cat === 'labor' ? (lang === 'es' ? 'Mano de obra' : 'Labor') : (lang === 'es' ? 'Otros' : 'Other')
+                return (
+                  <div key={cat}>
+                    <p className="text-[11px] font-semibold text-[#A8FF3E] uppercase tracking-wider mb-2">{catLabel}</p>
+                    {catItems.map((item, i) => (
+                      <div key={i} className="flex justify-between text-sm py-1.5 border-b border-[#2A2D35] last:border-0">
+                        <span className="text-[#D1D5DB]">{item.name} <span className="text-[#6B7280]">{item.quantity} {item.unit}</span></span>
+                        <span className="text-white tabular-nums font-medium">
+                          {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Number(item.quantity) * Number(item.unit_price))}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Payment & schedule */}
+          {(job.start_date || job.payment_terms) && (
+            <div className="bg-[#1E2228] border border-[#2A2D35] rounded-[12px] p-4 space-y-2 text-sm">
+              {job.start_date && (
+                <div className="flex justify-between">
+                  <span className="text-[#6B7280]">{lang === 'es' ? 'Fecha de inicio' : 'Start date'}</span>
+                  <span className="text-white font-medium">{new Date(job.start_date + 'T12:00').toLocaleDateString(lang === 'es' ? 'es' : 'en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                </div>
+              )}
+              {job.payment_terms && (
+                <div className="flex justify-between">
+                  <span className="text-[#6B7280]">{lang === 'es' ? 'Condiciones de pago' : 'Payment terms'}</span>
+                  <span className="text-white font-medium">{job.payment_terms}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* PDF download */}
+          <button
+            onClick={handleGeneratePdf}
+            disabled={generatingPdf}
+            className="w-full h-12 rounded-[10px] border border-[#2A2D35] bg-[#1E2228] text-white hover:border-[#A8FF3E] hover:text-[#A8FF3E] transition-colors flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-40"
+          >
+            {generatingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {lang === 'es' ? 'Descargar PDF del contrato' : 'Download contract PDF'}
+          </button>
+
+          <Link href={`/jobs/${id}`} className="block w-full h-11 rounded-[10px] btn-lime flex items-center justify-center gap-2 text-sm font-bold">
+            <ArrowLeft className="h-4 w-4" />
+            {lang === 'es' ? 'Volver al proyecto' : 'Back to project'}
+          </Link>
+        </div>
+
+        <MobileNav />
+        <style jsx global>{`
+          .btn-lime { background-color:#A8FF3E; color:#0F1117; font-weight:700; cursor:pointer; transition:all 0.2s; }
+          .btn-lime:hover { background-color:#95e636; }
+          .input-dark { background-color:#16191F!important; border-color:#2A2D35!important; color:white!important; border-radius:8px; }
+          .input-dark::placeholder { color:#4B5563!important; }
+          .input-dark:focus { border-color:#A8FF3E!important; outline:none; }
+          select option { background-color:#16191F; color:white; }
+          input[type="date"]::-webkit-calendar-picker-indicator { filter:invert(1); }
+        `}</style>
       </div>
     )
   }
