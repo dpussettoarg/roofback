@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { STATUS_CONFIG, JOB_TYPE_OPTIONS, ROOF_TYPE_OPTIONS } from '@/lib/templates'
+import { formatJobNumber } from '@/lib/types'
 import type { Job } from '@/lib/types'
 
 function formatMoney(n: number) {
@@ -46,12 +47,22 @@ export default function JobDetailPage() {
     router.push('/jobs')
   }
 
+  function getProposalUrl() {
+    if (!job?.public_token) return null
+    return `${window.location.origin}/proposal/${job.public_token}`
+  }
+
   function handleSendToClient() {
-    const proposalUrl = `${window.location.origin}/proposal/${job?.public_token}`
+    const proposalUrl = getProposalUrl()
+    if (!proposalUrl) {
+      toast.error(lang === 'es' ? 'Guardá el presupuesto primero para generar el link' : 'Save the estimate first to generate the link')
+      return
+    }
+    const jobLabel = job?.job_number ? formatJobNumber(job.job_number) : ''
     const subject = encodeURIComponent(
       lang === 'es'
-        ? `Presupuesto - ${job?.client_name}`
-        : `Estimate - ${job?.client_name}`
+        ? `Presupuesto ${jobLabel} - ${job?.client_name}`
+        : `Estimate ${jobLabel} - ${job?.client_name}`
     )
     const body = encodeURIComponent(
       lang === 'es'
@@ -64,8 +75,12 @@ export default function JobDetailPage() {
   }
 
   function handleCopyLink() {
-    const url = `${window.location.origin}/proposal/${job?.public_token}`
-    navigator.clipboard.writeText(url)
+    const proposalUrl = getProposalUrl()
+    if (!proposalUrl) {
+      toast.error(lang === 'es' ? 'Guardá el presupuesto primero para generar el link' : 'Save the estimate first to generate the link')
+      return
+    }
+    navigator.clipboard.writeText(proposalUrl)
     toast.success(lang === 'es' ? '¡Link copiado!' : 'Link copied!')
   }
 
@@ -138,9 +153,16 @@ export default function JobDetailPage() {
 
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
-            <h1 className="text-[28px] font-bold text-white leading-tight truncate">
-              {job.client_name}
-            </h1>
+            <div className="flex items-center gap-2">
+              {job.job_number && (
+                <span className="text-xs font-mono font-bold text-[#A8FF3E] bg-[#A8FF3E]/10 px-2 py-0.5 rounded-md">
+                  {formatJobNumber(job.job_number)}
+                </span>
+              )}
+              <h1 className="text-[28px] font-bold text-white leading-tight truncate">
+                {job.client_name}
+              </h1>
+            </div>
             <div className="flex items-center gap-2 mt-2">
               <span className={`status-dot ${statusDotClass} text-xs font-medium`}>
                 {lang === 'es' ? sc?.label_es : sc?.label_en}
@@ -339,7 +361,7 @@ export default function JobDetailPage() {
               <div className="flex gap-2">
                 <input
                   readOnly
-                  value={`${typeof window !== 'undefined' ? window.location.origin : ''}/proposal/${job?.public_token}`}
+                  value={getProposalUrl() || (lang === 'es' ? 'Guardá primero para generar link' : 'Save first to generate link')}
                   className="flex-1 h-10 rounded-[8px] bg-[#0F1117] border border-[#2A2D35] px-3 text-xs text-[#6B7280] focus:outline-none"
                 />
                 <button

@@ -57,6 +57,8 @@ export interface Job {
   language_output: 'es' | 'en'
   lat: number | null
   lng: number | null
+  job_number: number | null
+  estimate_version: number
 }
 
 export type JobType = 'repair' | 'reroof' | 'new_roof' | 'gutters' | 'waterproofing' | 'other'
@@ -131,6 +133,16 @@ export interface ActivityLog {
   photos: string[]
   log_type: 'progress' | 'issue' | 'delivery' | 'completion'
   created_at: string
+}
+
+export function formatJobNumber(jobNumber: number | null | undefined): string {
+  if (!jobNumber) return ''
+  return `J${String(jobNumber).padStart(3, '0')}`
+}
+
+export function formatEstimateNumber(jobNumber: number | null | undefined, version: number = 1): string {
+  if (!jobNumber) return ''
+  return `${formatJobNumber(jobNumber)}-${String(version).padStart(2, '0')}`
 }
 
 // Simple translation map for Español → English

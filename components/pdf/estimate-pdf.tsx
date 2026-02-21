@@ -3,11 +3,7 @@
 import {
   Document, Page, Text, View, Image, StyleSheet, Font,
 } from '@react-pdf/renderer'
-import { PAYMENT_TERMS_OPTIONS, translateMaterialName } from '@/lib/types'
-
-// ============================================
-// Types
-// ============================================
+import { PAYMENT_TERMS_OPTIONS, translateMaterialName, formatEstimateNumber } from '@/lib/types'
 
 interface PdfItem {
   name: string
@@ -30,6 +26,8 @@ export interface EstimatePdfProps {
   contractorEmail: string
   contractorWebsite: string
   jobId: string
+  jobNumber?: number | null
+  estimateVersion?: number
   createdAt: string
   startDate: string | null
   durationDays: number
@@ -47,16 +45,14 @@ export interface EstimatePdfProps {
   photos: string[]
 }
 
-// ============================================
-// Styles (Stripe/PandaDoc inspired)
-// ============================================
-
-const TEAL = '#008B99'
-const GREEN = '#78BE20'
-const SLATE = '#64748B'
-const DARK = '#0F172A'
-const LIGHT_BG = '#F8FAFC'
-const BORDER = '#E2E8F0'
+const CHARCOAL = '#0F1117'
+const SURFACE = '#1E2228'
+const LIME = '#A8FF3E'
+const LIME_DARK = '#7ACC2E'
+const GRAY = '#9CA3AF'
+const GRAY_LIGHT = '#6B7280'
+const WHITE = '#FFFFFF'
+const BORDER = '#2A2D35'
 
 Font.register({
   family: 'Helvetica',
@@ -70,14 +66,13 @@ const s = StyleSheet.create({
   page: {
     fontFamily: 'Helvetica',
     fontSize: 10,
-    color: DARK,
-    backgroundColor: '#FFFFFF',
+    color: WHITE,
+    backgroundColor: CHARCOAL,
     paddingTop: 40,
     paddingBottom: 60,
     paddingHorizontal: 40,
   },
 
-  // Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -85,7 +80,7 @@ const s = StyleSheet.create({
     marginBottom: 30,
     paddingBottom: 20,
     borderBottomWidth: 2,
-    borderBottomColor: TEAL,
+    borderBottomColor: LIME,
   },
   logoArea: {
     flexDirection: 'column',
@@ -93,38 +88,46 @@ const s = StyleSheet.create({
   logoText: {
     fontSize: 26,
     fontWeight: 'bold',
-    color: TEAL,
+    color: LIME,
     letterSpacing: -0.5,
   },
   logoSubtext: {
     fontSize: 8,
-    color: SLATE,
+    color: GRAY_LIGHT,
     marginTop: 2,
   },
   headerRight: {
     alignItems: 'flex-end',
   },
   docTitle: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#CBD5E1',
+    color: GRAY_LIGHT,
     letterSpacing: 2,
+  },
+  docNumber: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: LIME,
+    marginTop: 4,
+    textAlign: 'right' as const,
   },
   docMeta: {
     fontSize: 9,
-    color: SLATE,
-    marginTop: 4,
-    textAlign: 'right',
+    color: GRAY_LIGHT,
+    marginTop: 2,
+    textAlign: 'right' as const,
   },
 
-  // Info Grid
   infoGrid: {
     flexDirection: 'row',
-    backgroundColor: LIGHT_BG,
+    backgroundColor: SURFACE,
     borderRadius: 8,
     padding: 20,
     marginBottom: 24,
     gap: 30,
+    borderWidth: 1,
+    borderColor: BORDER,
   },
   infoCol: {
     flex: 1,
@@ -132,25 +135,24 @@ const s = StyleSheet.create({
   infoLabel: {
     fontSize: 8,
     fontWeight: 'bold',
-    color: TEAL,
+    color: LIME,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 8,
   },
   infoText: {
     fontSize: 10,
-    color: DARK,
+    color: WHITE,
     marginBottom: 3,
     lineHeight: 1.4,
   },
   infoTextLight: {
     fontSize: 9,
-    color: SLATE,
+    color: GRAY,
     marginBottom: 3,
     lineHeight: 1.4,
   },
 
-  // Schedule pills
   scheduleRow: {
     flexDirection: 'row',
     gap: 12,
@@ -158,16 +160,18 @@ const s = StyleSheet.create({
   },
   schedulePill: {
     flex: 1,
-    backgroundColor: LIGHT_BG,
+    backgroundColor: SURFACE,
     borderRadius: 6,
     padding: 12,
     borderLeftWidth: 3,
-    borderLeftColor: TEAL,
+    borderLeftColor: LIME,
+    borderWidth: 1,
+    borderColor: BORDER,
   },
   schedulePillLabel: {
     fontSize: 7,
     fontWeight: 'bold',
-    color: SLATE,
+    color: GRAY_LIGHT,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 4,
@@ -175,14 +179,13 @@ const s = StyleSheet.create({
   schedulePillValue: {
     fontSize: 11,
     fontWeight: 'bold',
-    color: DARK,
+    color: WHITE,
   },
 
-  // Section title
   sectionTitle: {
     fontSize: 11,
     fontWeight: 'bold',
-    color: TEAL,
+    color: LIME,
     textTransform: 'uppercase',
     letterSpacing: 1.5,
     marginBottom: 12,
@@ -191,28 +194,28 @@ const s = StyleSheet.create({
     borderBottomColor: BORDER,
   },
 
-  // Description
   description: {
     fontSize: 10,
-    color: DARK,
+    color: GRAY,
     lineHeight: 1.6,
     marginBottom: 24,
     paddingHorizontal: 4,
   },
 
-  // Table
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: TEAL,
+    backgroundColor: SURFACE,
     borderRadius: 4,
     paddingVertical: 8,
     paddingHorizontal: 12,
     marginBottom: 2,
+    borderWidth: 1,
+    borderColor: BORDER,
   },
   tableHeaderText: {
     fontSize: 8,
     fontWeight: 'bold',
-    color: '#FFFFFF',
+    color: LIME,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -221,34 +224,33 @@ const s = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: BORDER,
   },
   tableRowAlt: {
-    backgroundColor: '#FAFBFC',
+    backgroundColor: SURFACE,
   },
   tableCol1: { flex: 3 },
   tableCol2: { flex: 1, alignItems: 'center' as const },
   tableCol3: { flex: 1, alignItems: 'flex-end' as const },
   tableCellMain: {
     fontSize: 10,
-    color: DARK,
+    color: WHITE,
     fontWeight: 'bold',
   },
   tableCellSub: {
     fontSize: 9,
-    color: SLATE,
+    color: GRAY,
   },
   tableCellMoney: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: DARK,
+    color: WHITE,
   },
 
-  // Category label
   categoryLabel: {
     fontSize: 9,
     fontWeight: 'bold',
-    color: SLATE,
+    color: GRAY_LIGHT,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginTop: 16,
@@ -256,7 +258,6 @@ const s = StyleSheet.create({
     paddingLeft: 12,
   },
 
-  // Photos
   photosGrid: {
     flexDirection: 'row',
     gap: 8,
@@ -270,13 +271,17 @@ const s = StyleSheet.create({
     objectFit: 'cover',
   },
 
-  // Financial section
   financialSection: {
     marginTop: 24,
     alignItems: 'flex-end',
   },
   financialBox: {
     width: 260,
+    backgroundColor: SURFACE,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingVertical: 8,
   },
   financialRow: {
     flexDirection: 'row',
@@ -286,11 +291,11 @@ const s = StyleSheet.create({
   },
   financialLabel: {
     fontSize: 9,
-    color: SLATE,
+    color: GRAY,
   },
   financialValue: {
     fontSize: 10,
-    color: DARK,
+    color: WHITE,
     fontWeight: 'bold',
   },
   financialDivider: {
@@ -303,7 +308,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: GREEN,
+    backgroundColor: LIME,
     borderRadius: 8,
     paddingVertical: 14,
     paddingHorizontal: 16,
@@ -312,24 +317,22 @@ const s = StyleSheet.create({
   totalLabel: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#FFFFFF',
+    color: CHARCOAL,
   },
   totalValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#FFFFFF',
+    color: CHARCOAL,
   },
 
-  // Payment terms
-  paymentTerms: {
+  paymentTermsText: {
     fontSize: 9,
-    color: SLATE,
+    color: GRAY,
     marginTop: 12,
-    textAlign: 'right',
+    textAlign: 'right' as const,
     paddingRight: 4,
   },
 
-  // Signature
   signatureSection: {
     marginTop: 40,
     flexDirection: 'row',
@@ -340,25 +343,24 @@ const s = StyleSheet.create({
   },
   signatureLine: {
     borderBottomWidth: 1,
-    borderBottomColor: DARK,
+    borderBottomColor: GRAY_LIGHT,
     marginBottom: 6,
     height: 30,
   },
   signatureLabel: {
     fontSize: 8,
-    color: SLATE,
+    color: GRAY_LIGHT,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
 
-  // Footer
   footer: {
     position: 'absolute',
     bottom: 25,
     left: 40,
     right: 40,
     borderTopWidth: 1,
-    borderTopColor: TEAL,
+    borderTopColor: BORDER,
     paddingTop: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -366,18 +368,14 @@ const s = StyleSheet.create({
   },
   footerText: {
     fontSize: 7,
-    color: SLATE,
+    color: GRAY_LIGHT,
   },
   footerBrand: {
     fontSize: 7,
-    color: TEAL,
+    color: LIME,
     fontWeight: 'bold',
   },
 })
-
-// ============================================
-// Helper
-// ============================================
 
 function fmtMoney(n: number) {
   return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -388,15 +386,11 @@ function fmtDate(d: string | null, en: boolean) {
   return new Date(d + 'T12:00').toLocaleDateString(en ? 'en-US' : 'es', { month: 'long', day: 'numeric', year: 'numeric' })
 }
 
-// ============================================
-// Component
-// ============================================
-
 export function EstimatePDF(props: EstimatePdfProps) {
   const {
     mode, isEn, clientName, clientAddress, clientEmail, clientPhone,
     contractorName, contractorCompany, contractorPhone, contractorEmail, contractorWebsite,
-    jobId, createdAt, startDate, durationDays, paymentTerms,
+    jobNumber, estimateVersion = 1, createdAt, startDate, durationDays, paymentTerms,
     simpleDescription, items, subtotalMaterials, subtotalLabor, subtotalOther,
     overhead, overheadPct, margin, marginPct, total, photos,
   } = props
@@ -409,6 +403,10 @@ export function EstimatePDF(props: EstimatePdfProps) {
   const materialItems = items.filter(i => i.category === 'material')
   const laborItems = items.filter(i => i.category === 'labor')
   const otherItems = items.filter(i => i.category === 'other')
+
+  const docNumber = jobNumber
+    ? formatEstimateNumber(jobNumber, estimateVersion)
+    : ''
 
   const renderTableRows = (rows: PdfItem[]) =>
     rows.map((item, i) => (
@@ -429,7 +427,6 @@ export function EstimatePDF(props: EstimatePdfProps) {
     <Document>
       <Page size="LETTER" style={s.page}>
 
-        {/* ===== HEADER ===== */}
         <View style={s.header}>
           <View style={s.logoArea}>
             <Text style={s.logoText}>
@@ -446,12 +443,13 @@ export function EstimatePDF(props: EstimatePdfProps) {
           </View>
           <View style={s.headerRight}>
             <Text style={s.docTitle}>{isEn ? 'ESTIMATE' : 'PRESUPUESTO'}</Text>
-            <Text style={s.docMeta}>#{jobId.slice(0, 8).toUpperCase()}</Text>
+            {docNumber ? (
+              <Text style={s.docNumber}>#{docNumber}</Text>
+            ) : null}
             <Text style={s.docMeta}>{fmtDate(createdAt?.split('T')[0], isEn)}</Text>
           </View>
         </View>
 
-        {/* ===== INFO GRID ===== */}
         <View style={s.infoGrid}>
           <View style={s.infoCol}>
             <Text style={s.infoLabel}>{isEn ? 'PREPARED FOR' : 'PREPARADO PARA'}</Text>
@@ -463,13 +461,12 @@ export function EstimatePDF(props: EstimatePdfProps) {
           <View style={s.infoCol}>
             <Text style={s.infoLabel}>{isEn ? 'PROJECT DETAILS' : 'DETALLES DEL PROYECTO'}</Text>
             {startDate && <Text style={s.infoText}>{isEn ? 'Start: ' : 'Inicio: '}{fmtDate(startDate, isEn)}</Text>}
-            {durationDays > 0 && <Text style={s.infoTextLight}>{isEn ? 'Duration: ' : 'Duración: '}{durationDays} {isEn ? 'days' : 'días'}</Text>}
-            <Text style={s.infoTextLight}>{isEn ? 'Valid for 30 days' : 'Válido por 30 días'}</Text>
+            {durationDays > 0 && <Text style={s.infoTextLight}>{isEn ? 'Duration: ' : 'Duraci\u00f3n: '}{durationDays} {isEn ? 'days' : 'd\u00edas'}</Text>}
+            <Text style={s.infoTextLight}>{isEn ? 'Valid for 30 days' : 'V\u00e1lido por 30 d\u00edas'}</Text>
             {contractorName && <Text style={[s.infoTextLight, { marginTop: 4 }]}>{isEn ? 'By: ' : 'Por: '}{contractorName}</Text>}
           </View>
         </View>
 
-        {/* ===== SCHEDULE PILLS ===== */}
         {startDate && (
           <View style={s.scheduleRow}>
             <View style={s.schedulePill}>
@@ -477,8 +474,8 @@ export function EstimatePDF(props: EstimatePdfProps) {
               <Text style={s.schedulePillValue}>{fmtDate(startDate, isEn)}</Text>
             </View>
             <View style={s.schedulePill}>
-              <Text style={s.schedulePillLabel}>{isEn ? 'ESTIMATED DURATION' : 'DURACIÓN ESTIMADA'}</Text>
-              <Text style={s.schedulePillValue}>{durationDays} {isEn ? 'days' : 'días'}</Text>
+              <Text style={s.schedulePillLabel}>{isEn ? 'ESTIMATED DURATION' : 'DURACI\u00d3N ESTIMADA'}</Text>
+              <Text style={s.schedulePillValue}>{durationDays} {isEn ? 'days' : 'd\u00edas'}</Text>
             </View>
             {ptText && (
               <View style={s.schedulePill}>
@@ -489,7 +486,6 @@ export function EstimatePDF(props: EstimatePdfProps) {
           </View>
         )}
 
-        {/* ===== SCOPE OF WORK (Simple) ===== */}
         {mode === 'simple' && simpleDescription && (
           <View style={{ marginBottom: 20 }}>
             <Text style={s.sectionTitle}>{isEn ? 'SCOPE OF WORK' : 'ALCANCE DEL TRABAJO'}</Text>
@@ -497,19 +493,16 @@ export function EstimatePDF(props: EstimatePdfProps) {
           </View>
         )}
 
-        {/* ===== ITEMIZED TABLE ===== */}
         {mode === 'itemized' && items.length > 0 && (
           <View style={{ marginBottom: 16 }}>
             <Text style={s.sectionTitle}>{isEn ? 'SCOPE OF WORK' : 'DETALLE DEL PRESUPUESTO'}</Text>
 
-            {/* Table Header */}
             <View style={s.tableHeader}>
-              <View style={s.tableCol1}><Text style={s.tableHeaderText}>{isEn ? 'DESCRIPTION' : 'DESCRIPCIÓN'}</Text></View>
+              <View style={s.tableCol1}><Text style={s.tableHeaderText}>{isEn ? 'DESCRIPTION' : 'DESCRIPCI\u00d3N'}</Text></View>
               <View style={s.tableCol2}><Text style={[s.tableHeaderText, { textAlign: 'center' }]}>{isEn ? 'QTY' : 'CANT.'}</Text></View>
               <View style={s.tableCol3}><Text style={[s.tableHeaderText, { textAlign: 'right' }]}>TOTAL</Text></View>
             </View>
 
-            {/* Materials */}
             {materialItems.length > 0 && (
               <>
                 <Text style={s.categoryLabel}>{isEn ? 'MATERIALS' : 'MATERIALES'}</Text>
@@ -517,7 +510,6 @@ export function EstimatePDF(props: EstimatePdfProps) {
               </>
             )}
 
-            {/* Labor */}
             {laborItems.length > 0 && (
               <>
                 <Text style={s.categoryLabel}>{isEn ? 'LABOR' : 'MANO DE OBRA'}</Text>
@@ -525,7 +517,6 @@ export function EstimatePDF(props: EstimatePdfProps) {
               </>
             )}
 
-            {/* Other */}
             {otherItems.length > 0 && (
               <>
                 <Text style={s.categoryLabel}>{isEn ? 'OTHER' : 'OTROS'}</Text>
@@ -535,10 +526,9 @@ export function EstimatePDF(props: EstimatePdfProps) {
           </View>
         )}
 
-        {/* ===== PHOTOS ===== */}
         {photos.length > 0 && (
           <View style={{ marginBottom: 20 }}>
-            <Text style={s.sectionTitle}>{isEn ? 'CURRENT CONDITION' : 'CONDICIÓN ACTUAL'}</Text>
+            <Text style={s.sectionTitle}>{isEn ? 'CURRENT CONDITION' : 'CONDICI\u00d3N ACTUAL'}</Text>
             <View style={s.photosGrid}>
               {photos.slice(0, 4).map((url, i) => (
                 <Image key={i} src={url} style={s.photo} />
@@ -547,7 +537,6 @@ export function EstimatePDF(props: EstimatePdfProps) {
           </View>
         )}
 
-        {/* ===== FINANCIAL SECTION ===== */}
         <View style={s.financialSection}>
           <View style={s.financialBox}>
             {mode === 'itemized' && (
@@ -578,22 +567,19 @@ export function EstimatePDF(props: EstimatePdfProps) {
               </>
             )}
 
-            {/* TOTAL */}
             <View style={s.totalRow}>
               <Text style={s.totalLabel}>TOTAL</Text>
               <Text style={s.totalValue}>{fmtMoney(total)}</Text>
             </View>
 
-            {/* Payment Terms */}
             {ptText && (
-              <Text style={s.paymentTerms}>
+              <Text style={s.paymentTermsText}>
                 {isEn ? 'Payment: ' : 'Pago: '}{ptText}
               </Text>
             )}
           </View>
         </View>
 
-        {/* ===== SIGNATURE SECTION ===== */}
         <View style={s.signatureSection}>
           <View style={s.signatureBlock}>
             <View style={s.signatureLine} />
@@ -606,12 +592,11 @@ export function EstimatePDF(props: EstimatePdfProps) {
           </View>
         </View>
 
-        {/* ===== FOOTER ===== */}
         <View style={s.footer} fixed>
           <Text style={s.footerText}>
             {isEn
               ? 'This estimate is valid for 30 days from issue date.'
-              : 'Este presupuesto es válido por 30 días desde la fecha de emisión.'}
+              : 'Este presupuesto es v\u00e1lido por 30 d\u00edas desde la fecha de emisi\u00f3n.'}
           </Text>
           <Text style={s.footerBrand}>RoofBack — {isEn ? 'The way to grow.' : 'La manera de crecer.'}</Text>
         </View>

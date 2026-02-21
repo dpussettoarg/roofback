@@ -7,6 +7,7 @@ import { useI18n } from '@/lib/i18n/context'
 import { MobileNav } from '@/components/app/mobile-nav'
 import { Plus, ChevronRight, Search, Hammer } from 'lucide-react'
 import { STATUS_CONFIG, JOB_TYPE_OPTIONS } from '@/lib/templates'
+import { formatJobNumber } from '@/lib/types'
 import type { Job } from '@/lib/types'
 
 function formatMoney(n: number) {
@@ -164,7 +165,14 @@ export default function JobsPage() {
               <Link key={job.id} href={`/jobs/${job.id}`}>
                 <div className={`bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4 flex items-center justify-between hover:border-[#3A3D45] transition-colors ${borderClass(job.status)}`}>
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-white truncate">{job.client_name}</p>
+                    <div className="flex items-center gap-2">
+                      {job.job_number && (
+                        <span className="text-[10px] font-mono font-bold text-[#A8FF3E] bg-[#A8FF3E]/10 px-1.5 py-0.5 rounded">
+                          {formatJobNumber(job.job_number)}
+                        </span>
+                      )}
+                      <p className="font-semibold text-white truncate">{job.client_name}</p>
+                    </div>
                     <p className="text-xs text-[#6B7280] truncate mt-0.5">{job.client_address}</p>
                     <div className="flex items-center gap-3 mt-2">
                       <span className={statusDotClass(job.status)}>

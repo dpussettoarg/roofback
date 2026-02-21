@@ -71,40 +71,49 @@ export default function NewJobPage() {
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('No auth')
+      if (!user) throw new Error(lang === 'es' ? 'No estás autenticado' : 'Not authenticated')
+
+      if (!form.client_name.trim()) {
+        throw new Error(lang === 'es' ? 'El nombre del cliente es obligatorio' : 'Client name is required')
+      }
 
       const { data: profile } = await supabase
         .from('profiles')
         .select('default_overhead_pct, default_margin_pct')
         .eq('id', user.id)
-        .single()
+        .maybeSingle()
+
+      const insertPayload: Record<string, unknown> = {
+        user_id: user.id,
+        client_name: form.client_name.trim(),
+        client_phone: form.client_phone,
+        client_email: form.client_email,
+        client_address: form.client_address,
+        job_type: form.job_type,
+        roof_type: form.roof_type,
+        square_footage: parseFloat(form.square_footage) || 0,
+        pitch: form.pitch,
+        notes: form.notes,
+        overhead_pct: profile?.default_overhead_pct || 15,
+        margin_pct: profile?.default_margin_pct || 20,
+      }
+
+      if (form.lat !== null) insertPayload.lat = form.lat
+      if (form.lng !== null) insertPayload.lng = form.lng
 
       const { data, error } = await supabase
         .from('jobs')
-        .insert({
-          user_id: user.id,
-          client_name: form.client_name,
-          client_phone: form.client_phone,
-          client_email: form.client_email,
-          client_address: form.client_address,
-          lat: form.lat,
-          lng: form.lng,
-          job_type: form.job_type,
-          roof_type: form.roof_type,
-          square_footage: parseFloat(form.square_footage) || 0,
-          pitch: form.pitch,
-          notes: form.notes,
-          overhead_pct: profile?.default_overhead_pct || 15,
-          margin_pct: profile?.default_margin_pct || 20,
-        })
-        .select()
-        .single()
+        .insert(insertPayload)
+        .select('id')
+        .maybeSingle()
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
+      if (!data) throw new Error(lang === 'es' ? 'No se pudo crear el trabajo' : 'Could not create job')
 
       toast.success(lang === 'es' ? '¡Trabajo creado!' : 'Job created!')
       router.push(`/jobs/${data.id}/estimate`)
     } catch (err: unknown) {
+      console.error('Job creation error:', err)
       const message = err instanceof Error ? err.message : t('common.error')
       toast.error(message)
     } finally {

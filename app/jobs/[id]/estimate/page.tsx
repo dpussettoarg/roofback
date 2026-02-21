@@ -20,7 +20,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { JOB_TEMPLATES, scaleTemplateItems } from '@/lib/templates'
-import { PAYMENT_TERMS_OPTIONS, translateMaterialName } from '@/lib/types'
+import { PAYMENT_TERMS_OPTIONS, translateMaterialName, formatJobNumber, formatEstimateNumber } from '@/lib/types'
 import type { Job, EstimateItem, JobType, Profile } from '@/lib/types'
 import { pdf } from '@react-pdf/renderer'
 import { EstimatePDF } from '@/components/pdf/estimate-pdf'
@@ -325,10 +325,20 @@ export default function EstimatePage() {
     router.push(`/jobs/${id}`)
   }
 
+  function getProposalUrl() {
+    if (!job?.public_token) return null
+    return `${window.location.origin}/proposal/${job.public_token}`
+  }
+
   function handleSendToClient() {
-    const proposalUrl = `${window.location.origin}/proposal/${job?.public_token}`
+    const proposalUrl = getProposalUrl()
+    if (!proposalUrl) {
+      toast.error(lang === 'es' ? 'Guardá el presupuesto primero para generar el link' : 'Save the estimate first to generate the link')
+      return
+    }
     const isEn = languageOutput === 'en'
-    const subject = encodeURIComponent(isEn ? `Estimate for ${job?.client_name} - RoofBack` : `Presupuesto - ${job?.client_name}`)
+    const jobLabel = job?.job_number ? formatEstimateNumber(job.job_number, job.estimate_version || 1) : ''
+    const subject = encodeURIComponent(isEn ? `Estimate ${jobLabel} for ${job?.client_name} - RoofBack` : `Presupuesto ${jobLabel} - ${job?.client_name}`)
     const body = encodeURIComponent(isEn
       ? `Hi ${job?.client_name},\n\nYou can view and approve your estimate here:\n${proposalUrl}\n\nThanks!`
       : `Hola ${job?.client_name},\n\nAcá podés ver y aprobar tu presupuesto:\n${proposalUrl}\n\nGracias!`)
@@ -337,7 +347,12 @@ export default function EstimatePage() {
   }
 
   function handleCopyLink() {
-    navigator.clipboard.writeText(`${window.location.origin}/proposal/${job?.public_token}`)
+    const proposalUrl = getProposalUrl()
+    if (!proposalUrl) {
+      toast.error(lang === 'es' ? 'Guardá el presupuesto primero para generar el link' : 'Save the estimate first to generate the link')
+      return
+    }
+    navigator.clipboard.writeText(proposalUrl)
     toast.success(lang === 'es' ? '¡Link copiado!' : 'Link copied!')
   }
 
@@ -360,6 +375,8 @@ export default function EstimatePage() {
           contractorEmail={profile?.contact_email || ''}
           contractorWebsite={profile?.website || ''}
           jobId={job.id}
+          jobNumber={job.job_number}
+          estimateVersion={job.estimate_version || 1}
           createdAt={job.created_at}
           startDate={startDate}
           durationDays={durationDays}
@@ -520,7 +537,14 @@ export default function EstimatePage() {
             <ArrowLeft className="h-4 w-4 mr-1" />
             {job?.client_name}
           </Link>
-          <h1 className="text-2xl font-bold text-white">{t('estimate.title')}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-white">{t('estimate.title')}</h1>
+            {job?.job_number && (
+              <span className="text-sm font-mono font-bold text-[#A8FF3E] bg-[#A8FF3E]/10 px-2 py-0.5 rounded-md">
+                {formatEstimateNumber(job.job_number, job.estimate_version || 1)}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -948,7 +972,7 @@ export default function EstimatePage() {
             <div className="flex gap-2">
               <Input
                 readOnly
-                value={`${typeof window !== 'undefined' ? window.location.origin : ''}/proposal/${job?.public_token}`}
+                value={getProposalUrl() || (lang === 'es' ? 'Guardá primero para generar link' : 'Save first to generate link')}
                 className="input-dark h-10 text-xs rounded-[8px] flex-1"
               />
               <button
