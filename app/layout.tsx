@@ -14,6 +14,11 @@ export const metadata: Metadata = {
   title: 'RoofBack',
   description: 'Job management and quoting for roofing contractors.',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/logo.png',
+    shortcut: '/logo.png',
+    apple: '/logo.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',

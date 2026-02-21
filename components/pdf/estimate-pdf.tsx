@@ -85,6 +85,12 @@ const s = StyleSheet.create({
   logoArea: {
     flexDirection: 'column',
   },
+  logoImage: {
+    width: 160,
+    height: 48,
+    objectFit: 'contain',
+    marginBottom: 4,
+  },
   logoText: {
     fontSize: 26,
     fontWeight: 'bold',
@@ -429,11 +435,13 @@ export function EstimatePDF(props: EstimatePdfProps) {
 
         <View style={s.header}>
           <View style={s.logoArea}>
-            <Text style={s.logoText}>
-              {contractorCompany || 'RoofBack'}
-            </Text>
+            {/* RoofBack logo — loaded from public/logo.png via absolute URL */}
+            <Image
+              src={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://roofback.app'}/logo.png`}
+              style={s.logoImage}
+            />
             {contractorCompany ? (
-              <Text style={s.logoSubtext}>Powered by RoofBack</Text>
+              <Text style={s.logoSubtext}>{contractorCompany}</Text>
             ) : (
               <Text style={s.logoSubtext}>{isEn ? 'The way to grow.' : 'La manera de crecer.'}</Text>
             )}
