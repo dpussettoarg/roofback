@@ -16,13 +16,15 @@ const I18nContext = createContext<I18nContextType>({
 })
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>('es')
+  // Default is English for new / unrecognised users
+  const [lang, setLangState] = useState<Lang>('en')
 
   useEffect(() => {
     const saved = localStorage.getItem('roofback_lang') as Lang | null
-    if (saved && (saved === 'es' || saved === 'en')) {
+    if (saved === 'es' || saved === 'en') {
       setLangState(saved)
     }
+    // If nothing saved yet the default ('en') already set above is correct
   }, [])
 
   const setLang = useCallback((l: Lang) => {

@@ -11,6 +11,8 @@ import {
   MapPin, Phone, Send, CheckCircle, Link2, Copy, ChevronRight,
   ShieldCheck, CalendarCheck, Lock, HardHat, CalendarDays,
   MessageSquare, Package, TrendingUp, TrendingDown, AlertCircle,
+  Smartphone, MessageCircle, ChevronDown, ChevronUp,
+  ClipboardList, Wrench, HardDriveDownload, Flag,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { JOB_TYPE_OPTIONS, ROOF_TYPE_OPTIONS } from '@/lib/templates'
@@ -53,6 +55,8 @@ export default function JobDetailPage() {
   const [job, setJob] = useState<Job | null>(null)
   const [loading, setLoading] = useState(true)
   const [showSendDialog, setShowSendDialog] = useState(false)
+  const [showContactModal, setShowContactModal] = useState(false)
+  const [showTimeline, setShowTimeline] = useState(false)
   const [clientEmail, setClientEmail] = useState('')
   const [startDate, setStartDate] = useState('')
   const [savingDate, setSavingDate] = useState(false)
@@ -151,21 +155,41 @@ export default function JobDetailPage() {
     toast.success(lang === 'es' ? '¡Link copiado!' : 'Link copied!')
   }
 
-  function handleNotifyClient() {
-    if (!startDate) { toast.error(lang === 'es' ? 'Elegí una fecha primero' : 'Pick a date first'); return }
-    const dateStr = new Date(startDate + 'T12:00').toLocaleDateString(lang === 'es' ? 'es' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-    const msg = lang === 'es'
+  function buildNotifyMessage() {
+    const dateStr = startDate
+      ? new Date(startDate + 'T12:00').toLocaleDateString(lang === 'es' ? 'es' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+      : ''
+    return lang === 'es'
       ? `Hola ${job?.client_name}, te confirmo que arrancamos tu techo el ${dateStr}. Cualquier consulta avisá. ¡Gracias!`
       : `Hi ${job?.client_name}, I'm confirming we'll start your roofing job on ${dateStr}. Let me know if you have any questions. Thanks!`
-    const encoded = encodeURIComponent(msg)
-    const phone = job?.client_phone?.replace(/\D/g, '')
+  }
+
+  function handleNotifyViaSMS() {
+    const msg = buildNotifyMessage()
+    const phone = job?.client_phone?.replace(/\D/g, '') || ''
     if (phone) {
-      window.open(`https://wa.me/${phone}?text=${encoded}`, '_blank')
+      window.open(`sms:${phone}?body=${encodeURIComponent(msg)}`, '_blank')
     } else {
-      const mailBody = encodeURIComponent(msg)
       const subject = encodeURIComponent(lang === 'es' ? 'Fecha de inicio de tu techo' : 'Start date for your roof')
-      window.open(`mailto:${job?.client_email}?subject=${subject}&body=${mailBody}`, '_blank')
+      window.open(`mailto:${job?.client_email}?subject=${subject}&body=${encodeURIComponent(msg)}`, '_blank')
     }
+    setShowContactModal(false)
+  }
+
+  function handleNotifyViaWhatsApp() {
+    const msg = buildNotifyMessage()
+    const phone = job?.client_phone?.replace(/\D/g, '') || ''
+    if (phone) {
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
+    } else {
+      toast.error(lang === 'es' ? 'No hay número de teléfono registrado' : 'No phone number on file')
+    }
+    setShowContactModal(false)
+  }
+
+  function handleNotifyClient() {
+    if (!startDate) { toast.error(lang === 'es' ? 'Elegí una fecha primero' : 'Pick a date first'); return }
+    setShowContactModal(true)
   }
 
   function handleSendToClient() {
@@ -229,7 +253,7 @@ export default function JobDetailPage() {
               {isApproved ? (
                 <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#A8FF3E] bg-[#A8FF3E]/10 px-2 py-0.5 rounded-full">
                   <HardHat className="h-3 w-3" />
-                  {lang === 'es' ? 'Proyecto Activo' : 'Active Project'}
+                  {lang === 'es' ? 'En Proceso' : 'In Progress'}
                 </span>
               ) : (
                 <span className="text-xs font-medium text-[#6B7280]">
@@ -422,10 +446,100 @@ export default function JobDetailPage() {
                 disabled={!startDate}
                 className="w-full h-11 rounded-lg border border-[#2A2D35] bg-transparent text-sm font-semibold text-white flex items-center justify-center gap-2 hover:bg-[#252830] transition-colors disabled:opacity-40"
               >
-                <MessageSquare className="h-4 w-4 text-[#25D366]" />
-                {lang === 'es' ? 'Notificar fecha al cliente' : 'Notify client of start date'}
+                <MessageSquare className="h-4 w-4 text-[#A8FF3E]" />
+                {lang === 'es' ? 'Notificar al cliente' : 'Notify client'}
               </button>
             </div>
+
+            {/* ── Mini Gantt / Timeline ── */}
+            {(() => {
+              const stage = job.workflow_stage || 'draft'
+              const stages = [
+                { key: 'approved',           icon: ClipboardList,    label_es: 'Contrato',   label_en: 'Contract'  },
+                { key: 'materials_ordered',  icon: HardDriveDownload, label_es: 'Materiales', label_en: 'Materials' },
+                { key: 'in_progress',        icon: Wrench,           label_es: 'En obra',    label_en: 'Job Site'  },
+                { key: 'completed',          icon: Flag,             label_es: 'Terminado',  label_en: 'Finished'  },
+              ]
+              // Map workflow stage to 0-based step index
+              const stepIndex = stage === 'completed' || stage === 'invoiced' || stage === 'paid' ? 3
+                : stage === 'in_progress' ? 2
+                : stage === 'materials_ordered' ? 1
+                : 0 // approved / any other approved state
+              return (
+                <div className="bg-[#1E2228] rounded-[12px] border border-[#2A2D35] overflow-hidden">
+                  <button
+                    onClick={() => setShowTimeline(!showTimeline)}
+                    className="w-full flex items-center justify-between p-4 text-left hover:bg-[#252830] transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <CalendarDays className="h-4 w-4 text-[#A8FF3E]" />
+                      <span className="text-sm font-bold text-white">{lang === 'es' ? 'Cronograma' : 'Timeline'}</span>
+                    </div>
+                    {showTimeline
+                      ? <ChevronUp className="h-4 w-4 text-[#6B7280]" />
+                      : <ChevronDown className="h-4 w-4 text-[#6B7280]" />
+                    }
+                  </button>
+                  {showTimeline && (
+                    <div className="px-4 pb-5">
+                      {/* Step indicator */}
+                      <div className="flex items-center gap-0">
+                        {stages.map((s, i) => {
+                          const Icon = s.icon
+                          const done = i <= stepIndex
+                          const active = i === stepIndex
+                          return (
+                            <div key={s.key} className="flex items-center flex-1 min-w-0">
+                              <div className="flex flex-col items-center flex-shrink-0">
+                                <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+                                  active  ? 'bg-[#A8FF3E] text-[#0F1117] ring-2 ring-[#A8FF3E]/40'
+                                  : done  ? 'bg-[#A8FF3E]/20 text-[#A8FF3E]'
+                                  :         'bg-[#0F1117] text-[#4B5563] border border-[#2A2D35]'
+                                }`}>
+                                  <Icon className="h-4 w-4" />
+                                </div>
+                                <span className={`mt-1.5 text-[10px] font-semibold text-center leading-tight max-w-[52px] ${
+                                  active ? 'text-[#A8FF3E]' : done ? 'text-[#9CA3AF]' : 'text-[#4B5563]'
+                                }`}>
+                                  {lang === 'es' ? s.label_es : s.label_en}
+                                </span>
+                              </div>
+                              {i < stages.length - 1 && (
+                                <div className={`flex-1 h-0.5 mx-1 mb-5 rounded-full ${
+                                  i < stepIndex ? 'bg-[#A8FF3E]' : 'bg-[#2A2D35]'
+                                }`} />
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                      {/* Stage update buttons */}
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        {stages.map((s, i) => (
+                          <button
+                            key={s.key}
+                            disabled={i === stepIndex}
+                            onClick={async () => {
+                              const newStage = s.key as import('@/lib/types').WorkflowStage
+                              await supabase.from('jobs').update({ workflow_stage: newStage, updated_at: new Date().toISOString() }).eq('id', id)
+                              setJob(j => j ? { ...j, workflow_stage: newStage } : j)
+                              toast.success(lang === 'es' ? 'Etapa actualizada' : 'Stage updated')
+                            }}
+                            className={`h-9 rounded-lg text-xs font-semibold transition-all ${
+                              i === stepIndex
+                                ? 'bg-[#A8FF3E] text-[#0F1117] cursor-default'
+                                : 'border border-[#2A2D35] bg-transparent text-[#6B7280] hover:bg-[#252830] hover:text-white'
+                            }`}
+                          >
+                            {lang === 'es' ? s.label_es : s.label_en}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Material checklist summary */}
             <Link href={`/jobs/${id}/checklist`}>
@@ -579,6 +693,43 @@ export default function JobDetailPage() {
               <button onClick={handleSendToClient} disabled={!clientEmail} className="flex-1 h-12 rounded-[8px] btn-lime font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50">
                 <Send className="h-4 w-4" />
                 {lang === 'es' ? 'Enviar' : 'Send'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── SMS / WhatsApp contact modal ──────────────────────────────── */}
+      {showContactModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowContactModal(false)} />
+          <div className="relative bg-[#1E2228] rounded-t-2xl sm:rounded-[12px] w-full sm:max-w-sm p-6 pb-8 space-y-4 shadow-xl border border-[#2A2D35]">
+            <h3 className="text-base font-bold text-white">
+              {lang === 'es' ? 'Notificar al cliente' : 'Notify client'}
+            </h3>
+            <p className="text-xs text-[#6B7280]">
+              {lang === 'es' ? '¿Cómo querés enviar el mensaje?' : 'How would you like to send the message?'}
+            </p>
+            <div className="space-y-2 pt-1">
+              <button
+                onClick={handleNotifyViaSMS}
+                className="w-full h-13 py-3.5 rounded-xl border border-[#2A2D35] bg-[#16191F] text-white font-semibold text-sm flex items-center justify-center gap-3 hover:bg-[#252830] transition-colors"
+              >
+                <Smartphone className="h-5 w-5 text-[#A8FF3E]" />
+                {lang === 'es' ? 'Enviar SMS / Texto' : 'Send SMS / Text'}
+              </button>
+              <button
+                onClick={handleNotifyViaWhatsApp}
+                className="w-full h-13 py-3.5 rounded-xl border border-[#2A2D35] bg-[#16191F] text-white font-semibold text-sm flex items-center justify-center gap-3 hover:bg-[#252830] transition-colors"
+              >
+                <MessageCircle className="h-5 w-5 text-[#25D366]" />
+                WhatsApp
+              </button>
+              <button
+                onClick={() => setShowContactModal(false)}
+                className="w-full h-11 rounded-xl bg-transparent text-[#6B7280] text-sm hover:text-white transition-colors"
+              >
+                {lang === 'es' ? 'Cancelar' : 'Cancel'}
               </button>
             </div>
           </div>

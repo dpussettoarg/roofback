@@ -10,6 +10,7 @@ export interface Profile {
   default_overhead_pct: number
   default_margin_pct: number
   language: 'es' | 'en'
+  language_preference: 'es' | 'en'
   created_at: string
   updated_at: string
   // Billing

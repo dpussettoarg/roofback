@@ -17,9 +17,9 @@ function formatMoney(n: number) {
 type Tab = 'leads' | 'active' | 'completed'
 
 const TAB_CONFIG: { key: Tab; label_es: string; label_en: string; icon: React.ElementType }[] = [
-  { key: 'leads',     label_es: 'Leads',     label_en: 'Leads',     icon: FileText    },
-  { key: 'active',    label_es: 'Activos',   label_en: 'Active',    icon: HardHat     },
-  { key: 'completed', label_es: 'Completados', label_en: 'Completed', icon: CheckCircle2 },
+  { key: 'leads',     label_es: 'Leads',        label_en: 'Leads',       icon: FileText    },
+  { key: 'active',    label_es: 'En proceso',   label_en: 'In Progress', icon: HardHat     },
+  { key: 'completed', label_es: 'Completados',  label_en: 'Completed',   icon: CheckCircle2 },
 ]
 
 function jobTab(job: Job): Tab {
@@ -104,8 +104,8 @@ export default function JobsPage() {
 
   const emptyMsg = {
     leads:     { es: 'Sin leads abiertos', en: 'No open leads', cta_es: 'Crear presupuesto', cta_en: 'Create estimate' },
-    active:    { es: 'Sin proyectos activos', en: 'No active projects', cta_es: 'Crear presupuesto', cta_en: 'Create estimate' },
-    completed: { es: 'Sin trabajos completados', en: 'No completed jobs', cta_es: 'Ver activos', cta_en: 'View active' },
+    active:    { es: 'Sin proyectos en proceso', en: 'No projects in progress', cta_es: 'Crear presupuesto', cta_en: 'Create estimate' },
+    completed: { es: 'Sin trabajos completados', en: 'No completed jobs', cta_es: 'Ver en proceso', cta_en: 'View in progress' },
   }[activeTab]
 
   return (
