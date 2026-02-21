@@ -24,13 +24,17 @@ export async function POST(req: NextRequest) {
 
     // If OpenAI key is available, use it
     if (OPENAI_API_KEY) {
+      const langInstruction = language === 'es'
+        ? 'IMPORTANT: You MUST write the entire proposal in Spanish. Do NOT include any English text.'
+        : 'IMPORTANT: You MUST write the entire proposal in English. Do NOT include any Spanish text.'
+
       const systemPrompt = language === 'es'
-        ? `Sos un presupuestista profesional de techos en Estados Unidos. Mejorá y completá la siguiente descripción de trabajo para que suene profesional, clara y detallada para el cliente. Mantené el español pero usá terminología técnica de roofing. Incluí detalles como materiales, proceso de trabajo y garantía si corresponde. No inventes precios. Mantené un tono profesional pero accesible. Máximo 200 palabras.`
-        : `You are a professional roofing estimator in the United States. Improve and complete the following job description to sound professional, clear, and detailed for the client. Use proper roofing terminology. Include details about materials, work process, and warranty if applicable. Do not invent prices. Keep a professional but approachable tone. Maximum 200 words.`
+        ? `Sos un presupuestista profesional de techos en Estados Unidos. Mejorá y completá la siguiente descripción de trabajo para que suene profesional, clara y detallada para el cliente. Mantené el español pero usá terminología técnica de roofing. Incluí detalles como materiales, proceso de trabajo y garantía si corresponde. No inventes precios. Mantené un tono profesional pero accesible. Máximo 200 palabras.\n\n${langInstruction}`
+        : `You are a professional roofing estimator in the United States. Improve and complete the following job description to sound professional, clear, and detailed for the client. Use proper roofing terminology. Include details about materials, work process, and warranty if applicable. Do not invent prices. Keep a professional but approachable tone. Maximum 200 words.\n\n${langInstruction}`
 
       const userPrompt = language === 'es'
-        ? `Tipo de trabajo: ${jobType}\nTipo de techo: ${roofType}\nSuperficie: ${squareFootage} sqft\n\nDescripción original del techista:\n"${description}"\n\nMejorá esta descripción:`
-        : `Job type: ${jobType}\nRoof type: ${roofType}\nArea: ${squareFootage} sqft\n\nOriginal roofer description:\n"${description}"\n\nImprove this description:`
+        ? `Tipo de trabajo: ${jobType}\nTipo de techo: ${roofType}\nSuperficie: ${squareFootage} sqft\n\nDescripción original del techista:\n"${description}"\n\nMejorá esta descripción (respondé SOLO en español):`
+        : `Job type: ${jobType}\nRoof type: ${roofType}\nArea: ${squareFootage} sqft\n\nOriginal roofer description:\n"${description}"\n\nImprove this description (respond ONLY in English):`
 
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',

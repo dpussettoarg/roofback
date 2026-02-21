@@ -16,7 +16,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   ArrowLeft, Plus, Trash2, Download, CheckCircle, Loader2,
   Send, Zap, List, Sparkles, CalendarDays, Clock, CreditCard,
-  Globe, Camera, X, ImageIcon, Wand2
+  Globe, Camera, X, ImageIcon, Wand2, Lock
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { JOB_TEMPLATES, scaleTemplateItems } from '@/lib/templates'
@@ -183,6 +183,7 @@ export default function EstimatePage() {
   }, [items, overheadPct, marginPct])
 
   const finalTotal = mode === 'simple' ? simpleTotal : calc.total
+  const isLocked = job?.client_status === 'approved' || !!job?.approved_at
 
   async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files
@@ -551,7 +552,27 @@ export default function EstimatePage() {
       {/* ===== MAIN CONTENT ===== */}
       <div className="max-w-[430px] mx-auto px-5 py-5 space-y-4">
 
+        {/* ===== LANGUAGE OUTPUT TOGGLE (moved to top) ===== */}
+        <div className="flex items-center justify-between bg-[#1E2228] border border-[#2A2D35] rounded-[12px] p-4">
+          <div className="flex items-center gap-2">
+            <Globe className="h-4 w-4 text-[#A8FF3E]" />
+            <span className="text-sm font-medium text-white">{lang === 'es' ? 'Idioma de la propuesta' : 'Proposal language'}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`text-xs font-medium ${languageOutput === 'es' ? 'text-[#A8FF3E]' : 'text-[#6B7280]'}`}>ES</span>
+            <button
+              onClick={() => setLanguageOutput(languageOutput === 'es' ? 'en' : 'es')}
+              disabled={isLocked}
+              className={`w-12 h-7 rounded-full transition-colors relative ${languageOutput === 'en' ? 'bg-[#A8FF3E]' : 'bg-[#2A2D35]'} disabled:opacity-50`}
+            >
+              <div className={`w-5 h-5 bg-white rounded-full absolute top-1 transition-transform shadow-sm ${languageOutput === 'en' ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+            <span className={`text-xs font-medium ${languageOutput === 'en' ? 'text-[#A8FF3E]' : 'text-[#6B7280]'}`}>EN</span>
+          </div>
+        </div>
+
         {/* ===== AI PROPOSAL SECTION ===== */}
+        {!isLocked && (
         <div className="pulse-lime-border rounded-[12px] p-[2px]">
           <div className="bg-[#1E2228] rounded-[10px] p-5 space-y-4">
             <div className="flex items-start gap-3">
@@ -615,11 +636,36 @@ export default function EstimatePage() {
             )}
           </div>
         </div>
+        )}
+
+        {/* ===== LOCKED BANNER ===== */}
+        {isLocked && (
+          <div className="bg-[#A8FF3E]/10 border border-[#A8FF3E]/30 rounded-[12px] p-4 flex items-start gap-3">
+            <CheckCircle className="h-5 w-5 text-[#A8FF3E] mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-[#A8FF3E]">
+                {lang === 'es' ? 'Presupuesto aprobado' : 'Estimate approved'}
+              </p>
+              <p className="text-xs text-[#6B7280] mt-1">
+                {job?.approved_at
+                  ? `${lang === 'es' ? 'Aprobado el' : 'Approved on'} ${new Date(job.approved_at).toLocaleDateString(lang === 'es' ? 'es' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`
+                  : (lang === 'es' ? 'Este presupuesto está bloqueado.' : 'This estimate is locked.')}
+                {' '}{lang === 'es' ? '- Solo lectura' : '- Read only'}
+              </p>
+              {job?.client_signature && (
+                <p className="text-xs text-[#9CA3AF] mt-1">
+                  {lang === 'es' ? 'Firmado por: ' : 'Signed by: '}{job.client_signature}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ===== MODE TOGGLE ===== */}
-        <div className="bg-[#1E2228] border border-[#2A2D35] rounded-lg p-1 flex">
+        <div className={`bg-[#1E2228] border border-[#2A2D35] rounded-lg p-1 flex ${isLocked ? 'opacity-70 pointer-events-none' : ''}`}>
           <button
             onClick={() => setMode('simple')}
+            disabled={isLocked}
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-md text-sm font-medium transition-all ${
               mode === 'simple'
                 ? 'bg-[#A8FF3E] text-[#0F1117] font-bold shadow-lg shadow-[#A8FF3E]/20'
@@ -634,6 +680,7 @@ export default function EstimatePage() {
               setMode('itemized')
               if (items.length === 0 && job) loadTemplate(job.job_type as JobType, Number(job.square_footage) || 1000)
             }}
+            disabled={isLocked}
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-md text-sm font-medium transition-all ${
               mode === 'itemized'
                 ? 'bg-[#A8FF3E] text-[#0F1117] font-bold shadow-lg shadow-[#A8FF3E]/20'
@@ -647,8 +694,7 @@ export default function EstimatePage() {
 
         {/* ===== SIMPLE MODE ===== */}
         {mode === 'simple' && (
-          <div className="bg-[#1E2228] border border-[#2A2D35] rounded-[12px] p-5 space-y-5">
-            {/* Large price input */}
+          <div className={`bg-[#1E2228] border border-[#2A2D35] rounded-[12px] p-5 space-y-5 ${isLocked ? 'opacity-80' : ''}`}>
             <div className="text-center space-y-2">
               <Label className="text-[#6B7280] text-sm">{lang === 'es' ? 'Precio total' : 'Total price'}</Label>
               <div className="relative">
@@ -659,36 +705,39 @@ export default function EstimatePage() {
                   step="100"
                   value={simpleTotal || ''}
                   onChange={(e) => setSimpleTotal(parseFloat(e.target.value) || 0)}
+                  readOnly={isLocked}
                   placeholder="5,000"
                   className="input-dark h-16 text-3xl font-bold text-center tabular-nums pl-10 rounded-[12px]"
                 />
               </div>
             </div>
-            {/* Description textarea with AI improve button */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-[#6B7280] text-sm">
                   {lang === 'es' ? 'Descripción / Alcance' : 'Description / Scope'}
                 </Label>
-                <button
-                  type="button"
-                  onClick={handleImproveDescription}
-                  disabled={improvingDesc || !simpleDescription.trim()}
-                  className="flex items-center gap-1.5 text-xs font-medium text-[#A8FF3E] hover:text-[#A8FF3E]/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors px-2 py-1 rounded-lg hover:bg-[#A8FF3E]/5"
-                >
-                  {improvingDesc ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
-                  {improvingDesc
-                    ? (lang === 'es' ? 'Mejorando...' : 'Improving...')
-                    : (lang === 'es' ? 'Mejorar con IA' : 'Improve with AI')}
-                </button>
+                {!isLocked && (
+                  <button
+                    type="button"
+                    onClick={handleImproveDescription}
+                    disabled={improvingDesc || !simpleDescription.trim()}
+                    className="flex items-center gap-1.5 text-xs font-medium text-[#A8FF3E] hover:text-[#A8FF3E]/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors px-2 py-1 rounded-lg hover:bg-[#A8FF3E]/5"
+                  >
+                    {improvingDesc ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+                    {improvingDesc
+                      ? (lang === 'es' ? 'Mejorando...' : 'Improving...')
+                      : (lang === 'es' ? 'Mejorar con IA' : 'Improve with AI')}
+                  </button>
+                )}
               </div>
               <Textarea
                 value={simpleDescription}
                 onChange={(e) => setSimpleDescription(e.target.value)}
+                readOnly={isLocked}
                 placeholder={lang === 'es' ? 'Retecho completo de 2,000 sqft...' : 'Full reroof of 2,000 sqft...'}
                 className="input-dark min-h-[120px] text-base resize-none"
               />
-              {simpleDescription.trim().length > 0 && simpleDescription.trim().length < 20 && (
+              {!isLocked && simpleDescription.trim().length > 0 && simpleDescription.trim().length < 20 && (
                 <p className="text-xs text-[#6B7280] flex items-center gap-1">
                   <Wand2 className="h-3 w-3" />
                   {lang === 'es' ? 'Escribí más y usá "Mejorar con IA" para completar' : 'Write more and use "Improve with AI" to enhance'}
@@ -700,7 +749,7 @@ export default function EstimatePage() {
 
         {/* ===== ITEMIZED MODE ===== */}
         {mode === 'itemized' && (
-          <>
+          <div className={isLocked ? 'opacity-80 pointer-events-none' : ''}>
             {renderLineItems()}
 
             {/* Overhead / Margin / Totals */}
@@ -760,11 +809,11 @@ export default function EstimatePage() {
                 </div>
               </div>
             </div>
-          </>
+          </div>
         )}
 
         {/* ===== SCHEDULE & TERMS CARD ===== */}
-        <div className="bg-[#1E2228] border border-[#2A2D35] rounded-[12px] p-5 space-y-4">
+        <div className={`bg-[#1E2228] border border-[#2A2D35] rounded-[12px] p-5 space-y-4 ${isLocked ? 'opacity-80 pointer-events-none' : ''}`}>
           <h3 className="text-sm font-semibold text-white flex items-center gap-2">
             <CalendarDays className="h-4 w-4 text-[#A8FF3E]" />
             {lang === 'es' ? 'Fechas y condiciones' : 'Schedule & Terms'}
@@ -816,22 +865,8 @@ export default function EstimatePage() {
           </div>
         </div>
 
-        {/* ===== LANGUAGE OUTPUT TOGGLE ===== */}
-        <div className="flex items-center justify-between bg-[#1E2228] border border-[#2A2D35] rounded-[12px] p-4">
-          <div className="flex items-center gap-2">
-            <Globe className="h-4 w-4 text-[#A8FF3E]" />
-            <span className="text-sm font-medium text-white">{lang === 'es' ? 'Generar en Inglés' : 'Generate in English'}</span>
-          </div>
-          <button
-            onClick={() => setLanguageOutput(languageOutput === 'es' ? 'en' : 'es')}
-            className={`w-12 h-7 rounded-full transition-colors relative ${languageOutput === 'en' ? 'bg-[#A8FF3E]' : 'bg-[#2A2D35]'}`}
-          >
-            <div className={`w-5 h-5 bg-white rounded-full absolute top-1 transition-transform shadow-sm ${languageOutput === 'en' ? 'translate-x-6' : 'translate-x-1'}`} />
-          </button>
-        </div>
-
         {/* ===== PHOTOS SECTION ===== */}
-        <div className="bg-[#1E2228] border border-[#2A2D35] rounded-[12px] p-5 space-y-3">
+        <div className={`bg-[#1E2228] border border-[#2A2D35] rounded-[12px] p-5 space-y-3 ${isLocked ? 'opacity-80' : ''}`}>
           <h3 className="text-sm font-semibold text-white flex items-center gap-2">
             <Camera className="h-4 w-4 text-[#A8FF3E]" />
             {lang === 'es' ? 'Fotos del trabajo' : 'Job Photos'}
@@ -851,15 +886,19 @@ export default function EstimatePage() {
               ))}
             </div>
           )}
-          <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handlePhotoUpload} className="hidden" />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploadingPhoto}
-            className="w-full h-20 border-2 border-dashed border-[#2A2D35] rounded-[10px] text-[#6B7280] hover:border-[#A8FF3E] hover:text-[#A8FF3E] transition-colors flex flex-col items-center justify-center gap-1"
-          >
-            {uploadingPhoto ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImageIcon className="h-5 w-5" />}
-            <span className="text-xs">{uploadingPhoto ? (lang === 'es' ? 'Subiendo...' : 'Uploading...') : (lang === 'es' ? 'Subir fotos' : 'Upload photos')}</span>
-          </button>
+          {!isLocked && (
+            <>
+              <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handlePhotoUpload} className="hidden" />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingPhoto}
+                className="w-full h-20 border-2 border-dashed border-[#2A2D35] rounded-[10px] text-[#6B7280] hover:border-[#A8FF3E] hover:text-[#A8FF3E] transition-colors flex flex-col items-center justify-center gap-1"
+              >
+                {uploadingPhoto ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImageIcon className="h-5 w-5" />}
+                <span className="text-xs">{uploadingPhoto ? (lang === 'es' ? 'Subiendo...' : 'Uploading...') : (lang === 'es' ? 'Subir fotos' : 'Upload photos')}</span>
+              </button>
+            </>
+          )}
         </div>
 
         {/* ===== SUMMARY CARD ===== */}
@@ -913,15 +952,17 @@ export default function EstimatePage() {
 
         {/* ===== ACTIONS ===== */}
         <div className="space-y-3">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="btn-lime w-full h-12 rounded-[10px] flex items-center justify-center gap-2 text-base font-bold"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {saving ? t('estimate.saving') : t('estimate.save')}
-          </button>
-          <div className="grid grid-cols-3 gap-2">
+          {!isLocked && (
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="btn-lime w-full h-12 rounded-[10px] flex items-center justify-center gap-2 text-base font-bold"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {saving ? t('estimate.saving') : t('estimate.save')}
+            </button>
+          )}
+          <div className={`grid ${isLocked ? 'grid-cols-2' : 'grid-cols-3'} gap-2`}>
             <button
               onClick={handleGeneratePdf}
               disabled={generatingPdf}
@@ -937,13 +978,15 @@ export default function EstimatePage() {
               <Send className="h-4 w-4" />
               {lang === 'es' ? 'Enviar' : 'Send'}
             </button>
-            <button
-              onClick={handleAccepted}
-              className="h-12 rounded-[10px] border border-[#A8FF3E]/30 bg-[#1E2228] text-[#A8FF3E] hover:border-[#A8FF3E] transition-colors flex items-center justify-center gap-1 text-sm font-medium"
-            >
-              <CheckCircle className="h-4 w-4" />
-              {lang === 'es' ? 'Aceptar' : 'Accept'}
-            </button>
+            {!isLocked && (
+              <button
+                onClick={handleAccepted}
+                className="h-12 rounded-[10px] border border-[#A8FF3E]/30 bg-[#1E2228] text-[#A8FF3E] hover:border-[#A8FF3E] transition-colors flex items-center justify-center gap-1 text-sm font-medium"
+              >
+                <CheckCircle className="h-4 w-4" />
+                {lang === 'es' ? 'Aceptar' : 'Accept'}
+              </button>
+            )}
           </div>
         </div>
       </div>

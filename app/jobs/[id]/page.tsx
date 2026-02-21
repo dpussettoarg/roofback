@@ -8,7 +8,8 @@ import { useI18n } from '@/lib/i18n/context'
 import { MobileNav } from '@/components/app/mobile-nav'
 import {
   ArrowLeft, FileText, CheckSquare, Clock, BarChart3, Trash2,
-  MapPin, Phone, User, Send, CheckCircle, Link2, Copy, ChevronRight
+  MapPin, Phone, User, Send, CheckCircle, Link2, Copy, ChevronRight,
+  ShieldCheck, CalendarCheck, Lock
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { STATUS_CONFIG, JOB_TYPE_OPTIONS, ROOF_TYPE_OPTIONS } from '@/lib/templates'
@@ -239,6 +240,50 @@ export default function JobDetailPage() {
             </div>
           )}
         </div>
+
+        {/* Approved Proposal Card */}
+        {(job.client_status === 'approved' || job.approved_at) && (
+          <div className="bg-[#1E2228] rounded-[12px] overflow-hidden border border-[#A8FF3E]/30">
+            <div className="h-1.5 bg-[#A8FF3E]" />
+            <div className="p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-[#A8FF3E]" />
+                <h3 className="text-sm font-bold text-white">
+                  {lang === 'es' ? 'Propuesta Aprobada' : 'Approved Proposal'}
+                </h3>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-[#0F1117] rounded-[8px] p-3 text-center">
+                  <p className="text-xs text-[#6B7280] mb-1">{lang === 'es' ? 'Total aprobado' : 'Approved total'}</p>
+                  <p className="text-lg font-bold text-[#A8FF3E] tabular-nums">
+                    {formatMoney(Number(job.estimated_total))}
+                  </p>
+                </div>
+                <div className="bg-[#0F1117] rounded-[8px] p-3 text-center">
+                  <p className="text-xs text-[#6B7280] mb-1">{lang === 'es' ? 'Fecha aprobacion' : 'Approval date'}</p>
+                  <p className="text-sm font-semibold text-white">
+                    {job.approved_at
+                      ? new Date(job.approved_at).toLocaleDateString(lang === 'es' ? 'es' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                      : '-'}
+                  </p>
+                </div>
+              </div>
+              {job.client_signature && (
+                <div className="flex items-center gap-2 text-xs text-[#9CA3AF] bg-[#0F1117] rounded-[8px] px-3 py-2">
+                  <CalendarCheck className="h-3.5 w-3.5 text-[#A8FF3E]" />
+                  <span>{lang === 'es' ? 'Firmado por: ' : 'Signed by: '}{job.client_signature}</span>
+                </div>
+              )}
+              <Link
+                href={`/jobs/${id}/estimate`}
+                className="flex items-center gap-2 text-xs text-[#A8FF3E] hover:underline"
+              >
+                <Lock className="h-3 w-3" />
+                {lang === 'es' ? 'Ver presupuesto aprobado (solo lectura)' : 'View approved estimate (read only)'}
+              </Link>
+            </div>
+          </div>
+        )}
 
         {/* Action Cards */}
         <div className="space-y-3">
