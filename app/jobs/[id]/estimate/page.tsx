@@ -45,6 +45,14 @@ interface LocalItem {
   sort_order: number
 }
 
+const QUICK_ADD_CHIPS = [
+  { name: 'Shingles', category: 'material' as const, unit: 'sq', unit_price: 95 },
+  { name: 'Underlayment', category: 'material' as const, unit: 'roll', unit_price: 65 },
+  { name: 'Mano de obra', category: 'labor' as const, unit: 'sq', unit_price: 75 },
+  { name: 'Flashings', category: 'material' as const, unit: 'each', unit_price: 25 },
+  { name: 'Limpieza', category: 'other' as const, unit: 'job', unit_price: 300 },
+]
+
 export default function EstimatePage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
@@ -74,6 +82,11 @@ export default function EstimatePage() {
   const [languageOutput, setLanguageOutput] = useState<'es' | 'en'>('es')
   const [photos, setPhotos] = useState<string[]>([])
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
+
+  // AI Proposal state
+  const [aiNotes, setAiNotes] = useState('')
+  const [aiProposal, setAiProposal] = useState('')
+  const [generatingAi, setGeneratingAi] = useState(false)
 
   const deadlineDate = startDate ? addDays(startDate, durationDays) : ''
 
@@ -144,6 +157,17 @@ export default function EstimatePage() {
 
   const addItem = useCallback((category: 'material' | 'labor' | 'other') => {
     setItems((prev) => [...prev, { category, name: '', quantity: 1, unit: category === 'labor' ? 'horas' : 'each', unit_price: 0, sort_order: prev.length }])
+  }, [])
+
+  const addQuickItem = useCallback((chip: typeof QUICK_ADD_CHIPS[number]) => {
+    setItems((prev) => [...prev, {
+      category: chip.category,
+      name: chip.name,
+      quantity: 1,
+      unit: chip.unit,
+      unit_price: chip.unit_price,
+      sort_order: prev.length,
+    }])
   }, [])
 
   const calc = useMemo(() => {
@@ -219,6 +243,36 @@ export default function EstimatePage() {
       toast.error(lang === 'es' ? 'Error mejorando descripción' : 'Error improving description')
     } finally {
       setImprovingDesc(false)
+    }
+  }
+
+  async function handleGenerateAiProposal() {
+    if (!aiNotes.trim() || !job) return
+    setGeneratingAi(true)
+    try {
+      const res = await fetch('/api/ai/improve-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: aiNotes,
+          jobType: job.job_type,
+          roofType: job.roof_type,
+          squareFootage: Number(job.square_footage) || 0,
+          language: languageOutput,
+        }),
+      })
+      const data = await res.json()
+      if (data.error) {
+        toast.error(data.error)
+      } else if (data.improved) {
+        setAiProposal(data.improved)
+        setSimpleDescription(data.improved)
+        toast.success(lang === 'es' ? 'Propuesta generada con IA' : 'AI proposal generated')
+      }
+    } catch {
+      toast.error(lang === 'es' ? 'Error generando propuesta' : 'Error generating proposal')
+    } finally {
+      setGeneratingAi(false)
     }
   }
 
@@ -347,263 +401,648 @@ export default function EstimatePage() {
     }
   }
 
+  // --- Loading state ---
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-white">
-        <div className="w-8 h-8 rounded-full border-2 border-slate-200 border-t-[#008B99] animate-spin" />
+      <div className="flex items-center justify-center min-h-screen bg-[#0F1117]">
+        <div className="w-8 h-8 rounded-full border-2 border-[#2A2D35] border-t-[#A8FF3E] animate-spin" />
       </div>
     )
   }
 
-  const renderSection = (category: 'material' | 'labor' | 'other', title: string) => {
-    const sectionItems = items.map((item, idx) => ({ ...item, originalIndex: idx })).filter((i) => i.category === category)
+  // --- Itemized section renderer ---
+  const renderLineItems = () => {
+    const allItems = items.map((item, idx) => ({ ...item, originalIndex: idx }))
     return (
-      <Card className="border-0 shadow-sm bg-white rounded-2xl">
-        <CardContent className="p-4">
-          <h3 className="font-semibold text-slate-700 mb-3 text-sm uppercase tracking-wider">{title}</h3>
-          {category === 'material' && sectionItems.length > 0 && (
-            <div className="mb-3 p-3 rounded-xl bg-gradient-brand-subtle border border-slate-100">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-3.5 w-3.5 text-[#008B99]" />
-                <span className="text-xs text-slate-600">{lang === 'es' ? 'Marcas sugeridas: GAF / Owens Corning / CertainTeed' : 'Suggested brands: GAF / Owens Corning / CertainTeed'}</span>
+      <div className="space-y-4">
+        {/* Section header */}
+        <h3 className="text-[11px] font-bold uppercase tracking-wider text-[#A8FF3E] px-1">
+          {t('estimate.materialsAndLabor') || (lang === 'es' ? 'Materiales y mano de obra' : 'Materials & Labor')}
+        </h3>
+
+        {/* Line items */}
+        {allItems.map((item) => (
+          <div
+            key={item.originalIndex}
+            className="bg-[#1E2228] border border-[#2A2D35] rounded-[10px] p-4 space-y-3"
+          >
+            <div className="flex items-start gap-2">
+              <div className="flex-1">
+                <Label className="text-xs text-[#6B7280] mb-1 block">
+                  {lang === 'es' ? 'Descripción' : 'Description'}
+                </Label>
+                <Input
+                  value={item.name}
+                  onChange={(e) => updateItem(item.originalIndex, 'name', e.target.value)}
+                  placeholder={lang === 'es' ? 'Nombre del ítem' : 'Item name'}
+                  className="input-dark h-10 text-sm font-medium"
+                />
+              </div>
+              <button
+                onClick={() => removeItem(item.originalIndex)}
+                className="p-2 text-[#6B7280] hover:text-red-400 transition-colors mt-5"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label className="text-xs text-[#6B7280] mb-1 block">{t('estimate.qty')}</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={item.quantity}
+                  onChange={(e) => updateItem(item.originalIndex, 'quantity', parseFloat(e.target.value) || 0)}
+                  className="input-dark h-9 text-sm"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-[#6B7280] mb-1 block">{t('estimate.unit')}</Label>
+                <Input
+                  value={item.unit}
+                  onChange={(e) => updateItem(item.originalIndex, 'unit', e.target.value)}
+                  className="input-dark h-9 text-sm"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-[#6B7280] mb-1 block">$/u</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={item.unit_price}
+                  onChange={(e) => updateItem(item.originalIndex, 'unit_price', parseFloat(e.target.value) || 0)}
+                  className="input-dark h-9 text-sm"
+                />
               </div>
             </div>
-          )}
-          <div className="space-y-3">
-            {sectionItems.map((item) => (
-              <div key={item.originalIndex} className="flex items-start gap-2 pb-3 border-b border-slate-100 last:border-0">
-                <div className="flex-1 space-y-2">
-                  <Input value={item.name} onChange={(e) => updateItem(item.originalIndex, 'name', e.target.value)} placeholder={lang === 'es' ? 'Nombre' : 'Name'} className="h-10 text-sm font-medium bg-slate-50/50 border-slate-200 rounded-xl" />
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <Label className="text-[11px] text-slate-400">{t('estimate.qty')}</Label>
-                      <Input type="number" min="0" step="0.5" value={item.quantity} onChange={(e) => updateItem(item.originalIndex, 'quantity', parseFloat(e.target.value) || 0)} className="h-9 text-sm bg-slate-50/50 border-slate-200 rounded-lg" />
-                    </div>
-                    <div>
-                      <Label className="text-[11px] text-slate-400">{t('estimate.unit')}</Label>
-                      <Input value={item.unit} onChange={(e) => updateItem(item.originalIndex, 'unit', e.target.value)} className="h-9 text-sm bg-slate-50/50 border-slate-200 rounded-lg" />
-                    </div>
-                    <div>
-                      <Label className="text-[11px] text-slate-400">$/u</Label>
-                      <Input type="number" min="0" step="0.01" value={item.unit_price} onChange={(e) => updateItem(item.originalIndex, 'unit_price', parseFloat(e.target.value) || 0)} className="h-9 text-sm bg-slate-50/50 border-slate-200 rounded-lg" />
-                    </div>
-                  </div>
-                  <p className="text-right text-sm font-semibold text-slate-700 tabular-nums">= {formatMoney(item.quantity * item.unit_price)}</p>
-                </div>
-                <button onClick={() => removeItem(item.originalIndex)} className="p-2 text-red-400 hover:text-red-600 mt-1"><Trash2 className="h-4 w-4" /></button>
-              </div>
-            ))}
+            <p className="text-right text-sm font-semibold text-white tabular-nums">
+              = {formatMoney(item.quantity * item.unit_price)}
+            </p>
           </div>
-          <Button variant="ghost" size="sm" className="w-full mt-2 text-[#008B99] hover:text-[#006d78]" onClick={() => addItem(category)}><Plus className="h-4 w-4 mr-1" />{t('estimate.addItem')}</Button>
-        </CardContent>
-      </Card>
+        ))}
+
+        {/* Add item button */}
+        <button
+          onClick={() => addItem('material')}
+          className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium text-[#A8FF3E] hover:bg-[#A8FF3E]/5 rounded-[10px] border border-dashed border-[#2A2D35] hover:border-[#A8FF3E]/40 transition-colors"
+        >
+          <Plus className="h-4 w-4" />
+          {lang === 'es' ? 'Agregar ítem' : 'Add item'}
+        </button>
+
+        {/* Quick-add chips */}
+        <div className="flex flex-wrap gap-2">
+          {QUICK_ADD_CHIPS.map((chip) => (
+            <button
+              key={chip.name}
+              onClick={() => addQuickItem(chip)}
+              className="px-3 py-1.5 text-xs font-medium bg-[#16191F] border border-[#2A2D35] text-[#6B7280] rounded-full hover:border-[#A8FF3E] hover:text-[#A8FF3E] transition-colors"
+            >
+              {chip.name}
+            </button>
+          ))}
+        </div>
+      </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] pb-24">
-      <div className="bg-white border-b border-slate-100 px-5 pt-12 pb-4">
-        <Link href={`/jobs/${id}`} className="inline-flex items-center text-sm text-slate-400 mb-2">
-          <ArrowLeft className="h-4 w-4 mr-1" />{job?.client_name}
-        </Link>
-        <h1 className="text-2xl font-bold text-slate-900">{t('estimate.title')}</h1>
+    <div className="min-h-screen bg-[#0F1117] pb-28 font-[Inter,sans-serif]">
+      {/* ===== HEADER ===== */}
+      <div className="bg-[#0F1117] border-b border-[#2A2D35] px-5 pt-12 pb-4">
+        <div className="max-w-[430px] mx-auto">
+          <Link
+            href={`/jobs/${id}`}
+            className="inline-flex items-center text-sm text-[#6B7280] hover:text-[#A8FF3E] transition-colors mb-2"
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            {job?.client_name}
+          </Link>
+          <h1 className="text-2xl font-bold text-white">{t('estimate.title')}</h1>
+        </div>
       </div>
 
-      <div className="px-5 py-5 space-y-4">
-        {/* Mode Toggle */}
-        <div className="flex bg-white rounded-2xl border border-slate-100 p-1.5 shadow-sm">
-          <button onClick={() => setMode('simple')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium transition-all ${mode === 'simple' ? 'bg-gradient-brand text-white shadow-md' : 'text-slate-500'}`}>
-            <Zap className="h-4 w-4" />Simple
+      {/* ===== MAIN CONTENT ===== */}
+      <div className="max-w-[430px] mx-auto px-5 py-5 space-y-4">
+
+        {/* ===== AI PROPOSAL SECTION ===== */}
+        <div className="pulse-lime-border rounded-[12px] p-[2px]">
+          <div className="bg-[#1E2228] rounded-[10px] p-5 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-[#A8FF3E]/10 rounded-lg">
+                <Sparkles className="h-5 w-5 text-[#A8FF3E]" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-white">
+                  {t('estimate.aiTitle') || (lang === 'es' ? 'Propuesta con IA' : 'AI Proposal')}
+                </h2>
+                <p className="text-sm text-[#6B7280] mt-0.5">
+                  {t('estimate.aiSubtitle') || (lang === 'es' ? 'Describí el trabajo y generamos el presupuesto' : 'Describe the job and we generate the estimate')}
+                </p>
+              </div>
+            </div>
+            <Textarea
+              value={aiNotes}
+              onChange={(e) => setAiNotes(e.target.value)}
+              placeholder={lang === 'es'
+                ? 'Ej: Retecho de 2000 sqft, shingles arquitectónicos, incluir remoción...'
+                : 'E.g.: 2000 sqft reroof, architectural shingles, include tear-off...'}
+              className="input-dark min-h-[80px] text-sm resize-none"
+            />
+            <button
+              onClick={handleGenerateAiProposal}
+              disabled={generatingAi || !aiNotes.trim()}
+              className="btn-lime w-full h-11 rounded-[10px] flex items-center justify-center gap-2 text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+            >
+              {generatingAi ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              {t('estimate.aiGenerate') || (lang === 'es' ? 'Generar propuesta' : 'Generate proposal')}
+            </button>
+
+            {/* AI generated proposal display */}
+            {aiProposal && (
+              <div className="space-y-3 pt-2">
+                <Separator className="bg-[#2A2D35]" />
+                <Textarea
+                  value={aiProposal}
+                  onChange={(e) => {
+                    setAiProposal(e.target.value)
+                    setSimpleDescription(e.target.value)
+                  }}
+                  className="input-dark min-h-[120px] text-sm resize-none"
+                />
+                <button
+                  onClick={() => {
+                    setAiProposal('')
+                    handleGenerateAiProposal()
+                  }}
+                  disabled={generatingAi}
+                  className="text-sm text-[#6B7280] hover:text-[#A8FF3E] transition-colors flex items-center gap-1.5"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Regenerar
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ===== MODE TOGGLE ===== */}
+        <div className="bg-[#1E2228] border border-[#2A2D35] rounded-lg p-1 flex">
+          <button
+            onClick={() => setMode('simple')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-md text-sm font-medium transition-all ${
+              mode === 'simple'
+                ? 'bg-[#A8FF3E] text-[#0F1117] font-bold shadow-lg shadow-[#A8FF3E]/20'
+                : 'text-[#6B7280]'
+            }`}
+          >
+            <Zap className="h-4 w-4" />
+            Simple
           </button>
-          <button onClick={() => { setMode('itemized'); if (items.length === 0 && job) loadTemplate(job.job_type as JobType, Number(job.square_footage) || 1000) }} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium transition-all ${mode === 'itemized' ? 'bg-gradient-brand text-white shadow-md' : 'text-slate-500'}`}>
-            <List className="h-4 w-4" />{lang === 'es' ? 'Detallado' : 'Itemized'}
+          <button
+            onClick={() => {
+              setMode('itemized')
+              if (items.length === 0 && job) loadTemplate(job.job_type as JobType, Number(job.square_footage) || 1000)
+            }}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-md text-sm font-medium transition-all ${
+              mode === 'itemized'
+                ? 'bg-[#A8FF3E] text-[#0F1117] font-bold shadow-lg shadow-[#A8FF3E]/20'
+                : 'text-[#6B7280]'
+            }`}
+          >
+            <List className="h-4 w-4" />
+            {lang === 'es' ? 'Detallado' : 'Itemized'}
           </button>
         </div>
 
-        {/* Schedule & Payment Section */}
-        <Card className="border-0 shadow-sm bg-white rounded-2xl">
-          <CardContent className="p-4 space-y-4">
-            <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-              <CalendarDays className="h-4 w-4 text-[#008B99]" />
-              {lang === 'es' ? 'Fechas y condiciones' : 'Schedule & Terms'}
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-[11px] text-slate-400">{lang === 'es' ? 'Fecha de inicio' : 'Start date'}</Label>
-                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-10 bg-slate-50/50 border-slate-200 rounded-xl text-sm" />
-              </div>
-              <div>
-                <Label className="text-[11px] text-slate-400">{lang === 'es' ? 'Duración (días)' : 'Duration (days)'}</Label>
-                <Input type="number" min="1" value={durationDays} onChange={(e) => setDurationDays(parseInt(e.target.value) || 1)} className="h-10 bg-slate-50/50 border-slate-200 rounded-xl text-sm" />
+        {/* ===== SIMPLE MODE ===== */}
+        {mode === 'simple' && (
+          <div className="bg-[#1E2228] border border-[#2A2D35] rounded-[12px] p-5 space-y-5">
+            {/* Large price input */}
+            <div className="text-center space-y-2">
+              <Label className="text-[#6B7280] text-sm">{lang === 'es' ? 'Precio total' : 'Total price'}</Label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-[#6B7280]">$</span>
+                <Input
+                  type="number"
+                  min="0"
+                  step="100"
+                  value={simpleTotal || ''}
+                  onChange={(e) => setSimpleTotal(parseFloat(e.target.value) || 0)}
+                  placeholder="5,000"
+                  className="input-dark h-16 text-3xl font-bold text-center tabular-nums pl-10 rounded-[12px]"
+                />
               </div>
             </div>
-            {startDate && (
-              <div className="flex items-center gap-2 p-3 rounded-xl bg-gradient-brand-subtle">
-                <Clock className="h-4 w-4 text-[#008B99]" />
-                <span className="text-sm text-slate-700">
-                  {lang === 'es' ? 'Fecha prometida: ' : 'Deadline: '}
-                  <strong>{new Date(deadlineDate + 'T12:00').toLocaleDateString(lang === 'es' ? 'es' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</strong>
-                </span>
+            {/* Description textarea with AI improve button */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-[#6B7280] text-sm">
+                  {lang === 'es' ? 'Descripción / Alcance' : 'Description / Scope'}
+                </Label>
+                <button
+                  type="button"
+                  onClick={handleImproveDescription}
+                  disabled={improvingDesc || !simpleDescription.trim()}
+                  className="flex items-center gap-1.5 text-xs font-medium text-[#A8FF3E] hover:text-[#A8FF3E]/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors px-2 py-1 rounded-lg hover:bg-[#A8FF3E]/5"
+                >
+                  {improvingDesc ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+                  {improvingDesc
+                    ? (lang === 'es' ? 'Mejorando...' : 'Improving...')
+                    : (lang === 'es' ? 'Mejorar con IA' : 'Improve with AI')}
+                </button>
               </div>
-            )}
-            <div>
-              <Label className="text-[11px] text-slate-400 flex items-center gap-1"><CreditCard className="h-3 w-3" />{lang === 'es' ? 'Condiciones de pago' : 'Payment terms'}</Label>
-              <select value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} className="w-full h-10 bg-slate-50/50 border border-slate-200 rounded-xl text-sm px-3 mt-1">
-                {PAYMENT_TERMS_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{lang === 'es' ? opt.label_es : opt.label_en}</option>
-                ))}
-              </select>
+              <Textarea
+                value={simpleDescription}
+                onChange={(e) => setSimpleDescription(e.target.value)}
+                placeholder={lang === 'es' ? 'Retecho completo de 2,000 sqft...' : 'Full reroof of 2,000 sqft...'}
+                className="input-dark min-h-[120px] text-base resize-none"
+              />
+              {simpleDescription.trim().length > 0 && simpleDescription.trim().length < 20 && (
+                <p className="text-xs text-[#6B7280] flex items-center gap-1">
+                  <Wand2 className="h-3 w-3" />
+                  {lang === 'es' ? 'Escribí más y usá "Mejorar con IA" para completar' : 'Write more and use "Improve with AI" to enhance'}
+                </p>
+              )}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        )}
 
-        {/* Language Output Toggle */}
-        <div className="flex items-center justify-between bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
+        {/* ===== ITEMIZED MODE ===== */}
+        {mode === 'itemized' && (
+          <>
+            {renderLineItems()}
+
+            {/* Overhead / Margin / Totals */}
+            <div className="bg-[#1E2228] border border-[#2A2D35] rounded-[12px] p-5 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-[#6B7280] mb-1 block">{t('estimate.overheadPct')}</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={overheadPct}
+                    onChange={(e) => setOverheadPct(parseFloat(e.target.value) || 0)}
+                    className="input-dark h-10"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-[#6B7280] mb-1 block">{t('estimate.marginPct')}</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={marginPct}
+                    onChange={(e) => setMarginPct(parseFloat(e.target.value) || 0)}
+                    className="input-dark h-10"
+                  />
+                </div>
+              </div>
+              <Separator className="bg-[#2A2D35]" />
+              <div className="space-y-1.5 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-[#6B7280]">{t('estimate.subtotalMaterials')}</span>
+                  <span className="text-white tabular-nums">{formatMoney(calc.materials)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#6B7280]">{t('estimate.subtotalLabor')}</span>
+                  <span className="text-white tabular-nums">{formatMoney(calc.labor)}</span>
+                </div>
+                {calc.other > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-[#6B7280]">{t('estimate.subtotalOther')}</span>
+                    <span className="text-white tabular-nums">{formatMoney(calc.other)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-[#6B7280]">{t('estimate.overhead')} ({overheadPct}%)</span>
+                  <span className="text-white tabular-nums">{formatMoney(calc.overhead)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#6B7280]">{t('estimate.margin')} ({marginPct}%)</span>
+                  <span className="text-white tabular-nums">{formatMoney(calc.margin)}</span>
+                </div>
+                <Separator className="bg-[#2A2D35]" />
+                <div className="flex justify-between text-lg font-bold pt-1">
+                  <span className="text-[#A8FF3E]">{t('estimate.grandTotal')}</span>
+                  <span className="text-[#A8FF3E] tabular-nums">{formatMoney(calc.total)}</span>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ===== SCHEDULE & TERMS CARD ===== */}
+        <div className="bg-[#1E2228] border border-[#2A2D35] rounded-[12px] p-5 space-y-4">
+          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-[#A8FF3E]" />
+            {lang === 'es' ? 'Fechas y condiciones' : 'Schedule & Terms'}
+          </h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs text-[#6B7280] mb-1 block">{lang === 'es' ? 'Fecha de inicio' : 'Start date'}</Label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="input-dark h-10 text-sm"
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-[#6B7280] mb-1 block">{lang === 'es' ? 'Duración (días)' : 'Duration (days)'}</Label>
+              <Input
+                type="number"
+                min="1"
+                value={durationDays}
+                onChange={(e) => setDurationDays(parseInt(e.target.value) || 1)}
+                className="input-dark h-10 text-sm"
+              />
+            </div>
+          </div>
+          {startDate && (
+            <div className="flex items-center gap-2 p-3 rounded-[8px] bg-[#A8FF3E]/5 border border-[#A8FF3E]/20">
+              <Clock className="h-4 w-4 text-[#A8FF3E]" />
+              <span className="text-sm text-white">
+                {lang === 'es' ? 'Fecha prometida: ' : 'Deadline: '}
+                <strong>{new Date(deadlineDate + 'T12:00').toLocaleDateString(lang === 'es' ? 'es' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</strong>
+              </span>
+            </div>
+          )}
+          <div>
+            <Label className="text-xs text-[#6B7280] mb-1 flex items-center gap-1">
+              <CreditCard className="h-3 w-3" />
+              {lang === 'es' ? 'Condiciones de pago' : 'Payment terms'}
+            </Label>
+            <select
+              value={paymentTerms}
+              onChange={(e) => setPaymentTerms(e.target.value)}
+              className="w-full h-10 bg-[#16191F] border border-[#2A2D35] rounded-[8px] text-sm text-white px-3 mt-1 focus:outline-none focus:border-[#A8FF3E] transition-colors"
+            >
+              {PAYMENT_TERMS_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{lang === 'es' ? opt.label_es : opt.label_en}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* ===== LANGUAGE OUTPUT TOGGLE ===== */}
+        <div className="flex items-center justify-between bg-[#1E2228] border border-[#2A2D35] rounded-[12px] p-4">
           <div className="flex items-center gap-2">
-            <Globe className="h-4 w-4 text-[#008B99]" />
-            <span className="text-sm font-medium text-slate-700">{lang === 'es' ? 'Generar en Inglés' : 'Generate in English'}</span>
+            <Globe className="h-4 w-4 text-[#A8FF3E]" />
+            <span className="text-sm font-medium text-white">{lang === 'es' ? 'Generar en Inglés' : 'Generate in English'}</span>
           </div>
           <button
             onClick={() => setLanguageOutput(languageOutput === 'es' ? 'en' : 'es')}
-            className={`w-12 h-7 rounded-full transition-colors relative ${languageOutput === 'en' ? 'bg-[#008B99]' : 'bg-slate-200'}`}
+            className={`w-12 h-7 rounded-full transition-colors relative ${languageOutput === 'en' ? 'bg-[#A8FF3E]' : 'bg-[#2A2D35]'}`}
           >
             <div className={`w-5 h-5 bg-white rounded-full absolute top-1 transition-transform shadow-sm ${languageOutput === 'en' ? 'translate-x-6' : 'translate-x-1'}`} />
           </button>
         </div>
 
-        {/* Photos Section */}
-        <Card className="border-0 shadow-sm bg-white rounded-2xl">
-          <CardContent className="p-4 space-y-3">
-            <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-              <Camera className="h-4 w-4 text-[#008B99]" />
-              {lang === 'es' ? 'Fotos del trabajo' : 'Job Photos'}
-            </h3>
-            {photos.length > 0 && (
-              <div className="grid grid-cols-3 gap-2">
-                {photos.map((url, i) => (
-                  <div key={i} className="relative group rounded-xl overflow-hidden aspect-square bg-slate-100">
-                    <Image src={url} alt="" fill className="object-cover" sizes="120px" />
-                    <button onClick={() => removePhoto(i)} className="absolute top-1 right-1 p-1 bg-black/50 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handlePhotoUpload} className="hidden" />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingPhoto}
-              className="w-full h-20 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 hover:border-[#008B99] hover:text-[#008B99] transition-colors flex flex-col items-center justify-center gap-1"
-            >
-              {uploadingPhoto ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImageIcon className="h-5 w-5" />}
-              <span className="text-xs">{uploadingPhoto ? (lang === 'es' ? 'Subiendo...' : 'Uploading...') : (lang === 'es' ? 'Subir fotos' : 'Upload photos')}</span>
-            </button>
-          </CardContent>
-        </Card>
-
-        {/* SIMPLE MODE */}
-        {mode === 'simple' && (
-          <Card className="border-0 shadow-sm bg-white rounded-2xl">
-            <CardContent className="p-5 space-y-5">
-              <div className="text-center space-y-2">
-                <Label className="text-slate-500 text-sm">{lang === 'es' ? 'Precio total' : 'Total price'}</Label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-slate-400">$</span>
-                  <Input type="number" min="0" step="100" value={simpleTotal || ''} onChange={(e) => setSimpleTotal(parseFloat(e.target.value) || 0)} placeholder="5,000" className="h-16 text-3xl font-bold text-center tabular-nums bg-slate-50/50 border-slate-200 rounded-2xl pl-10" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-slate-500 text-sm">{lang === 'es' ? 'Descripción / Alcance' : 'Description / Scope'}</Label>
+        {/* ===== PHOTOS SECTION ===== */}
+        <div className="bg-[#1E2228] border border-[#2A2D35] rounded-[12px] p-5 space-y-3">
+          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+            <Camera className="h-4 w-4 text-[#A8FF3E]" />
+            {lang === 'es' ? 'Fotos del trabajo' : 'Job Photos'}
+          </h3>
+          {photos.length > 0 && (
+            <div className="grid grid-cols-3 gap-2">
+              {photos.map((url, i) => (
+                <div key={i} className="relative group rounded-[8px] overflow-hidden aspect-square bg-[#16191F]">
+                  <Image src={url} alt="" fill className="object-cover" sizes="120px" />
                   <button
-                    type="button"
-                    onClick={handleImproveDescription}
-                    disabled={improvingDesc || !simpleDescription.trim()}
-                    className="flex items-center gap-1.5 text-xs font-medium text-[#008B99] hover:text-[#006d78] disabled:opacity-40 disabled:cursor-not-allowed transition-colors px-2 py-1 rounded-lg hover:bg-[#008B99]/5"
+                    onClick={() => removePhoto(i)}
+                    className="absolute top-1 right-1 p-1 bg-black/60 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
                   >
-                    {improvingDesc ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
-                    {improvingDesc
-                      ? (lang === 'es' ? 'Mejorando...' : 'Improving...')
-                      : (lang === 'es' ? 'Mejorar con IA' : 'Improve with AI')}
+                    <X className="h-3 w-3" />
                   </button>
                 </div>
-                <Textarea value={simpleDescription} onChange={(e) => setSimpleDescription(e.target.value)} placeholder={lang === 'es' ? 'Retecho completo de 2,000 sqft...' : 'Full reroof of 2,000 sqft...'} className="min-h-[120px] text-base bg-slate-50/50 border-slate-200 rounded-xl resize-none" />
-                {simpleDescription.trim().length > 0 && simpleDescription.trim().length < 20 && (
-                  <p className="text-xs text-slate-400 flex items-center gap-1">
-                    <Wand2 className="h-3 w-3" />
-                    {lang === 'es' ? 'Escribí más y usá "Mejorar con IA" para completar' : 'Write more and use "Improve with AI" to enhance'}
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+              ))}
+            </div>
+          )}
+          <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handlePhotoUpload} className="hidden" />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadingPhoto}
+            className="w-full h-20 border-2 border-dashed border-[#2A2D35] rounded-[10px] text-[#6B7280] hover:border-[#A8FF3E] hover:text-[#A8FF3E] transition-colors flex flex-col items-center justify-center gap-1"
+          >
+            {uploadingPhoto ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImageIcon className="h-5 w-5" />}
+            <span className="text-xs">{uploadingPhoto ? (lang === 'es' ? 'Subiendo...' : 'Uploading...') : (lang === 'es' ? 'Subir fotos' : 'Upload photos')}</span>
+          </button>
+        </div>
 
-        {/* ITEMIZED MODE */}
-        {mode === 'itemized' && (
-          <>
-            {renderSection('material', lang === 'es' ? 'Materiales' : 'Materials')}
-            {renderSection('labor', lang === 'es' ? 'Mano de obra' : 'Labor')}
-            {renderSection('other', lang === 'es' ? 'Otros' : 'Other')}
-            <Card className="border-t-gradient border-0 shadow-sm bg-white rounded-2xl overflow-hidden">
-              <CardContent className="p-5 space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div><Label className="text-[11px] text-slate-400">{t('estimate.overheadPct')}</Label><Input type="number" min="0" max="100" value={overheadPct} onChange={(e) => setOverheadPct(parseFloat(e.target.value) || 0)} className="h-10 bg-slate-50/50 border-slate-200 rounded-xl" /></div>
-                  <div><Label className="text-[11px] text-slate-400">{t('estimate.marginPct')}</Label><Input type="number" min="0" max="100" value={marginPct} onChange={(e) => setMarginPct(parseFloat(e.target.value) || 0)} className="h-10 bg-slate-50/50 border-slate-200 rounded-xl" /></div>
+        {/* ===== SUMMARY CARD ===== */}
+        <div className="bg-[#1E2228] border border-[#2A2D35] border-t-[#A8FF3E] border-t-2 rounded-[12px] p-5 space-y-4">
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-[#6B7280]">{lang === 'es' ? 'Subtotal' : 'Subtotal'}</span>
+              <span className="text-white tabular-nums">
+                {formatMoney(mode === 'simple' ? simpleTotal : calc.subtotal)}
+              </span>
+            </div>
+            {mode === 'itemized' && (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-[#6B7280]">{t('estimate.overhead')} ({overheadPct}%)</span>
+                  <span className="text-white tabular-nums">{formatMoney(calc.overhead)}</span>
                 </div>
-                <Separator className="bg-slate-100" />
-                <div className="space-y-1.5 text-sm">
-                  <div className="flex justify-between"><span className="text-slate-500">{t('estimate.subtotalMaterials')}</span><span className="tabular-nums">{formatMoney(calc.materials)}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">{t('estimate.subtotalLabor')}</span><span className="tabular-nums">{formatMoney(calc.labor)}</span></div>
-                  {calc.other > 0 && <div className="flex justify-between"><span className="text-slate-500">{t('estimate.subtotalOther')}</span><span className="tabular-nums">{formatMoney(calc.other)}</span></div>}
-                  <div className="flex justify-between"><span className="text-slate-500">{t('estimate.overhead')} ({overheadPct}%)</span><span className="tabular-nums">{formatMoney(calc.overhead)}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">{t('estimate.margin')} ({marginPct}%)</span><span className="tabular-nums">{formatMoney(calc.margin)}</span></div>
-                  <Separator className="bg-slate-100" />
-                  <div className="flex justify-between text-lg font-bold pt-1"><span className="text-gradient-brand">{t('estimate.grandTotal')}</span><span className="text-gradient-brand tabular-nums">{formatMoney(calc.total)}</span></div>
+                <div className="flex justify-between">
+                  <span className="text-[#6B7280]">{t('estimate.margin')} ({marginPct}%)</span>
+                  <span className="text-white tabular-nums">{formatMoney(calc.margin)}</span>
                 </div>
-              </CardContent>
-            </Card>
-          </>
-        )}
+              </>
+            )}
+            <Separator className="bg-[#2A2D35]" />
+            <div className="flex justify-between items-center pt-1">
+              <span className="text-lg font-bold text-white">TOTAL</span>
+              <span className="text-2xl font-bold text-[#A8FF3E] tabular-nums">
+                {formatMoney(finalTotal)}
+              </span>
+            </div>
+          </div>
 
-        {/* ACTIONS */}
+          <div className="space-y-2 pt-2">
+            <button
+              onClick={handleGeneratePdf}
+              disabled={generatingPdf}
+              className="w-full h-11 rounded-[10px] border border-[#2A2D35] text-white hover:border-[#A8FF3E] hover:text-[#A8FF3E] transition-colors flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-40"
+            >
+              {generatingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              {lang === 'es' ? 'Vista Previa del PDF' : 'Preview PDF'}
+            </button>
+            <button
+              onClick={() => setShowSendDialog(true)}
+              className="btn-lime w-full h-12 rounded-[10px] flex items-center justify-center gap-2 text-sm font-bold"
+            >
+              <Send className="h-4 w-4" />
+              {lang === 'es' ? 'Enviar al Cliente' : 'Send to Client'} &rarr;
+            </button>
+          </div>
+        </div>
+
+        {/* ===== ACTIONS ===== */}
         <div className="space-y-3">
-          <button onClick={handleSave} disabled={saving} className="w-full h-12 text-base font-medium rounded-2xl btn-gradient flex items-center justify-center gap-2">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="btn-lime w-full h-12 rounded-[10px] flex items-center justify-center gap-2 text-base font-bold"
+          >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {saving ? t('estimate.saving') : t('estimate.save')}
           </button>
           <div className="grid grid-cols-3 gap-2">
-            <Button variant="outline" onClick={handleGeneratePdf} disabled={generatingPdf} className="h-12 rounded-xl border-slate-200">{generatingPdf ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}PDF</Button>
-            <Button variant="outline" onClick={() => setShowSendDialog(true)} className="h-12 rounded-xl border-slate-200 text-[#008B99]"><Send className="h-4 w-4 mr-1" />{lang === 'es' ? 'Enviar' : 'Send'}</Button>
-            <Button variant="outline" onClick={handleAccepted} className="h-12 rounded-xl border-[#78BE20]/30 text-[#3D7A00]"><CheckCircle className="h-4 w-4 mr-1" />{lang === 'es' ? 'Aceptar' : 'Accept'}</Button>
+            <button
+              onClick={handleGeneratePdf}
+              disabled={generatingPdf}
+              className="h-12 rounded-[10px] border border-[#2A2D35] bg-[#1E2228] text-white hover:border-[#A8FF3E] transition-colors flex items-center justify-center gap-1 text-sm font-medium"
+            >
+              {generatingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              PDF
+            </button>
+            <button
+              onClick={() => setShowSendDialog(true)}
+              className="h-12 rounded-[10px] border border-[#2A2D35] bg-[#1E2228] text-[#A8FF3E] hover:border-[#A8FF3E] transition-colors flex items-center justify-center gap-1 text-sm font-medium"
+            >
+              <Send className="h-4 w-4" />
+              {lang === 'es' ? 'Enviar' : 'Send'}
+            </button>
+            <button
+              onClick={handleAccepted}
+              className="h-12 rounded-[10px] border border-[#A8FF3E]/30 bg-[#1E2228] text-[#A8FF3E] hover:border-[#A8FF3E] transition-colors flex items-center justify-center gap-1 text-sm font-medium"
+            >
+              <CheckCircle className="h-4 w-4" />
+              {lang === 'es' ? 'Aceptar' : 'Accept'}
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Send Dialog */}
+      {/* ===== SEND DIALOG (dark overlay + dark card modal) ===== */}
       {showSendDialog && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowSendDialog(false)} />
-          <div className="relative bg-white rounded-t-3xl sm:rounded-2xl w-full sm:max-w-md p-6 pb-8 space-y-4 shadow-xl">
-            <h3 className="text-lg font-semibold text-slate-900">{lang === 'es' ? 'Enviar presupuesto' : 'Send estimate'}</h3>
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowSendDialog(false)}
+          />
+          <div className="relative bg-[#1E2228] border border-[#2A2D35] rounded-t-[20px] sm:rounded-[16px] w-full sm:max-w-md p-6 pb-8 space-y-4 shadow-2xl">
+            <h3 className="text-lg font-semibold text-white">
+              {lang === 'es' ? 'Enviar presupuesto' : 'Send estimate'}
+            </h3>
             <div className="space-y-2">
-              <Label className="text-slate-600 text-sm">Email</Label>
-              <Input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="client@email.com" className="h-12 rounded-xl" />
+              <Label className="text-[#6B7280] text-sm">Email</Label>
+              <Input
+                type="email"
+                value={clientEmail}
+                onChange={(e) => setClientEmail(e.target.value)}
+                placeholder="client@email.com"
+                className="input-dark h-12 rounded-[10px]"
+              />
             </div>
             <div className="flex gap-2">
-              <Input readOnly value={`${typeof window !== 'undefined' ? window.location.origin : ''}/proposal/${job?.public_token}`} className="h-10 text-xs bg-slate-50 rounded-lg flex-1" />
-              <Button variant="outline" size="sm" onClick={handleCopyLink} className="h-10 rounded-lg px-3">{lang === 'es' ? 'Copiar' : 'Copy'}</Button>
+              <Input
+                readOnly
+                value={`${typeof window !== 'undefined' ? window.location.origin : ''}/proposal/${job?.public_token}`}
+                className="input-dark h-10 text-xs rounded-[8px] flex-1"
+              />
+              <button
+                onClick={handleCopyLink}
+                className="h-10 px-4 rounded-[8px] border border-[#2A2D35] bg-[#16191F] text-white text-sm font-medium hover:border-[#A8FF3E] transition-colors"
+              >
+                {lang === 'es' ? 'Copiar' : 'Copy'}
+              </button>
             </div>
             <div className="flex gap-2 pt-2">
-              <Button variant="outline" className="flex-1 h-12 rounded-xl" onClick={() => setShowSendDialog(false)}>{lang === 'es' ? 'Cancelar' : 'Cancel'}</Button>
-              <button onClick={handleSendToClient} disabled={!clientEmail} className="flex-1 h-12 rounded-xl btn-gradient flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-50"><Send className="h-4 w-4" />{lang === 'es' ? 'Enviar' : 'Send'}</button>
+              <button
+                onClick={() => setShowSendDialog(false)}
+                className="flex-1 h-12 rounded-[10px] border border-[#2A2D35] bg-[#16191F] text-white text-sm font-medium hover:border-[#A8FF3E] transition-colors"
+              >
+                {lang === 'es' ? 'Cancelar' : 'Cancel'}
+              </button>
+              <button
+                onClick={handleSendToClient}
+                disabled={!clientEmail}
+                className="btn-lime flex-1 h-12 rounded-[10px] flex items-center justify-center gap-2 text-sm font-bold disabled:opacity-50"
+              >
+                <Send className="h-4 w-4" />
+                {lang === 'es' ? 'Enviar' : 'Send'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
       <MobileNav />
+
+      {/* ===== INLINE STYLES for pulse-lime-border, btn-lime, input-dark ===== */}
+      <style jsx global>{`
+        .pulse-lime-border {
+          border: 2px solid #A8FF3E;
+          animation: pulse-lime 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-lime {
+          0%, 100% {
+            border-color: #A8FF3E;
+            box-shadow: 0 0 0 0 rgba(168, 255, 62, 0.3);
+          }
+          50% {
+            border-color: #7acc2e;
+            box-shadow: 0 0 16px 2px rgba(168, 255, 62, 0.15);
+          }
+        }
+
+        .btn-lime {
+          background-color: #A8FF3E;
+          color: #0F1117;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .btn-lime:hover {
+          background-color: #95e636;
+          box-shadow: 0 0 20px rgba(168, 255, 62, 0.25);
+        }
+
+        .btn-lime:active {
+          transform: scale(0.98);
+        }
+
+        .input-dark {
+          background-color: #16191F !important;
+          border-color: #2A2D35 !important;
+          color: white !important;
+          border-radius: 8px;
+        }
+
+        .input-dark::placeholder {
+          color: #4B5563 !important;
+        }
+
+        .input-dark:focus {
+          border-color: #A8FF3E !important;
+          box-shadow: 0 0 0 1px rgba(168, 255, 62, 0.2) !important;
+          outline: none;
+        }
+
+        /* Dark theme overrides for select option elements */
+        select option {
+          background-color: #16191F;
+          color: white;
+        }
+
+        /* Date input icon color fix for dark theme */
+        input[type="date"]::-webkit-calendar-picker-indicator {
+          filter: invert(1);
+        }
+      `}</style>
     </div>
   )
 }

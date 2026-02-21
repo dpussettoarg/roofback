@@ -141,83 +141,97 @@ export default function ChecklistPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-pulse text-gray-400">{t('common.loading')}</div>
+      <div className="flex items-center justify-center min-h-screen bg-[#0F1117]">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#2A2D35] border-t-[#A8FF3E]" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen pb-24">
-      <div className="bg-white border-b px-4 pt-12 pb-4">
-        <Link href={`/jobs/${id}`} className="inline-flex items-center text-sm text-gray-500 mb-2">
+    <div className="min-h-screen bg-[#0F1117] pb-24">
+      {/* Header */}
+      <div className="border-b border-[#2A2D35] px-4 pt-12 pb-4 max-w-[430px] mx-auto">
+        <Link href={`/jobs/${id}`} className="inline-flex items-center text-sm text-[#6B7280] mb-2">
           <ArrowLeft className="h-4 w-4 mr-1" />
           {job?.client_name}
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">{t('checklist.title')}</h1>
-        <p className="text-sm text-gray-500 mt-1">{t('checklist.subtitle')}</p>
+        <h1 className="text-2xl font-bold text-white">{t('checklist.title')}</h1>
+        <p className="text-sm text-[#6B7280] mt-1">{t('checklist.subtitle')}</p>
       </div>
 
-      <div className="px-4 py-4 space-y-4">
+      <div className="px-4 py-4 space-y-4 max-w-[430px] mx-auto">
         {/* Status bar */}
         {items.length > 0 && (
-          <Card className={`border-0 shadow-md ${allChecked ? 'border-l-4 border-l-emerald-500' : 'border-l-4 border-l-amber-400'}`}>
-            <CardContent className="p-4 flex items-center gap-3">
+          <div
+            className={`rounded-lg bg-[#1E2228] border border-[#2A2D35] ${
+              allChecked ? 'border-l-4 border-l-[#A8FF3E]' : 'border-l-4 border-l-amber-400'
+            }`}
+          >
+            <div className="p-4 flex items-center gap-3">
               {allChecked ? (
-                <CheckCircle className="h-6 w-6 text-emerald-500" />
+                <CheckCircle className="h-6 w-6 text-[#A8FF3E]" />
               ) : (
                 <AlertCircle className="h-6 w-6 text-amber-500" />
               )}
               <div>
-                <p className="font-semibold text-sm">
+                <p className="font-semibold text-sm text-white">
                   {allChecked ? t('checklist.allReady') : t('checklist.notReady')}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-[#6B7280]">
                   {checkedCount}/{items.length} items
                 </p>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )}
 
         {/* Generate from estimate */}
         {items.length === 0 && (
-          <Button onClick={generateFromEstimate} variant="outline" className="w-full h-12">
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <button
+            onClick={generateFromEstimate}
+            className="w-full h-12 rounded-lg border border-[#2A2D35] bg-[#1E2228] text-[#A8FF3E] font-medium text-sm flex items-center justify-center gap-2 hover:bg-[#252930] transition-colors"
+          >
+            <RefreshCw className="h-4 w-4" />
             {t('checklist.generate')}
-          </Button>
+          </button>
         )}
 
         {/* Checklist items */}
         {items.length > 0 && (
-          <Card className="border-0 shadow-md">
-            <CardContent className="p-4 space-y-3">
+          <div className="rounded-lg bg-[#1E2228] border border-[#2A2D35]">
+            <div className="p-4 space-y-3">
               {items.map((item, idx) => (
                 <div
                   key={idx}
-                  className={`flex items-start gap-3 pb-3 border-b border-gray-100 last:border-0 ${item.is_checked ? 'opacity-60' : ''}`}
+                  className={`flex items-start gap-3 pb-3 border-b border-[#2A2D35] last:border-0 ${
+                    item.is_checked ? 'opacity-60' : ''
+                  }`}
                 >
                   <Checkbox
                     checked={item.is_checked}
                     onCheckedChange={() => toggleCheck(idx)}
-                    className="mt-1 h-6 w-6 data-[state=checked]:bg-emerald-600"
+                    className="mt-1 h-6 w-6 border-[#2A2D35] data-[state=checked]:bg-[#A8FF3E] data-[state=checked]:border-[#A8FF3E] data-[state=checked]:text-[#0F1117]"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className={`font-medium text-sm ${item.is_checked ? 'line-through text-gray-400' : 'text-gray-900'}`}>
+                    <p
+                      className={`font-medium text-sm ${
+                        item.is_checked ? 'line-through text-[#6B7280]' : 'text-white'
+                      }`}
+                    >
                       {item.name}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-[#6B7280]">
                       {item.quantity_needed} {item.unit}
                     </p>
                     <div className="mt-1.5">
-                      <Input
+                      <input
                         type="number"
                         min="0"
                         step="0.01"
                         placeholder={t('checklist.actualCost')}
                         value={item.actual_cost ?? ''}
                         onChange={(e) => updateActualCost(idx, e.target.value)}
-                        className="h-9 text-sm w-32"
+                        className="input-dark h-9 text-sm w-32 rounded-md border border-[#2A2D35] bg-[#16191F] px-3 text-white placeholder:text-[#6B7280] focus:outline-none focus:ring-1 focus:ring-[#A8FF3E] focus:border-[#A8FF3E]"
                       />
                     </div>
                   </div>
@@ -228,32 +242,35 @@ export default function ChecklistPage() {
               {totals.actual > 0 && (
                 <>
                   <div className="pt-2 space-y-1 text-sm">
-                    <div className="flex justify-between font-semibold">
+                    <div className="flex justify-between font-semibold text-white">
                       <span>{t('checklist.totalActual')}</span>
                       <span>{formatMoney(totals.actual)}</span>
                     </div>
                   </div>
                 </>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )}
 
         {/* Actions */}
         {items.length > 0 && (
           <div className="space-y-2">
-            <Button
+            <button
               onClick={handleSave}
               disabled={saving}
-              className="w-full h-12 bg-emerald-600 hover:bg-emerald-700"
+              className="btn-lime w-full h-12 rounded-lg bg-[#A8FF3E] text-[#0F1117] font-semibold text-sm flex items-center justify-center gap-2 hover:bg-[#9AEF36] transition-colors disabled:opacity-50"
             >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {t('checklist.save')}
-            </Button>
-            <Button onClick={generateFromEstimate} variant="outline" className="w-full h-12">
-              <RefreshCw className="h-4 w-4 mr-2" />
+            </button>
+            <button
+              onClick={generateFromEstimate}
+              className="w-full h-12 rounded-lg bg-transparent text-[#A8FF3E] font-medium text-sm flex items-center justify-center gap-2 hover:bg-[#1E2228] transition-colors"
+            >
+              <RefreshCw className="h-4 w-4" />
               {t('checklist.generate')}
-            </Button>
+            </button>
           </div>
         )}
       </div>

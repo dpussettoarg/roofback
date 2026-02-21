@@ -113,154 +113,156 @@ export default function ResultsPage() {
   }
 
   function diffColor(est: number, act: number) {
-    if (act === 0) return 'text-gray-400'
+    if (act === 0) return 'text-[#6B7280]'
     const diff = est - act
-    if (diff > 0) return 'text-emerald-600'
-    if (diff < 0) return 'text-red-500'
-    return 'text-gray-600'
+    if (diff > 0) return 'text-[#A8FF3E]'
+    if (diff < 0) return 'text-[#EF4444]'
+    return 'text-[#6B7280]'
   }
 
   function diffIcon(est: number, act: number) {
-    if (act === 0) return <Minus className="h-4 w-4 text-gray-400" />
+    if (act === 0) return <Minus className="h-4 w-4 text-[#6B7280]" />
     const diff = est - act
-    if (diff > 0) return <TrendingDown className="h-4 w-4 text-emerald-600" />
-    if (diff < 0) return <TrendingUp className="h-4 w-4 text-red-500" />
-    return <Minus className="h-4 w-4" />
+    if (diff > 0) return <TrendingDown className="h-4 w-4 text-[#A8FF3E]" />
+    if (diff < 0) return <TrendingUp className="h-4 w-4 text-[#EF4444]" />
+    return <Minus className="h-4 w-4 text-[#6B7280]" />
   }
 
-  const profitColor = calc.actProfit > 0 ? 'text-emerald-600' : calc.actProfit < 0 ? 'text-red-500' : 'text-amber-500'
-  const profitBg = calc.actProfit > 0 ? 'bg-emerald-50 border-emerald-200' : calc.actProfit < 0 ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'
+  const profitColor = calc.actProfit > 0 ? 'text-[#A8FF3E]' : calc.actProfit < 0 ? 'text-[#EF4444]' : 'text-[#F59E0B]'
+  const profitBg = calc.actProfit > 0 ? 'bg-[#A8FF3E]/10 border-[#A8FF3E]/30' : calc.actProfit < 0 ? 'bg-[#EF4444]/10 border-[#EF4444]/30' : 'bg-[#F59E0B]/10 border-[#F59E0B]/30'
   const profitMessage = calc.actProfit > 200 ? t('results.great') : calc.actProfit >= 0 ? t('results.ok') : t('results.bad')
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-pulse text-gray-400">{t('common.loading')}</div>
+      <div className="flex items-center justify-center min-h-screen bg-[#0F1117]">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#2A2D35] border-t-[#A8FF3E]" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen pb-24">
-      <div className="bg-white border-b px-4 pt-12 pb-4">
-        <Link href={`/jobs/${id}`} className="inline-flex items-center text-sm text-gray-500 mb-2">
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          {job?.client_name}
-        </Link>
-        <h1 className="text-2xl font-bold text-gray-900">{t('results.title')}</h1>
-      </div>
+    <div className="min-h-screen bg-[#0F1117] pb-24">
+      <div className="mx-auto max-w-[430px]">
+        <div className="border-b border-[#2A2D35] px-4 pt-12 pb-4">
+          <Link href={`/jobs/${id}`} className="inline-flex items-center text-sm text-[#6B7280] mb-2">
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            {job?.client_name}
+          </Link>
+          <h1 className="text-2xl font-bold text-white">{t('results.title')}</h1>
+        </div>
 
-      <div className="px-4 py-4 space-y-4">
-        {/* Profit indicator */}
-        <Card className={`border shadow-md ${profitBg}`}>
-          <CardContent className="p-5 text-center">
-            <p className={`text-4xl font-bold ${profitColor}`}>
-              {formatMoney(calc.actProfit)}
-            </p>
-            <p className={`text-lg font-semibold ${profitColor} mt-1`}>
-              {calc.actMargin.toFixed(1)}% {lang === 'es' ? 'margen' : 'margin'}
-            </p>
-            <p className="text-sm text-gray-500 mt-2">{profitMessage}</p>
-          </CardContent>
-        </Card>
+        <div className="px-4 py-4 space-y-4">
+          {/* Profit indicator */}
+          <Card className={`border shadow-md ${profitBg} bg-[#1E2228]`} style={{ backgroundColor: undefined }}>
+            <CardContent className="p-5 text-center">
+              <p className={`text-4xl font-bold ${profitColor}`}>
+                {formatMoney(calc.actProfit)}
+              </p>
+              <p className={`text-lg font-semibold ${profitColor} mt-1`}>
+                {calc.actMargin.toFixed(1)}% {lang === 'es' ? 'margen' : 'margin'}
+              </p>
+              <p className="text-sm text-[#6B7280] mt-2">{profitMessage}</p>
+            </CardContent>
+          </Card>
 
-        {/* Comparison table */}
-        <Card className="border-0 shadow-md">
-          <CardContent className="p-4">
-            {/* Header */}
-            <div className="grid grid-cols-4 gap-2 text-xs font-semibold text-gray-500 mb-3 pb-2 border-b">
-              <span>{t('results.concept')}</span>
-              <span className="text-right">{t('results.estimated')}</span>
-              <span className="text-right">{t('results.actual')}</span>
-              <span className="text-right">{t('results.diff')}</span>
-            </div>
+          {/* Comparison table */}
+          <Card className="border border-[#2A2D35] bg-[#1E2228] shadow-md">
+            <CardContent className="p-4">
+              {/* Header */}
+              <div className="grid grid-cols-4 gap-2 text-xs font-semibold text-[#6B7280] mb-3 pb-2 border-b border-[#2A2D35]">
+                <span>{t('results.concept')}</span>
+                <span className="text-right">{t('results.estimated')}</span>
+                <span className="text-right">{t('results.actual')}</span>
+                <span className="text-right">{t('results.diff')}</span>
+              </div>
 
-            {/* Materials */}
-            <div className="grid grid-cols-4 gap-2 text-sm py-2 border-b border-gray-100">
-              <span className="text-gray-700">{t('results.materials')}</span>
-              <span className="text-right">{formatMoney(estMaterials)}</span>
-              <span className="text-right">{formatMoney(actMaterials)}</span>
-              <span className={`text-right flex items-center justify-end gap-1 ${diffColor(estMaterials, actMaterials)}`}>
-                {diffIcon(estMaterials, actMaterials)}
-                {formatMoney(estMaterials - actMaterials)}
-              </span>
-            </div>
+              {/* Materials */}
+              <div className="grid grid-cols-4 gap-2 text-sm py-2 border-b border-[#2A2D35]">
+                <span className="text-[#6B7280]">{t('results.materials')}</span>
+                <span className="text-right text-white">{formatMoney(estMaterials)}</span>
+                <span className="text-right text-white">{formatMoney(actMaterials)}</span>
+                <span className={`text-right flex items-center justify-end gap-1 ${diffColor(estMaterials, actMaterials)}`}>
+                  {diffIcon(estMaterials, actMaterials)}
+                  {formatMoney(estMaterials - actMaterials)}
+                </span>
+              </div>
 
-            {/* Labor */}
-            <div className="grid grid-cols-4 gap-2 text-sm py-2 border-b border-gray-100">
-              <span className="text-gray-700">{t('results.labor')}</span>
-              <span className="text-right">{formatMoney(estLabor)}</span>
-              <span className="text-right">{formatMoney(actLabor)}</span>
-              <span className={`text-right flex items-center justify-end gap-1 ${diffColor(estLabor, actLabor)}`}>
-                {diffIcon(estLabor, actLabor)}
-                {formatMoney(estLabor - actLabor)}
-              </span>
-            </div>
+              {/* Labor */}
+              <div className="grid grid-cols-4 gap-2 text-sm py-2 border-b border-[#2A2D35]">
+                <span className="text-[#6B7280]">{t('results.labor')}</span>
+                <span className="text-right text-white">{formatMoney(estLabor)}</span>
+                <span className="text-right text-white">{formatMoney(actLabor)}</span>
+                <span className={`text-right flex items-center justify-end gap-1 ${diffColor(estLabor, actLabor)}`}>
+                  {diffIcon(estLabor, actLabor)}
+                  {formatMoney(estLabor - actLabor)}
+                </span>
+              </div>
 
-            {/* Extras */}
-            <div className="grid grid-cols-4 gap-2 text-sm py-2 border-b border-gray-100">
-              <span className="text-gray-700">{t('results.extras')}</span>
-              <span className="text-right">{formatMoney(estOther)}</span>
-              <span className="text-right">{formatMoney(actExpenses)}</span>
-              <span className={`text-right flex items-center justify-end gap-1 ${diffColor(estOther, actExpenses)}`}>
-                {diffIcon(estOther, actExpenses)}
-                {formatMoney(estOther - actExpenses)}
-              </span>
-            </div>
+              {/* Extras */}
+              <div className="grid grid-cols-4 gap-2 text-sm py-2 border-b border-[#2A2D35]">
+                <span className="text-[#6B7280]">{t('results.extras')}</span>
+                <span className="text-right text-white">{formatMoney(estOther)}</span>
+                <span className="text-right text-white">{formatMoney(actExpenses)}</span>
+                <span className={`text-right flex items-center justify-end gap-1 ${diffColor(estOther, actExpenses)}`}>
+                  {diffIcon(estOther, actExpenses)}
+                  {formatMoney(estOther - actExpenses)}
+                </span>
+              </div>
 
-            <Separator className="my-2" />
+              <Separator className="my-2 bg-[#2A2D35]" />
 
-            {/* Total cost */}
-            <div className="grid grid-cols-4 gap-2 text-sm py-2 font-semibold">
-              <span>{t('results.totalCost')}</span>
-              <span className="text-right">{formatMoney(calc.estCost)}</span>
-              <span className="text-right">{formatMoney(calc.actCost)}</span>
-              <span className={`text-right ${diffColor(calc.estCost, calc.actCost)}`}>
-                {formatMoney(calc.estCost - calc.actCost)}
-              </span>
-            </div>
+              {/* Total cost */}
+              <div className="grid grid-cols-4 gap-2 text-sm py-2 font-semibold text-white">
+                <span>{t('results.totalCost')}</span>
+                <span className="text-right">{formatMoney(calc.estCost)}</span>
+                <span className="text-right">{formatMoney(calc.actCost)}</span>
+                <span className={`text-right ${diffColor(calc.estCost, calc.actCost)}`}>
+                  {formatMoney(calc.estCost - calc.actCost)}
+                </span>
+              </div>
 
-            {/* Charged */}
-            <div className="grid grid-cols-4 gap-2 text-sm py-2 bg-gray-50 rounded px-2">
-              <span className="font-semibold col-span-2">{t('results.charged')}</span>
-              <span className="text-right font-semibold col-span-2">{formatMoney(calc.charged)}</span>
-            </div>
+              {/* Charged */}
+              <div className="grid grid-cols-4 gap-2 text-sm py-2 bg-[#0F1117] rounded px-2">
+                <span className="font-semibold text-white col-span-2">{t('results.charged')}</span>
+                <span className="text-right font-semibold text-white col-span-2">{formatMoney(calc.charged)}</span>
+              </div>
 
-            <Separator className="my-2" />
+              <Separator className="my-2 bg-[#2A2D35]" />
 
-            {/* Profit */}
-            <div className={`grid grid-cols-4 gap-2 text-sm py-3 font-bold ${profitColor}`}>
-              <span>{t('results.profit')}</span>
-              <span className="text-right">{formatMoney(calc.estCost > 0 ? calc.charged - calc.estCost : 0)}</span>
-              <span className="text-right">{formatMoney(calc.actProfit)}</span>
-              <span></span>
-            </div>
+              {/* Profit */}
+              <div className={`grid grid-cols-4 gap-2 text-sm py-3 font-bold ${profitColor}`}>
+                <span>{t('results.profit')}</span>
+                <span className="text-right">{formatMoney(calc.estCost > 0 ? calc.charged - calc.estCost : 0)}</span>
+                <span className="text-right">{formatMoney(calc.actProfit)}</span>
+                <span></span>
+              </div>
 
-            {/* Margin */}
-            <div className={`grid grid-cols-4 gap-2 text-sm py-1 font-bold ${profitColor}`}>
-              <span>{t('results.margin')}</span>
-              <span className="text-right">{calc.estCost > 0 ? ((calc.charged - calc.estCost) / calc.charged * 100).toFixed(1) : '0'}%</span>
-              <span className="text-right">{calc.actMargin.toFixed(1)}%</span>
-              <span></span>
-            </div>
-          </CardContent>
-        </Card>
+              {/* Margin */}
+              <div className={`grid grid-cols-4 gap-2 text-sm py-1 font-bold ${profitColor}`}>
+                <span>{t('results.margin')}</span>
+                <span className="text-right">{calc.estCost > 0 ? ((calc.charged - calc.estCost) / calc.charged * 100).toFixed(1) : '0'}%</span>
+                <span className="text-right">{calc.actMargin.toFixed(1)}%</span>
+                <span></span>
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Actions */}
-        {job?.status !== 'completed' ? (
-          <Button
-            onClick={markComplete}
-            className="w-full h-14 text-lg bg-emerald-600 hover:bg-emerald-700"
-          >
-            <CheckCircle className="h-5 w-5 mr-2" />
-            {t('results.markComplete')}
-          </Button>
-        ) : (
-          <Button onClick={markInProgress} variant="outline" className="w-full h-12">
-            <RotateCcw className="h-4 w-4 mr-2" />
-            {t('results.backToProgress')}
-          </Button>
-        )}
+          {/* Actions */}
+          {job?.status !== 'completed' ? (
+            <Button
+              onClick={markComplete}
+              className="btn-lime w-full h-14 text-lg"
+            >
+              <CheckCircle className="h-5 w-5 mr-2" />
+              {t('results.markComplete')}
+            </Button>
+          ) : (
+            <Button onClick={markInProgress} variant="outline" className="w-full h-12 border-[#2A2D35] bg-transparent text-white hover:bg-[#1E2228]">
+              <RotateCcw className="h-4 w-4 mr-2" />
+              {t('results.backToProgress')}
+            </Button>
+          )}
+        </div>
       </div>
 
       <MobileNav />

@@ -160,15 +160,21 @@ export default function LoginPage() {
   const isForgot = view === 'forgot'
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-6 bg-white relative overflow-hidden">
-      {/* Background orbs */}
-      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full bg-gradient-brand-subtle opacity-60 blur-3xl pointer-events-none" />
-      <div className="absolute bottom-[-15%] left-[-10%] w-[400px] h-[400px] rounded-full bg-gradient-brand-subtle opacity-40 blur-3xl pointer-events-none" />
+    <div className="flex min-h-screen flex-col items-center justify-center px-6 relative overflow-hidden" style={{ backgroundColor: '#0F1117' }}>
+      {/* Background blurred lime-green orbs */}
+      <div
+        className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full blur-3xl pointer-events-none"
+        style={{ background: 'radial-gradient(circle, rgba(168,255,62,0.08) 0%, rgba(168,255,62,0.02) 60%, transparent 80%)' }}
+      />
+      <div
+        className="absolute bottom-[-15%] left-[-10%] w-[400px] h-[400px] rounded-full blur-3xl pointer-events-none"
+        style={{ background: 'radial-gradient(circle, rgba(168,255,62,0.06) 0%, rgba(168,255,62,0.015) 60%, transparent 80%)' }}
+      />
 
       {/* Language toggle */}
       <button
         onClick={() => setLang(lang === 'es' ? 'en' : 'es')}
-        className="absolute top-5 right-5 text-sm text-slate-400 hover:text-slate-700 border border-slate-200 rounded-full px-3 py-1.5 transition-colors z-10"
+        className="absolute top-5 right-5 text-sm text-[#6B7280] hover:text-white border border-[#2A2D35] rounded-full px-3 py-1.5 transition-colors z-10"
       >
         {lang === 'es' ? 'EN' : 'ES'}
       </button>
@@ -189,19 +195,22 @@ export default function LoginPage() {
 
       {/* Card */}
       <div className="w-full max-w-sm relative z-10">
-        <div className="bg-white/80 backdrop-blur-md rounded-2xl border border-slate-100 shadow-sm p-8">
+        <div className="rounded-2xl border border-[#2A2D35] p-8" style={{ backgroundColor: '#1E2228' }}>
 
           {/* ===== FORGOT PASSWORD VIEW ===== */}
           {isForgot && (
             <>
               <div className="mb-6 text-center">
-                <div className="flex items-center justify-center w-12 h-12 mx-auto mb-3 rounded-full bg-gradient-brand-subtle">
-                  <Mail className="h-5 w-5 text-[#008B99]" />
+                <div
+                  className="flex items-center justify-center w-12 h-12 mx-auto mb-3 rounded-full"
+                  style={{ backgroundColor: 'rgba(168,255,62,0.1)' }}
+                >
+                  <Mail className="h-5 w-5 text-[#A8FF3E]" />
                 </div>
-                <h2 className="text-xl font-semibold text-slate-900">
+                <h2 className="text-xl font-semibold text-white">
                   {lang === 'es' ? 'Recuperar contraseña' : 'Reset password'}
                 </h2>
-                <p className="text-slate-500 text-sm mt-1">
+                <p className="text-[#6B7280] text-sm mt-1">
                   {lang === 'es'
                     ? 'Te enviaremos un link para resetear tu contraseña'
                     : "We'll send you a link to reset your password"}
@@ -209,21 +218,21 @@ export default function LoginPage() {
               </div>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email-forgot" className="text-slate-600 text-sm font-medium">Email</Label>
+                  <Label htmlFor="email-forgot" className="text-[#6B7280] text-sm">Email</Label>
                   <Input
                     id="email-forgot"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="tu@email.com"
-                    className="h-12 text-base bg-slate-50/50 border-slate-200 rounded-xl focus:border-[#008B99] focus:ring-[#008B99]/20"
+                    className="input-dark h-12 rounded-lg"
                     required
                   />
                 </div>
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="w-full h-12 text-base font-medium rounded-xl btn-gradient"
+                  className="btn-lime w-full h-12 rounded-lg"
                 >
                   {loading ? (
                     <span className="flex items-center gap-2">
@@ -238,7 +247,7 @@ export default function LoginPage() {
               <div className="mt-5 text-center">
                 <button
                   onClick={() => setView('login')}
-                  className="text-sm text-slate-500 hover:text-[#008B99] transition-colors"
+                  className="text-sm text-[#6B7280] hover:text-[#A8FF3E] transition-colors"
                 >
                   {lang === 'es' ? '← Volver al login' : '← Back to login'}
                 </button>
@@ -250,10 +259,10 @@ export default function LoginPage() {
           {!isForgot && (
             <>
               <div className="mb-6">
-                <h2 className="text-xl font-semibold text-slate-900">
+                <h2 className="text-xl font-semibold text-white">
                   {isSignUp ? t('auth.signup') : t('auth.login')}
                 </h2>
-                <p className="text-slate-500 text-sm mt-1">
+                <p className="text-[#6B7280] text-sm mt-1">
                   {isSignUp
                     ? lang === 'es' ? 'Es gratis. Sin tarjeta.' : "It's free. No card needed."
                     : lang === 'es' ? 'Ingresá con tu cuenta' : 'Sign in to your account'}
@@ -264,7 +273,8 @@ export default function LoginPage() {
               <button
                 onClick={handleGoogleSignIn}
                 disabled={googleLoading}
-                className="w-full h-12 flex items-center justify-center gap-3 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 transition-colors text-sm font-medium text-slate-700 mb-5 disabled:opacity-50"
+                className="w-full h-12 flex items-center justify-center gap-3 border border-[#2A2D35] rounded-lg text-sm font-medium text-white mb-5 disabled:opacity-50 transition-colors hover:bg-[#252830]"
+                style={{ backgroundColor: '#1E2228' }}
               >
                 {googleLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -282,10 +292,10 @@ export default function LoginPage() {
               {/* Divider */}
               <div className="relative mb-5">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-200" />
+                  <div className="w-full border-t border-[#2A2D35]" />
                 </div>
                 <div className="relative flex justify-center text-xs">
-                  <span className="bg-white px-3 text-slate-400">
+                  <span className="px-3 text-[#6B7280]" style={{ backgroundColor: '#1E2228' }}>
                     {lang === 'es' ? 'o con email' : 'or with email'}
                   </span>
                 </div>
@@ -294,7 +304,7 @@ export default function LoginPage() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 {isSignUp && (
                   <div className="space-y-2">
-                    <Label htmlFor="name" className="text-slate-600 text-sm font-medium">
+                    <Label htmlFor="name" className="text-[#6B7280] text-sm">
                       {t('auth.name')}
                     </Label>
                     <Input
@@ -303,14 +313,14 @@ export default function LoginPage() {
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       placeholder="Juan Pérez"
-                      className="h-12 text-base bg-slate-50/50 border-slate-200 rounded-xl focus:border-[#008B99] focus:ring-[#008B99]/20"
+                      className="input-dark h-12 rounded-lg"
                       required
                     />
                   </div>
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-slate-600 text-sm font-medium">
+                  <Label htmlFor="email" className="text-[#6B7280] text-sm">
                     {t('auth.email')}
                   </Label>
                   <Input
@@ -319,21 +329,21 @@ export default function LoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="tu@email.com"
-                    className="h-12 text-base bg-slate-50/50 border-slate-200 rounded-xl focus:border-[#008B99] focus:ring-[#008B99]/20"
+                    className="input-dark h-12 rounded-lg"
                     required
                   />
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="password" className="text-slate-600 text-sm font-medium">
+                    <Label htmlFor="password" className="text-[#6B7280] text-sm">
                       {t('auth.password')}
                     </Label>
                     {!isSignUp && (
                       <button
                         type="button"
                         onClick={() => setView('forgot')}
-                        className="text-xs text-[#008B99] hover:text-[#006d78] transition-colors"
+                        className="text-xs text-[#A8FF3E] hover:text-[#bdff72] transition-colors"
                       >
                         {lang === 'es' ? '¿Olvidaste tu clave?' : 'Forgot password?'}
                       </button>
@@ -346,14 +356,14 @@ export default function LoginPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="h-12 text-base bg-slate-50/50 border-slate-200 rounded-xl focus:border-[#008B99] focus:ring-[#008B99]/20 pr-12"
+                      className="input-dark h-12 rounded-lg pr-12"
                       minLength={6}
                       required
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-white transition-colors"
                       tabIndex={-1}
                     >
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
@@ -364,7 +374,7 @@ export default function LoginPage() {
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="w-full h-12 text-base font-medium rounded-xl btn-gradient"
+                  className="btn-lime w-full h-12 rounded-lg"
                 >
                   {loading ? (
                     <span className="flex items-center gap-2">
@@ -380,7 +390,7 @@ export default function LoginPage() {
               <div className="mt-5 text-center">
                 <button
                   onClick={() => setView(isSignUp ? 'login' : 'signup')}
-                  className="text-sm text-slate-500 hover:text-[#008B99] transition-colors"
+                  className="text-sm text-[#6B7280] hover:text-[#A8FF3E] transition-colors"
                 >
                   {isSignUp ? t('auth.switchToLogin') : t('auth.switchToSignup')}
                 </button>
@@ -391,7 +401,7 @@ export default function LoginPage() {
       </div>
 
       {/* Footer */}
-      <p className="mt-6 text-xs text-slate-400 text-center relative z-10 max-w-xs">
+      <p className="mt-6 text-xs text-[#6B7280] text-center relative z-10 max-w-xs">
         {lang === 'es'
           ? 'Respaldado por 20 años de experiencia en roofing.'
           : 'Backed by 20 years of roofing expertise.'}

@@ -122,7 +122,7 @@ export function AddressInput({
   return (
     <div className="space-y-2">
       <div className="relative">
-        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B7280]" />
         <Input
           ref={inputRef}
           value={value}
@@ -132,11 +132,11 @@ export function AddressInput({
           className={`h-12 text-base pl-10 pr-10 ${className}`}
         />
         {validated && (
-          <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#78BE20]" />
+          <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#A8FF3E]" />
         )}
         {!validated && hasAutocomplete && value.length > 3 && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+            <span className="text-[10px] text-[#6B7280] bg-[#16191F] px-1.5 py-0.5 rounded">
               {lang === 'es' ? 'Seleccioná del menú' : 'Select from menu'}
             </span>
           </div>
@@ -145,10 +145,10 @@ export function AddressInput({
 
       {/* Map Preview */}
       {showMap && mapUrl && (
-        <div className="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+        <div className="relative rounded-xl overflow-hidden border border-[#2A2D35] bg-[#1E2228]">
           {loadingMap && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-50">
-              <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#1E2228]">
+              <Loader2 className="h-5 w-5 animate-spin text-[#6B7280]" />
             </div>
           )}
           <iframe
@@ -165,7 +165,7 @@ export function AddressInput({
           <button
             type="button"
             onClick={openInMaps}
-            className="absolute bottom-2 right-2 flex items-center gap-1 bg-white/90 backdrop-blur-sm text-xs text-slate-600 px-2 py-1 rounded-lg shadow-sm hover:bg-white transition-colors"
+            className="absolute bottom-2 right-2 flex items-center gap-1 bg-[#0F1117]/90 backdrop-blur-sm text-xs text-[#A8FF3E] px-2 py-1 rounded-lg shadow-sm hover:bg-[#0F1117] transition-colors"
           >
             <ExternalLink className="h-3 w-3" />
             {lang === 'es' ? 'Ver en Maps' : 'View in Maps'}
@@ -178,7 +178,7 @@ export function AddressInput({
         <button
           type="button"
           onClick={openInMaps}
-          className="flex items-center gap-1.5 text-xs text-[#008B99] hover:underline"
+          className="flex items-center gap-1.5 text-xs text-[#A8FF3E] hover:underline"
         >
           <MapPin className="h-3 w-3" />
           {lang === 'es' ? 'Verificar dirección en Google Maps' : 'Verify address on Google Maps'}

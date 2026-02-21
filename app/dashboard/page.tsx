@@ -2,16 +2,13 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { useI18n } from '@/lib/i18n/context'
 import { MobileNav } from '@/components/app/mobile-nav'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Briefcase, DollarSign, TrendingUp, Percent, Plus, ChevronRight, AlertCircle, Package, CalendarCheck, FileText } from 'lucide-react'
+import { Briefcase, DollarSign, TrendingUp, Percent, Plus, ChevronRight } from 'lucide-react'
 import { STATUS_CONFIG } from '@/lib/templates'
 import type { Job } from '@/lib/types'
-import { format, startOfMonth, endOfMonth, addDays, isToday, isTomorrow } from 'date-fns'
+import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 function formatMoney(n: number) {
@@ -21,6 +18,7 @@ function formatMoney(n: number) {
 export default function DashboardPage() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [profileName, setProfileName] = useState('')
+  const [companyName, setCompanyName] = useState('')
   const [loading, setLoading] = useState(true)
   const { t, lang } = useI18n()
   const supabase = createClient()
@@ -32,10 +30,11 @@ export default function DashboardPage() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('full_name')
+        .select('full_name, company_name')
         .eq('id', user.id)
         .single()
       setProfileName(profile?.full_name || user.email?.split('@')[0] || '')
+      setCompanyName(profile?.company_name || '')
 
       const { data } = await supabase
         .from('jobs')
@@ -80,248 +79,159 @@ export default function DashboardPage() {
 
   const recentJobs = jobs.slice(0, 5)
 
+  const statusDotClass = (status: string) => {
+    switch (status) {
+      case 'estimate': return 'status-dot status-dot-lime'
+      case 'approved': return 'status-dot status-dot-amber'
+      case 'in_progress': return 'status-dot status-dot-blue'
+      case 'completed': return 'status-dot status-dot-gray'
+      default: return 'status-dot status-dot-gray'
+    }
+  }
+
+  const borderClass = (status: string) => {
+    switch (status) {
+      case 'estimate': return 'border-l-4 border-l-[#A8FF3E]'
+      case 'approved': return 'border-l-4 border-l-[#F59E0B]'
+      case 'in_progress': return 'border-l-4 border-l-[#3B82F6]'
+      case 'completed': return 'border-l-4 border-l-[#6B7280]'
+      default: return 'border-l-4 border-l-[#6B7280]'
+    }
+  }
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-white">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full border-2 border-slate-200 border-t-[#008B99] animate-spin" />
-          <span className="text-slate-400 text-sm">{t('common.loading')}</span>
+      <div className="min-h-screen bg-[#0F1117] pb-24 max-w-[430px] mx-auto">
+        <div className="px-5 pt-14 pb-5">
+          <div className="skeleton h-4 w-20 mb-2" />
+          <div className="skeleton h-8 w-48" />
         </div>
+        <div className="px-5 space-y-4">
+          <div className="skeleton h-32 w-full" />
+          <div className="grid grid-cols-3 gap-3">
+            <div className="skeleton h-24" />
+            <div className="skeleton h-24" />
+            <div className="skeleton h-24" />
+          </div>
+          <div className="skeleton h-14 w-full" />
+          <div className="skeleton h-20 w-full" />
+          <div className="skeleton h-20 w-full" />
+        </div>
+        <MobileNav />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] pb-24">
-      {/* Header */}
-      <div className="bg-white px-5 pt-12 pb-5 border-b border-slate-100">
-        <div className="flex items-center justify-between mb-4">
-          <Image
-            src={lang === 'es' ? '/LOGO/3.png' : '/LOGO/4.png'}
-            alt="RoofBack"
-            width={140}
-            height={40}
-            priority
-            className="h-8 w-auto"
-          />
-          <div className="h-10 w-10 rounded-full bg-gradient-brand flex items-center justify-center text-white font-semibold text-sm">
-            {(profileName || 'U').charAt(0).toUpperCase()}
-          </div>
-        </div>
-        <div>
-          <p className="text-slate-400 text-sm">{t('dashboard.welcome')}</p>
-          <h1 className="text-2xl font-bold text-slate-900 mt-0.5">{profileName || 'Techista'}</h1>
-        </div>
+    <div className="min-h-screen bg-[#0F1117] pb-24 max-w-[430px] mx-auto">
+      <div className="px-5 pt-14 pb-5">
+        <p className="text-[#6B7280] text-sm">{t('dashboard.welcome')}</p>
+        <h1 className="text-[32px] font-bold text-white leading-tight mt-0.5">
+          {companyName || profileName || 'RoofBack'}
+        </h1>
       </div>
 
-      <div className="px-5 pt-5 space-y-5">
-        {/* Main Profit Widget */}
-        <Card className="border-t-gradient border-0 shadow-sm bg-white rounded-2xl overflow-hidden">
-          <CardContent className="p-5 pt-6">
-            <p className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-1">
-              {t('dashboard.monthProfit')}
-            </p>
-            <p className={`text-3xl font-bold tabular-nums ${monthProfit >= 0 ? 'text-slate-900' : 'text-red-500'}`}>
-              {formatMoney(monthProfit)}
-            </p>
-            <div className="flex items-center gap-1 mt-2">
-              <TrendingUp className="h-3.5 w-3.5 text-[#78BE20]" />
-              <span className="text-xs text-[#78BE20] font-medium">
-                {avgMargin.toFixed(1)}% {lang === 'es' ? 'margen' : 'margin'}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className="bg-white rounded-xl border border-slate-100 p-4 shadow-sm">
-            <Briefcase className="h-4 w-4 text-[#008B99] mb-2" />
-            <p className="text-xl font-bold tabular-nums text-slate-900">{activeJobs}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">{t('dashboard.activeJobs')}</p>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-100 p-4 shadow-sm">
-            <DollarSign className="h-4 w-4 text-[#78BE20] mb-2" />
-            <p className="text-xl font-bold tabular-nums text-slate-900">{formatMoney(monthRevenue)}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">{t('dashboard.monthRevenue')}</p>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-100 p-4 shadow-sm">
-            <Percent className="h-4 w-4 text-[#008B99] mb-2" />
-            <p className="text-xl font-bold tabular-nums text-slate-900">{avgMargin.toFixed(1)}%</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">{t('dashboard.avgMargin')}</p>
+      <div className="px-5 space-y-5">
+        <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-5">
+          <p className="text-[#A8FF3E] text-xs font-bold uppercase tracking-widest mb-2">
+            {t('dashboard.profitThisMonth')}
+          </p>
+          <p className={`text-[56px] font-black tabular-nums leading-none ${monthProfit >= 0 ? 'text-white' : 'text-red-400'}`}>
+            {formatMoney(monthProfit)}
+          </p>
+          <div className="flex items-center gap-1.5 mt-3">
+            <TrendingUp className="h-4 w-4 text-[#6B7280]" />
+            <span className="text-sm text-[#6B7280]">
+              {avgMargin.toFixed(1)}% {t('dashboard.margin')}
+            </span>
           </div>
         </div>
 
-        {/* Action Center - Smart Alerts */}
-        {(() => {
-          interface ActionAlert { id: string; icon: React.ReactNode; color: string; message: string; action?: { label: string; href: string } }
-          const alerts: ActionAlert[] = []
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4">
+            <Briefcase className="h-5 w-5 text-[#A8FF3E] mb-2" />
+            <p className="text-2xl font-bold tabular-nums text-white">{activeJobs}</p>
+            <p className="text-[11px] text-[#6B7280] mt-1">{t('dashboard.activeJobs')}</p>
+          </div>
+          <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4">
+            <DollarSign className="h-5 w-5 text-[#3B82F6] mb-2" />
+            <p className="text-2xl font-bold tabular-nums text-white">{formatMoney(monthRevenue)}</p>
+            <p className="text-[11px] text-[#6B7280] mt-1">{t('dashboard.monthRevenue')}</p>
+          </div>
+          <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4">
+            <Percent className="h-5 w-5 text-[#6B7280] mb-2" />
+            <p className="text-2xl font-bold tabular-nums text-white">{avgMargin.toFixed(1)}%</p>
+            <p className="text-[11px] text-[#6B7280] mt-1">{t('dashboard.avgMargin')}</p>
+          </div>
+        </div>
 
-          jobs.forEach(job => {
-            // Approved but materials not ordered
-            if ((job.status === 'approved' || job.workflow_stage === 'approved') && !job.materials_ordered) {
-              alerts.push({
-                id: `mat-${job.id}`,
-                icon: <Package className="h-4 w-4" />,
-                color: 'bg-amber-50 border-amber-200 text-amber-700',
-                message: lang === 'es'
-                  ? `Falta pedir materiales para ${job.client_name}`
-                  : `Materials pending for ${job.client_name}`,
-                action: { label: lang === 'es' ? 'Ver trabajo' : 'View job', href: `/jobs/${job.id}` },
-              })
-            }
-
-            // Start date is tomorrow
-            if (job.start_date) {
-              const start = new Date(job.start_date + 'T12:00')
-              if (isTomorrow(start) && job.status !== 'completed') {
-                alerts.push({
-                  id: `start-${job.id}`,
-                  icon: <CalendarCheck className="h-4 w-4" />,
-                  color: 'bg-[#78BE20]/10 border-[#78BE20]/30 text-[#3D7A00]',
-                  message: lang === 'es'
-                    ? `Mañana arranca ${job.client_name}. ¿Todo listo?`
-                    : `${job.client_name} starts tomorrow. Ready?`,
-                  action: { label: lang === 'es' ? 'Ver' : 'View', href: `/jobs/${job.id}` },
-                })
-              }
-              if (isToday(start) && job.status !== 'completed') {
-                alerts.push({
-                  id: `today-${job.id}`,
-                  icon: <AlertCircle className="h-4 w-4" />,
-                  color: 'bg-[#008B99]/10 border-[#008B99]/30 text-[#008B99]',
-                  message: lang === 'es'
-                    ? `HOY arranca ${job.client_name}`
-                    : `${job.client_name} starts TODAY`,
-                  action: { label: lang === 'es' ? 'Ver' : 'View', href: `/jobs/${job.id}` },
-                })
-              }
-            }
-
-            // Completed but not invoiced/paid
-            if (job.status === 'completed' && job.workflow_stage !== 'invoiced' && job.workflow_stage !== 'paid') {
-              alerts.push({
-                id: `inv-${job.id}`,
-                icon: <FileText className="h-4 w-4" />,
-                color: 'bg-blue-50 border-blue-200 text-blue-700',
-                message: lang === 'es'
-                  ? `Trabajo terminado. Enviar factura a ${job.client_name}`
-                  : `Job complete. Send invoice to ${job.client_name}`,
-                action: { label: lang === 'es' ? 'Ver' : 'View', href: `/jobs/${job.id}` },
-              })
-            }
-          })
-
-          if (alerts.length === 0) return null
-
-          return (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-[#008B99]" />
-                {lang === 'es' ? 'Centro de Acción' : 'Action Center'}
-              </h3>
-              {alerts.slice(0, 5).map(alert => (
-                <div key={alert.id} className={`flex items-center gap-3 p-3 rounded-xl border ${alert.color}`}>
-                  {alert.icon}
-                  <span className="flex-1 text-sm font-medium">{alert.message}</span>
-                  {alert.action && (
-                    <Link href={alert.action.href} className="text-xs font-semibold underline whitespace-nowrap">
-                      {alert.action.label}
-                    </Link>
-                  )}
-                </div>
-              ))}
-            </div>
-          )
-        })()}
-
-        {/* New Job Button */}
         <Link href="/jobs/new">
-          <button className="w-full h-14 text-base font-medium rounded-2xl btn-gradient flex items-center justify-center gap-2 shadow-lg">
+          <button className="w-full h-14 text-base font-bold rounded-xl btn-lime flex items-center justify-center gap-2">
             <Plus className="h-5 w-5" />
             {t('dashboard.newJob')}
           </button>
         </Link>
 
-        {/* Profit Chart */}
         {jobs.some((j) => j.status === 'completed') && (
-          <Card className="border-0 shadow-sm bg-white rounded-2xl">
-            <CardContent className="p-5">
-              <h3 className="text-sm font-semibold text-slate-700 mb-4">{t('dashboard.profitChart')}</h3>
-              <div className="h-40">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} tickFormatter={(v) => `$${v}`} axisLine={false} tickLine={false} />
-                    <Tooltip
-                      formatter={(v) => formatMoney(Number(v))}
-                      labelFormatter={(l) => String(l)}
-                      contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 12px rgba(0,0,0,0.06)' }}
-                    />
-                    <Bar dataKey="ganancia" fill="url(#chartGradient)" radius={[6, 6, 0, 0]} />
-                    <defs>
-                      <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#008B99" stopOpacity={0.9} />
-                        <stop offset="100%" stopColor="#78BE20" stopOpacity={0.7} />
-                      </linearGradient>
-                    </defs>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-5">
+            <h3 className="text-sm font-semibold text-white mb-4">{t('dashboard.profitChart')}</h3>
+            <div className="h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#2A2D35" />
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#6B7280' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#6B7280' }} tickFormatter={(v) => `$${v}`} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    formatter={(v) => formatMoney(Number(v))}
+                    labelFormatter={(l) => String(l)}
+                    contentStyle={{ borderRadius: '8px', border: '1px solid #2A2D35', background: '#1E2228', color: '#fff' }}
+                  />
+                  <Bar dataKey="ganancia" fill="#A8FF3E" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         )}
 
-        {/* Recent Jobs */}
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-slate-700">{t('dashboard.recentJobs')}</h3>
+            <h3 className="text-sm font-semibold text-white">{t('dashboard.recentJobs')}</h3>
             {recentJobs.length > 0 && (
-              <Link href="/jobs" className="text-xs text-[#008B99] font-medium">
-                {lang === 'es' ? 'Ver todos' : 'View all'}
+              <Link href="/jobs" className="text-xs text-[#A8FF3E] font-medium">
+                {t('dashboard.viewAll')}
               </Link>
             )}
           </div>
           {recentJobs.length === 0 ? (
-            <Card className="border-0 shadow-sm bg-white rounded-2xl">
-              <CardContent className="p-8 text-center">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gradient-brand-subtle flex items-center justify-center">
-                  <Briefcase className="h-5 w-5 text-[#008B99]" />
-                </div>
-                <p className="text-slate-400 text-sm">{t('dashboard.noJobs')}</p>
-              </CardContent>
-            </Card>
+            <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-8 text-center">
+              <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-[#A8FF3E]/10 flex items-center justify-center">
+                <Briefcase className="h-5 w-5 text-[#A8FF3E]" />
+              </div>
+              <p className="text-[#6B7280] text-sm">{t('dashboard.noJobs')}</p>
+            </div>
           ) : (
             <div className="space-y-2">
               {recentJobs.map((job) => {
                 const sc = STATUS_CONFIG[job.status]
-                const statusClass =
-                  job.status === 'estimate' ? 'status-estimate' :
-                  job.status === 'approved' ? 'status-approved' :
-                  job.status === 'in_progress' ? 'status-in-progress' :
-                  'status-completed'
                 return (
                   <Link key={job.id} href={`/jobs/${job.id}`}>
-                    <Card className="border-0 shadow-sm bg-white rounded-xl hover:shadow-md transition-all duration-200">
-                      <CardContent className="p-4 flex items-center justify-between">
-                        <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-slate-900 truncate">{job.client_name}</p>
-                          <p className="text-xs text-slate-400 truncate mt-0.5">{job.client_address}</p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <span className={`text-[11px] font-medium px-2.5 py-0.5 rounded-full ${statusClass}`}>
-                              {lang === 'es' ? sc?.label_es : sc?.label_en}
+                    <div className={`bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4 flex items-center justify-between hover:border-[#3A3D45] transition-colors ${borderClass(job.status)}`}>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-white truncate">{job.client_name}</p>
+                        <p className="text-xs text-[#6B7280] truncate mt-0.5">{job.client_address}</p>
+                        <div className="flex items-center gap-3 mt-2">
+                          <span className={statusDotClass(job.status)}>
+                            {lang === 'es' ? sc?.label_es : sc?.label_en}
+                          </span>
+                          {Number(job.estimated_total) > 0 && (
+                            <span className="text-xs text-[#6B7280] tabular-nums font-medium">
+                              {formatMoney(Number(job.estimated_total))}
                             </span>
-                            {Number(job.estimated_total) > 0 && (
-                              <span className="text-xs text-slate-500 tabular-nums font-medium">
-                                {formatMoney(Number(job.estimated_total))}
-                              </span>
-                            )}
-                          </div>
+                          )}
                         </div>
-                        <ChevronRight className="h-5 w-5 text-slate-300 flex-shrink-0 ml-3" />
-                      </CardContent>
-                    </Card>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-[#6B7280] flex-shrink-0 ml-3" />
+                    </div>
                   </Link>
                 )
               })}
