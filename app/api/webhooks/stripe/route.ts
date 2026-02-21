@@ -1,131 +1,174 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe'
-import { getSupabaseAdmin } from '@/lib/supabase/admin'
+import { NextRequest } from 'next/server'
+import Stripe from 'stripe'
+import { createClient } from '@supabase/supabase-js'
+
+// ── Inline admin client construction ─────────────────────────────────────────
+// We intentionally avoid any shared module so there is zero risk of the client
+// being null due to module-load-time env var timing issues.
+function makeAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+  if (!url) throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set')
+  if (!key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set')
+  return createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+}
+
+// ── Inline Stripe client construction ────────────────────────────────────────
+function makeStripeClient() {
+  const key = process.env.STRIPE_SECRET_KEY?.trim()
+  if (!key) throw new Error('STRIPE_SECRET_KEY is not set')
+  // No explicit apiVersion — use the package default to avoid type mismatches
+  return new Stripe(key)
+}
 
 export async function POST(request: NextRequest) {
+  console.log('WEBHOOK_START')
 
-  // ── 1. Verify every required env var individually ─────────────────────────
+  // ── 1. Validate env vars up-front ─────────────────────────────────────────
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim()
   if (!webhookSecret) {
-    console.error('CRITICAL: STRIPE_WEBHOOK_SECRET is not set in environment variables')
-    return NextResponse.json({ error: 'STRIPE_WEBHOOK_SECRET not configured' }, { status: 500 })
-  }
-  if (!stripe) {
-    console.error('CRITICAL: Stripe client not initialised — STRIPE_SECRET_KEY missing?')
-    return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 })
-  }
-  // Validate admin client is constructible (throws with exact var name if not)
-  try {
-    getSupabaseAdmin()
-  } catch (err) {
-    console.error(err instanceof Error ? err.message : String(err))
-    return NextResponse.json({ error: 'Supabase admin client not configured' }, { status: 500 })
+    console.error('MISSING_ENV: STRIPE_WEBHOOK_SECRET is not set')
+    return new Response(
+      JSON.stringify({ error: 'STRIPE_WEBHOOK_SECRET is not set' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    )
   }
 
-  // ── 2. Read raw body BEFORE any other async work ──────────────────────────
+  let stripeClient: Stripe
+  try {
+    stripeClient = makeStripeClient()
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('MISSING_ENV:', msg)
+    return new Response(JSON.stringify({ error: msg }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  // ── 2. Read raw body (must happen before any other await) ─────────────────
   const body = await request.text()
   const signature = request.headers.get('stripe-signature')
 
   if (!signature) {
-    console.error('[Stripe Webhook] Request missing stripe-signature header')
-    return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 })
+    console.error('MISSING_SIGNATURE: stripe-signature header not present')
+    return new Response(
+      JSON.stringify({ error: 'Missing stripe-signature header' }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    )
   }
 
-  // ── 3. Verify Stripe signature ────────────────────────────────────────────
-  let event: import('stripe').Stripe.Event
+  // ── 3. Verify Stripe webhook signature ────────────────────────────────────
+  let event: Stripe.Event
   try {
-    event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
+    event = stripeClient.webhooks.constructEvent(body, signature, webhookSecret)
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Unknown error'
-    console.error(`[Stripe Webhook] Signature verification FAILED: ${msg}`)
-    return NextResponse.json({ error: `Webhook signature error: ${msg}` }, { status: 400 })
+    const msg = err instanceof Error ? err.message : 'Signature verification failed'
+    console.error('SIGNATURE_FAILED:', msg)
+    return new Response(JSON.stringify({ error: msg }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    })
   }
 
-  console.log(`[Stripe Webhook] ✅ Webhook Signature Verified — event: ${event.type} (${event.id})`)
+  console.log('WEBHOOK_SIGNATURE_VERIFIED', event.type, event.id)
 
-  // Instantiate admin client once for this request (bypasses RLS)
-  const db = getSupabaseAdmin()
-
+  // ── 4. Handle events ──────────────────────────────────────────────────────
   switch (event.type) {
 
-    // ── checkout.session.completed → activate subscription ────────────────
     case 'checkout.session.completed': {
-      const session = event.data.object as import('stripe').Stripe.Checkout.Session
+      const session = event.data.object as Stripe.Checkout.Session
 
       // client_reference_id is set to user.id in app/actions/stripe.ts
       const userId = session.client_reference_id
       const customerId =
-        typeof session.customer === 'string' ? session.customer : session.customer?.id
+        typeof session.customer === 'string' ? session.customer : session.customer?.id ?? null
       const subscriptionId =
         typeof session.subscription === 'string'
           ? session.subscription
-          : session.subscription?.id
+          : session.subscription?.id ?? null
 
-      console.log(
-        `[Stripe Webhook] checkout.session.completed — ` +
-        `client_reference_id=${userId ?? 'MISSING'} ` +
-        `customer=${customerId ?? 'none'} ` +
-        `subscription=${subscriptionId ?? 'none'}`
-      )
+      console.log('SESSION_FIELDS', {
+        userId,
+        customerId,
+        subscriptionId,
+        mode: session.mode,
+      })
 
       if (!userId) {
-        // Return 200 — Stripe would retry 4xx/5xx forever; this is a data issue
-        console.error(
-          '[Stripe Webhook] ❌ No client_reference_id on session. ' +
-          'Ensure createCheckoutSession() sets client_reference_id: user.id'
+        console.error('MISSING_USER_ID_IN_SESSION', {
+          sessionId: session.id,
+          hint: 'createCheckoutSession() must pass client_reference_id: user.id',
+        })
+        // Return 200 so Stripe does not endlessly retry — this is a data problem
+        return new Response(
+          JSON.stringify({ received: true, warning: 'MISSING_USER_ID_IN_SESSION' }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
         )
-        return NextResponse.json({ received: true, warning: 'Missing client_reference_id' })
       }
 
-      // Resolve price_id from subscription (non-fatal if it fails)
+      // Resolve price_id (non-fatal)
       let priceId: string | null = null
       if (subscriptionId) {
         try {
-          const sub = await stripe.subscriptions.retrieve(subscriptionId)
+          const sub = await stripeClient.subscriptions.retrieve(subscriptionId)
           priceId = sub.items.data[0]?.price?.id ?? null
         } catch (err) {
-          console.warn('[Stripe Webhook] Could not retrieve price_id from subscription:', err)
+          console.warn('PRICE_ID_FETCH_FAILED', err instanceof Error ? err.message : err)
         }
       }
 
-      console.log(`[Stripe Webhook] ✏️  Updating Profile for User ID: ${userId}`)
+      console.log('DB_UPDATE_ATTEMPT', userId)
 
-      const { error: dbError, count } = await db
-        .from('profiles')
-        .update({
-          stripe_customer_id: customerId ?? null,
-          stripe_subscription_id: subscriptionId ?? null,
-          subscription_status: 'active',
-          price_id: priceId,
-          trial_expires_at: null, // paying customer — clear trial
-          updated_at: new Date().toISOString(),
+      // ── DB update wrapped in try/catch so the real error reaches Stripe ──
+      try {
+        const db = makeAdminClient()
+
+        const { error: dbError, data } = await db
+          .from('profiles')
+          .update({
+            subscription_status: 'active',
+            trial_expires_at: null,
+            stripe_customer_id: customerId,
+            stripe_subscription_id: subscriptionId,
+            price_id: priceId,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', userId)
+          .select('id, subscription_status')
+
+        if (dbError) {
+          // Throw so the outer catch returns 500 with the real Supabase error
+          throw new Error(
+            `Supabase update failed: ${dbError.message} (code=${dbError.code}, hint=${dbError.hint})`
+          )
+        }
+
+        console.log('DB_UPDATE_SUCCESS', { userId, rowsReturned: data?.length, data })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error('DB_UPDATE_ERROR', msg)
+        return new Response(JSON.stringify({ error: msg }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
         })
-        .eq('id', userId)
-        .select('id') // ensure we can count matched rows
-
-      if (dbError) {
-        console.error('[Stripe Webhook] ❌ DB update failed:', JSON.stringify(dbError))
-        return NextResponse.json({ error: 'Database update failed' }, { status: 500 })
       }
 
-      console.log(
-        `[Stripe Webhook] ✅ Profile Updated Successfully — ` +
-        `user_id=${userId} rows_affected=${count ?? 'unknown'} status=active`
-      )
       break
     }
 
-    // ── customer.subscription.updated → sync status ───────────────────────
     case 'customer.subscription.updated': {
-      const subscription = event.data.object as import('stripe').Stripe.Subscription
+      const subscription = event.data.object as Stripe.Subscription
       const customerId =
         typeof subscription.customer === 'string'
           ? subscription.customer
           : subscription.customer?.id
 
       if (!customerId) {
-        console.warn('[Stripe Webhook] customer.subscription.updated: no customer id — skipping')
-        return NextResponse.json({ received: true })
+        console.warn('SUBSCRIPTION_UPDATED_NO_CUSTOMER_ID')
+        break
       }
 
       const stripeStatus = subscription.status
@@ -135,67 +178,81 @@ export async function POST(request: NextRequest) {
             : 'canceled'
 
       const priceId = subscription.items.data[0]?.price?.id ?? null
-      const updatePayload: Record<string, unknown> = {
+      const payload: Record<string, unknown> = {
         stripe_subscription_id: subscription.id,
         subscription_status: subscriptionStatus,
         price_id: priceId,
         updated_at: new Date().toISOString(),
       }
-      if (subscriptionStatus === 'active') {
-        updatePayload.trial_expires_at = null
-      }
+      if (subscriptionStatus === 'active') payload.trial_expires_at = null
 
-      console.log(`[Stripe Webhook] ✏️  Updating Profile for Customer: ${customerId} → status=${subscriptionStatus}`)
+      console.log('DB_UPDATE_ATTEMPT (subscription.updated)', customerId)
 
-      const { error: dbError } = await db
-        .from('profiles')
-        .update(updatePayload)
-        .eq('stripe_customer_id', customerId)
+      try {
+        const db = makeAdminClient()
+        const { error: dbError } = await db
+          .from('profiles')
+          .update(payload)
+          .eq('stripe_customer_id', customerId)
 
-      if (dbError) {
-        console.error('[Stripe Webhook] ❌ subscription.updated DB update failed:', JSON.stringify(dbError))
-      } else {
-        console.log(`[Stripe Webhook] ✅ Profile Updated Successfully — customer=${customerId} status=${subscriptionStatus}`)
+        if (dbError) throw new Error(`${dbError.message} (code=${dbError.code})`)
+        console.log('DB_UPDATE_SUCCESS (subscription.updated)', { customerId, subscriptionStatus })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error('DB_UPDATE_ERROR (subscription.updated)', msg)
+        return new Response(JSON.stringify({ error: msg }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        })
       }
       break
     }
 
-    // ── customer.subscription.deleted → cancel access ─────────────────────
     case 'customer.subscription.deleted': {
-      const subscription = event.data.object as import('stripe').Stripe.Subscription
+      const subscription = event.data.object as Stripe.Subscription
       const customerId =
         typeof subscription.customer === 'string'
           ? subscription.customer
           : subscription.customer?.id
 
       if (!customerId) {
-        console.warn('[Stripe Webhook] customer.subscription.deleted: no customer id — skipping')
-        return NextResponse.json({ received: true })
+        console.warn('SUBSCRIPTION_DELETED_NO_CUSTOMER_ID')
+        break
       }
 
-      console.log(`[Stripe Webhook] ✏️  Updating Profile for Customer: ${customerId} → status=canceled`)
+      console.log('DB_UPDATE_ATTEMPT (subscription.deleted)', customerId)
 
-      const { error: dbError } = await db
-        .from('profiles')
-        .update({
-          subscription_status: 'canceled',
-          stripe_subscription_id: null,
-          updated_at: new Date().toISOString(),
+      try {
+        const db = makeAdminClient()
+        const { error: dbError } = await db
+          .from('profiles')
+          .update({
+            subscription_status: 'canceled',
+            stripe_subscription_id: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('stripe_customer_id', customerId)
+
+        if (dbError) throw new Error(`${dbError.message} (code=${dbError.code})`)
+        console.log('DB_UPDATE_SUCCESS (subscription.deleted)', { customerId })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error('DB_UPDATE_ERROR (subscription.deleted)', msg)
+        return new Response(JSON.stringify({ error: msg }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
         })
-        .eq('stripe_customer_id', customerId)
-
-      if (dbError) {
-        console.error('[Stripe Webhook] ❌ subscription.deleted DB update failed:', JSON.stringify(dbError))
-      } else {
-        console.log(`[Stripe Webhook] ✅ Profile Updated Successfully — customer=${customerId} status=canceled`)
       }
       break
     }
 
     default:
-      console.log(`[Stripe Webhook] Unhandled event type: ${event.type} — ignored`)
+      console.log('WEBHOOK_UNHANDLED_EVENT', event.type)
       break
   }
 
-  return NextResponse.json({ received: true })
+  return new Response(JSON.stringify({ received: true }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
 }
