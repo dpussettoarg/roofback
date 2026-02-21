@@ -5,8 +5,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useI18n } from '@/lib/i18n/context'
 import { MobileNav } from '@/components/app/mobile-nav'
-import { Plus, ChevronRight, Search, Hammer } from 'lucide-react'
-import { STATUS_CONFIG, JOB_TYPE_OPTIONS } from '@/lib/templates'
+import { Plus, ChevronRight, Search, Hammer, FileText, HardHat, CheckCircle2 } from 'lucide-react'
+import { JOB_TYPE_OPTIONS } from '@/lib/templates'
 import { formatJobNumber } from '@/lib/types'
 import type { Job } from '@/lib/types'
 
@@ -14,21 +14,52 @@ function formatMoney(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
 }
 
-type FilterType = 'all' | 'estimate' | 'active' | 'completed'
+type Tab = 'leads' | 'active' | 'completed'
+
+const TAB_CONFIG: { key: Tab; label_es: string; label_en: string; icon: React.ElementType }[] = [
+  { key: 'leads',     label_es: 'Leads',     label_en: 'Leads',     icon: FileText    },
+  { key: 'active',    label_es: 'Activos',   label_en: 'Active',    icon: HardHat     },
+  { key: 'completed', label_es: 'Completados', label_en: 'Completed', icon: CheckCircle2 },
+]
+
+function jobTab(job: Job): Tab {
+  if (job.status === 'completed') return 'completed'
+  if (job.client_status === 'approved' || job.status === 'approved' || job.status === 'in_progress') return 'active'
+  return 'leads'
+}
+
+function StatusBadge({ job, lang }: { job: Job; lang: string }) {
+  if (job.client_status === 'approved')
+    return <span className="status-dot status-dot-lime">{lang === 'es' ? '✓ Aprobado' : '✓ Approved'}</span>
+  if (job.status === 'in_progress')
+    return <span className="status-dot status-dot-blue">{lang === 'es' ? 'En obra' : 'In progress'}</span>
+  if (job.status === 'completed')
+    return <span className="status-dot status-dot-gray">{lang === 'es' ? 'Completado' : 'Completed'}</span>
+  if (job.workflow_stage === 'sent')
+    return <span className="status-dot status-dot-amber">{lang === 'es' ? 'Enviado' : 'Sent'}</span>
+  return <span className="status-dot status-dot-lime">{lang === 'es' ? 'Presupuesto' : 'Estimate'}</span>
+}
+
+function borderClass(job: Job) {
+  if (job.client_status === 'approved') return 'border-l-4 border-l-[#A8FF3E]'
+  if (job.status === 'in_progress')    return 'border-l-4 border-l-[#3B82F6]'
+  if (job.status === 'completed')      return 'border-l-4 border-l-[#6B7280]'
+  if (job.workflow_stage === 'sent')   return 'border-l-4 border-l-[#F59E0B]'
+  return 'border-l-4 border-l-[#4B5563]'
+}
 
 export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [search, setSearch] = useState('')
-  const [activeFilter, setActiveFilter] = useState<FilterType>('all')
+  const [activeTab, setActiveTab] = useState<Tab>('leads')
   const [loading, setLoading] = useState(true)
-  const { t, lang } = useI18n()
+  const { lang } = useI18n()
   const supabase = createClient()
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-
       const { data } = await supabase
         .from('jobs')
         .select('*')
@@ -38,46 +69,21 @@ export default function JobsPage() {
       setLoading(false)
     }
     load()
-  }, [supabase])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  const filteredJobs = jobs
-    .filter((j) =>
-      j.client_name.toLowerCase().includes(search.toLowerCase()) ||
-      j.client_address.toLowerCase().includes(search.toLowerCase())
-    )
-    .filter((j) => {
-      if (activeFilter === 'all') return true
-      if (activeFilter === 'estimate') return j.status === 'estimate'
-      if (activeFilter === 'active') return j.status === 'approved' || j.status === 'in_progress'
-      if (activeFilter === 'completed') return j.status === 'completed'
-      return true
-    })
+  const searchLower = search.toLowerCase()
+  const filtered = jobs.filter(
+    (j) =>
+      jobTab(j) === activeTab &&
+      (j.client_name.toLowerCase().includes(searchLower) ||
+        (j.client_address || '').toLowerCase().includes(searchLower))
+  )
 
-  const filters: { key: FilterType; label: string }[] = [
-    { key: 'all', label: t('jobs.all') },
-    { key: 'estimate', label: t('jobs.filterEstimate') },
-    { key: 'active', label: t('jobs.filterActive') },
-    { key: 'completed', label: t('jobs.filterCompleted') },
-  ]
-
-  const statusDotClass = (status: string) => {
-    switch (status) {
-      case 'estimate': return 'status-dot status-dot-lime'
-      case 'approved': return 'status-dot status-dot-amber'
-      case 'in_progress': return 'status-dot status-dot-blue'
-      case 'completed': return 'status-dot status-dot-gray'
-      default: return 'status-dot status-dot-gray'
-    }
-  }
-
-  const borderClass = (status: string) => {
-    switch (status) {
-      case 'estimate': return 'border-l-4 border-l-[#A8FF3E]'
-      case 'approved': return 'border-l-4 border-l-[#F59E0B]'
-      case 'in_progress': return 'border-l-4 border-l-[#3B82F6]'
-      case 'completed': return 'border-l-4 border-l-[#6B7280]'
-      default: return 'border-l-4 border-l-[#6B7280]'
-    }
+  const counts: Record<Tab, number> = {
+    leads:     jobs.filter((j) => jobTab(j) === 'leads').length,
+    active:    jobs.filter((j) => jobTab(j) === 'active').length,
+    completed: jobs.filter((j) => jobTab(j) === 'completed').length,
   }
 
   if (loading) {
@@ -86,27 +92,30 @@ export default function JobsPage() {
         <div className="px-5 pt-14 pb-4">
           <div className="skeleton h-8 w-32 mb-4" />
           <div className="skeleton h-11 w-full mb-3" />
-          <div className="flex gap-2">
-            <div className="skeleton h-8 w-16" />
-            <div className="skeleton h-8 w-24" />
-            <div className="skeleton h-8 w-20" />
-          </div>
+          <div className="flex gap-2"><div className="skeleton h-9 flex-1" /><div className="skeleton h-9 flex-1" /><div className="skeleton h-9 flex-1" /></div>
         </div>
         <div className="px-5 space-y-2">
-          <div className="skeleton h-20 w-full" />
-          <div className="skeleton h-20 w-full" />
-          <div className="skeleton h-20 w-full" />
+          {[1,2,3].map((i) => <div key={i} className="skeleton h-20 w-full" />)}
         </div>
         <MobileNav />
       </div>
     )
   }
 
+  const emptyMsg = {
+    leads:     { es: 'Sin leads abiertos', en: 'No open leads', cta_es: 'Crear presupuesto', cta_en: 'Create estimate' },
+    active:    { es: 'Sin proyectos activos', en: 'No active projects', cta_es: 'Crear presupuesto', cta_en: 'Create estimate' },
+    completed: { es: 'Sin trabajos completados', en: 'No completed jobs', cta_es: 'Ver activos', cta_en: 'View active' },
+  }[activeTab]
+
   return (
     <div className="min-h-screen bg-[#0F1117] pb-24 max-w-[430px] mx-auto">
-      <div className="px-5 pt-14 pb-4">
+      {/* Header */}
+      <div className="px-5 pt-14 pb-3">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-[28px] font-bold text-white">{t('jobs.title')}</h1>
+          <h1 className="text-[28px] font-bold text-white">
+            {lang === 'es' ? 'Trabajos' : 'Jobs'}
+          </h1>
           <Link href="/jobs/new">
             <button className="h-9 px-4 text-sm font-bold rounded-lg btn-lime flex items-center gap-1.5">
               <Plus className="h-4 w-4" />
@@ -115,55 +124,64 @@ export default function JobsPage() {
           </Link>
         </div>
 
-        <div className="relative mb-3">
+        {/* Search */}
+        <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B7280]" />
           <input
-            placeholder={t('jobs.searchPlaceholder')}
+            placeholder={lang === 'es' ? 'Buscar cliente o dirección...' : 'Search client or address...'}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full h-11 pl-10 pr-4 rounded-lg input-dark text-sm"
           />
         </div>
 
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {filters.map((f) => (
+        {/* Tabs */}
+        <div className="grid grid-cols-3 gap-1 bg-[#1E2228] rounded-xl p-1 border border-[#2A2D35]">
+          {TAB_CONFIG.map(({ key, label_es, label_en, icon: Icon }) => (
             <button
-              key={f.key}
-              onClick={() => setActiveFilter(f.key)}
-              className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
-                activeFilter === f.key
-                  ? 'bg-[#A8FF3E] text-[#0F1117] font-bold'
-                  : 'bg-[#1E2228] border border-[#2A2D35] text-[#6B7280]'
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`flex flex-col items-center gap-0.5 py-2 rounded-lg text-[11px] font-semibold transition-all ${
+                activeTab === key
+                  ? 'bg-[#A8FF3E] text-[#0F1117]'
+                  : 'text-[#6B7280] hover:text-white'
               }`}
             >
-              {f.label}
+              <Icon className="h-4 w-4" />
+              <span>{lang === 'es' ? label_es : label_en}</span>
+              {counts[key] > 0 && (
+                <span className={`text-[10px] font-bold ${activeTab === key ? 'text-[#0F1117]/60' : 'text-[#A8FF3E]'}`}>
+                  {counts[key]}
+                </span>
+              )}
             </button>
           ))}
         </div>
       </div>
 
+      {/* Job list */}
       <div className="px-5 space-y-2">
-        {filteredJobs.length === 0 ? (
-          <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-10 text-center">
+        {filtered.length === 0 ? (
+          <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-10 text-center mt-2">
             <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-[#A8FF3E]/10 flex items-center justify-center">
               <Hammer className="h-6 w-6 text-[#A8FF3E]" />
             </div>
-            <p className="text-white font-semibold mb-1">{t('jobs.noJobs')}</p>
-            <p className="text-[#6B7280] text-sm mb-4">{t('jobs.noJobsCta')}</p>
+            <p className="text-white font-semibold mb-1">
+              {lang === 'es' ? emptyMsg.es : emptyMsg.en}
+            </p>
             <Link href="/jobs/new">
-              <button className="h-10 px-6 text-sm font-bold rounded-lg btn-lime">
+              <button className="mt-3 h-10 px-6 text-sm font-bold rounded-lg btn-lime">
                 <Plus className="h-4 w-4 mr-1 inline" />
-                {t('dashboard.newJob')}
+                {lang === 'es' ? emptyMsg.cta_es : emptyMsg.cta_en}
               </button>
             </Link>
           </div>
         ) : (
-          filteredJobs.map((job) => {
-            const sc = STATUS_CONFIG[job.status]
+          filtered.map((job) => {
             const jt = JOB_TYPE_OPTIONS.find((o) => o.value === job.job_type)
             return (
               <Link key={job.id} href={`/jobs/${job.id}`}>
-                <div className={`bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4 flex items-center justify-between hover:border-[#3A3D45] transition-colors ${borderClass(job.status)}`}>
+                <div className={`bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4 flex items-center justify-between hover:border-[#3A3D45] transition-colors ${borderClass(job)}`}>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       {job.job_number && (
@@ -175,9 +193,7 @@ export default function JobsPage() {
                     </div>
                     <p className="text-xs text-[#6B7280] truncate mt-0.5">{job.client_address}</p>
                     <div className="flex items-center gap-3 mt-2">
-                      <span className={statusDotClass(job.status)}>
-                        {lang === 'es' ? sc?.label_es : sc?.label_en}
-                      </span>
+                      <StatusBadge job={job} lang={lang} />
                       <span className="text-[11px] text-[#6B7280]">
                         {lang === 'es' ? jt?.label_es : jt?.label_en}
                       </span>

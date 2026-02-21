@@ -36,6 +36,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="bg-[#0F1117] text-white antialiased font-sans">
         <Providers>{children}</Providers>
+        <footer className="w-full border-t border-[#1E2228] py-3 text-center">
+          <p className="text-[11px] text-[#4B5563]">
+            Support:{' '}
+            <a href="mailto:hello@roofback.app" className="hover:text-[#A8FF3E] transition-colors">
+              hello@roofback.app
+            </a>
+          </p>
+        </footer>
       </body>
     </html>
   )

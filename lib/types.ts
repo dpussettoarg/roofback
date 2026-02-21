@@ -59,6 +59,10 @@ export interface Job {
   lng: number | null
   job_number: number | null
   estimate_version: number
+  // Simple mode budget buckets (for financial tracker)
+  simple_materials_budget: number
+  simple_labor_budget: number
+  simple_other_budget: number
 }
 
 export type JobType = 'repair' | 'reroof' | 'new_roof' | 'gutters' | 'waterproofing' | 'other'

@@ -68,6 +68,10 @@ export default function EstimatePage() {
   const [marginPct, setMarginPct] = useState(20)
   const [simpleTotal, setSimpleTotal] = useState(0)
   const [simpleDescription, setSimpleDescription] = useState('')
+  // Simple mode budget buckets
+  const [simpleMaterials, setSimpleMaterials] = useState(0)
+  const [simpleLabor, setSimpleLabor] = useState(0)
+  const [simpleOther, setSimpleOther] = useState(0)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [generatingPdf, setGeneratingPdf] = useState(false)
@@ -105,8 +109,21 @@ export default function EstimatePage() {
       setMode(j.estimate_mode || 'simple')
       setOverheadPct(Number(j.overhead_pct) || 15)
       setMarginPct(Number(j.margin_pct) || 20)
-      setSimpleTotal(Number(j.estimated_total) || 0)
       setSimpleDescription(j.simple_description || '')
+      // Load budget buckets
+      const mat = Number(j.simple_materials_budget) || 0
+      const lab = Number(j.simple_labor_budget) || 0
+      const oth = Number(j.simple_other_budget) || 0
+      setSimpleMaterials(mat)
+      setSimpleLabor(lab)
+      setSimpleOther(oth)
+      // If buckets are set, derive total from them; otherwise use stored total
+      if (mat + lab + oth > 0) {
+        const mp = Number(j.margin_pct) || 20
+        setSimpleTotal(Math.round((mat + lab + oth) * (1 + mp / 100)))
+      } else {
+        setSimpleTotal(Number(j.estimated_total) || 0)
+      }
       setClientEmail(j.client_email || '')
       setStartDate(j.start_date || '')
       setDurationDays(j.duration_days || 1)
@@ -299,6 +316,9 @@ export default function EstimatePage() {
         simple_description: mode === 'simple' ? simpleDescription : '',
         overhead_pct: overheadPct,
         margin_pct: marginPct,
+        simple_materials_budget: mode === 'simple' ? simpleMaterials : 0,
+        simple_labor_budget: mode === 'simple' ? simpleLabor : 0,
+        simple_other_budget: mode === 'simple' ? simpleOther : 0,
         start_date: startDate || null,
         duration_days: durationDays,
         deadline_date: deadlineDate || null,
@@ -695,22 +715,120 @@ export default function EstimatePage() {
         {/* ===== SIMPLE MODE ===== */}
         {mode === 'simple' && (
           <div className={`bg-[#1E2228] border border-[#2A2D35] rounded-[12px] p-5 space-y-5 ${isLocked ? 'opacity-80' : ''}`}>
-            <div className="text-center space-y-2">
-              <Label className="text-[#6B7280] text-sm">{lang === 'es' ? 'Precio total' : 'Total price'}</Label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-[#6B7280]">$</span>
-                <Input
-                  type="number"
-                  min="0"
-                  step="100"
-                  value={simpleTotal || ''}
-                  onChange={(e) => setSimpleTotal(parseFloat(e.target.value) || 0)}
-                  readOnly={isLocked}
-                  placeholder="5,000"
-                  className="input-dark h-16 text-3xl font-bold text-center tabular-nums pl-10 rounded-[12px]"
-                />
+            {/* Budget buckets */}
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-[#A8FF3E] mb-3">
+                {lang === 'es' ? 'Presupuesto por categoría' : 'Budget by category'}
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-[#6B7280] text-xs mb-1 block">
+                    {lang === 'es' ? '1. Materiales estimados ($)' : '1. Estimated materials ($)'}
+                  </Label>
+                  <Input
+                    type="number" min="0" step="100"
+                    value={simpleMaterials || ''}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value) || 0
+                      setSimpleMaterials(v)
+                      setSimpleTotal(Math.round((v + simpleLabor + simpleOther) * (1 + marginPct / 100)))
+                    }}
+                    readOnly={isLocked}
+                    placeholder="3,000"
+                    className="input-dark h-11 text-base font-semibold"
+                  />
+                </div>
+                <div>
+                  <Label className="text-[#6B7280] text-xs mb-1 block">
+                    {lang === 'es' ? '2. Mano de obra estimada ($)' : '2. Estimated labor ($)'}
+                  </Label>
+                  <Input
+                    type="number" min="0" step="100"
+                    value={simpleLabor || ''}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value) || 0
+                      setSimpleLabor(v)
+                      setSimpleTotal(Math.round((simpleMaterials + v + simpleOther) * (1 + marginPct / 100)))
+                    }}
+                    readOnly={isLocked}
+                    placeholder="1,500"
+                    className="input-dark h-11 text-base font-semibold"
+                  />
+                </div>
+                <div>
+                  <Label className="text-[#6B7280] text-xs mb-1 block">
+                    {lang === 'es' ? '3. Otros gastos ($)' : '3. Other expenses ($)'}
+                  </Label>
+                  <Input
+                    type="number" min="0" step="50"
+                    value={simpleOther || ''}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value) || 0
+                      setSimpleOther(v)
+                      setSimpleTotal(Math.round((simpleMaterials + simpleLabor + v) * (1 + marginPct / 100)))
+                    }}
+                    readOnly={isLocked}
+                    placeholder="200"
+                    className="input-dark h-11 text-base font-semibold"
+                  />
+                </div>
+                <div>
+                  <Label className="text-[#6B7280] text-xs mb-1 block">
+                    {lang === 'es' ? '4. Margen de ganancia deseado (%)' : '4. Desired profit margin (%)'}
+                  </Label>
+                  <Input
+                    type="number" min="0" max="100" step="1"
+                    value={marginPct || ''}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value) || 0
+                      setMarginPct(v)
+                      setSimpleTotal(Math.round((simpleMaterials + simpleLabor + simpleOther) * (1 + v / 100)))
+                    }}
+                    readOnly={isLocked}
+                    placeholder="20"
+                    className="input-dark h-11 text-base font-semibold"
+                  />
+                </div>
               </div>
+
+              {/* Auto-calculated total */}
+              {(simpleMaterials + simpleLabor + simpleOther) > 0 && (
+                <div className="mt-4 p-3 bg-[#0F1117] rounded-[10px] border border-[#A8FF3E]/20">
+                  <div className="flex justify-between text-xs text-[#6B7280] mb-1">
+                    <span>{lang === 'es' ? 'Costo base' : 'Base cost'}</span>
+                    <span className="tabular-nums">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(simpleMaterials + simpleLabor + simpleOther)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-[#6B7280] mb-2">
+                    <span>{lang === 'es' ? `Ganancia (${marginPct}%)` : `Profit (${marginPct}%)`}</span>
+                    <span className="tabular-nums">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format((simpleMaterials + simpleLabor + simpleOther) * (marginPct / 100))}</span>
+                  </div>
+                  <div className="flex justify-between font-bold">
+                    <span className="text-sm text-white">{lang === 'es' ? 'Precio total al cliente' : 'Total client price'}</span>
+                    <span className="text-lg text-[#A8FF3E] tabular-nums">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(simpleTotal)}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Fallback manual total (when no buckets filled) */}
+              {(simpleMaterials + simpleLabor + simpleOther) === 0 && (
+                <div className="mt-4">
+                  <Label className="text-[#6B7280] text-xs mb-1 block">{lang === 'es' ? 'O ingresá el precio total directo' : 'Or enter total price directly'}</Label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl text-[#6B7280]">$</span>
+                    <Input
+                      type="number" min="0" step="100"
+                      value={simpleTotal || ''}
+                      onChange={(e) => setSimpleTotal(parseFloat(e.target.value) || 0)}
+                      readOnly={isLocked}
+                      placeholder="5,000"
+                      className="input-dark h-14 text-2xl font-bold text-center tabular-nums pl-10 rounded-[12px]"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* Description */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-[#6B7280] text-sm">
@@ -737,12 +855,6 @@ export default function EstimatePage() {
                 placeholder={lang === 'es' ? 'Retecho completo de 2,000 sqft...' : 'Full reroof of 2,000 sqft...'}
                 className="input-dark min-h-[120px] text-base resize-none"
               />
-              {!isLocked && simpleDescription.trim().length > 0 && simpleDescription.trim().length < 20 && (
-                <p className="text-xs text-[#6B7280] flex items-center gap-1">
-                  <Wand2 className="h-3 w-3" />
-                  {lang === 'es' ? 'Escribí más y usá "Mejorar con IA" para completar' : 'Write more and use "Improve with AI" to enhance'}
-                </p>
-              )}
             </div>
           </div>
         )}
