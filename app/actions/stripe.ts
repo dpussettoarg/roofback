@@ -43,9 +43,8 @@ export async function createCheckoutSession(
       cancel_url: getURL('/billing?canceled=true'),
       // Carry the Supabase user ID so the webhook can identify the user
       client_reference_id: user.id,
-      // 30-day trial at the Stripe level as a safety net
+      // Trial is managed in our DB — no trial_period_days sent to Stripe
       subscription_data: {
-        trial_period_days: 0, // Trial is managed in our DB, not Stripe
         metadata: { supabase_user_id: user.id },
       },
     })
