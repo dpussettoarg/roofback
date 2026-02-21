@@ -70,15 +70,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // ── Root → dashboard ──────────────────────────────────────────────────────
-  if (user && pathname === '/') {
-    const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
-    return NextResponse.redirect(url)
-  }
+  // ── Root → dashboard (only when trial is not expired, handled below) ────────
+  // We intentionally don't redirect here for expired-trial users so they can
+  // reach / to read the landing page or click "Sign out".
 
   // ── Trial-expiry bouncer (only for protected non-billing routes) ───────────
-  if (user && !isPublicRoute && !isBillingRoute) {
+  // Exemptions: public routes, billing/pricing, AND the root path + auth routes
+  // so an expired-trial user can always sign out or navigate to the home page.
+  const isEscapeRoute = pathname === '/' || pathname.startsWith('/auth')
+
+  if (user && !isPublicRoute && !isBillingRoute && !isEscapeRoute) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('subscription_status, trial_expires_at')
@@ -93,7 +94,6 @@ export async function middleware(request: NextRequest) {
         profile.trial_expires_at &&
         new Date(profile.trial_expires_at) < new Date()
 
-      // Canceled plans also gate access
       const isCanceled = profile.subscription_status === 'canceled'
 
       if (!isActive && (trialExpired || isCanceled)) {
@@ -103,6 +103,14 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(url)
       }
     }
+  }
+
+  // ── Root → dashboard (active/trialing users only — expired users stay on /) ─
+  if (user && pathname === '/') {
+    // If we reach here, the user is not expired (bouncer above would have redirected)
+    const url = request.nextUrl.clone()
+    url.pathname = '/dashboard'
+    return NextResponse.redirect(url)
   }
 
   return supabaseResponse

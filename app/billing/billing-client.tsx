@@ -3,10 +3,11 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { createCheckoutSession } from '@/app/actions/stripe'
+import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
   CheckCircle, AlertTriangle, Clock, Zap, Loader2,
-  ArrowLeft, Shield, Infinity, Headphones,
+  ArrowLeft, Shield, Infinity, Headphones, LogOut, Home,
 } from 'lucide-react'
 
 interface BillingClientProps {
@@ -42,6 +43,15 @@ function getDaysLeft(expiresAt: string | null): number | null {
 
 export function BillingClient({ profile, reason, success, canceled }: BillingClientProps) {
   const [loading, setLoading] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
+
+  async function handleSignOut() {
+    setSigningOut(true)
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    // Hard redirect to home — clears all client state and cookies
+    window.location.href = '/'
+  }
 
   // NOTE: when success=true, the server-rendered profile may still show
   // 'trialing' because the Stripe webhook hasn't fired yet. We treat
@@ -122,16 +132,35 @@ export function BillingClient({ profile, reason, success, canceled }: BillingCli
     <div className="min-h-screen" style={{ backgroundColor: '#0F1117' }}>
       <div className="max-w-lg mx-auto px-6 py-10">
 
-        {/* Back link */}
-        {isActive && (
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center gap-2 text-sm text-[#6B7280] hover:text-white mb-8 transition-colors"
+        {/* ── Top nav row: back (active users) + sign-out (always) ─────────── */}
+        <div className="flex items-center justify-between mb-8">
+          {isActive ? (
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center gap-2 text-sm text-[#6B7280] hover:text-white transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to dashboard
+            </Link>
+          ) : (
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 text-sm text-[#6B7280] hover:text-white transition-colors"
+            >
+              <Home className="h-4 w-4" />
+              Volver al Inicio
+            </Link>
+          )}
+
+          <button
+            onClick={handleSignOut}
+            disabled={signingOut}
+            className="inline-flex items-center gap-1.5 text-sm text-[#6B7280] hover:text-red-400 transition-colors disabled:opacity-50"
           >
-            <ArrowLeft className="h-4 w-4" />
-            Back to dashboard
-          </Link>
-        )}
+            {signingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+            Cerrar Sesión
+          </button>
+        </div>
 
         {/* ── Canceled checkout banner ─────────────────────────────────────── */}
         {canceled && (
@@ -271,6 +300,20 @@ export function BillingClient({ profile, reason, success, canceled }: BillingCli
                 Secure payment via Stripe. You won&apos;t be charged until you enter your card details.
               </p>
             </div>
+          </div>
+        )}
+
+        {/* ── Escape hatch for non-active users ───────────────────────────── */}
+        {!isActive && (
+          <div className="flex flex-col items-center gap-3 mb-6">
+            <button
+              onClick={handleSignOut}
+              disabled={signingOut}
+              className="inline-flex items-center gap-2 text-sm text-red-400/70 hover:text-red-400 transition-colors disabled:opacity-50"
+            >
+              {signingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+              Cerrar Sesión
+            </button>
           </div>
         )}
 
