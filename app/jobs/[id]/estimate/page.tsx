@@ -294,23 +294,26 @@ export default function EstimatePage() {
     }
   }
 
-  async function handleSave() {
+  async function handleSave(): Promise<boolean> {
     setSaving(true)
     try {
       if (mode === 'itemized') {
-        await supabase.from('estimate_items').delete().eq('job_id', id)
+        const { error: delErr } = await supabase
+          .from('estimate_items').delete().eq('job_id', id)
+        if (delErr) throw new Error(`[estimate_items delete] ${delErr.message}`)
+
         if (items.length > 0) {
           const rows = items.map((item, idx) => ({
             job_id: id, category: item.category, name: item.name,
             quantity: item.quantity, unit: item.unit, unit_price: item.unit_price,
             total_price: item.quantity * item.unit_price, sort_order: idx,
           }))
-          const { error } = await supabase.from('estimate_items').insert(rows)
-          if (error) throw error
+          const { error: insErr } = await supabase.from('estimate_items').insert(rows)
+          if (insErr) throw new Error(`[estimate_items insert] ${insErr.message}`)
         }
       }
 
-      await supabase.from('jobs').update({
+      const { error: updErr } = await supabase.from('jobs').update({
         estimate_mode: mode,
         estimated_total: finalTotal,
         simple_description: mode === 'simple' ? simpleDescription : '',
@@ -328,33 +331,47 @@ export default function EstimatePage() {
         updated_at: new Date().toISOString(),
       }).eq('id', id)
 
+      if (updErr) throw new Error(`[jobs update] ${updErr.message}`)
+
       // Re-fetch so React state has the latest DB row, including
-      // public_token (set by DB trigger) that may not have been in the
-      // initial load if this is the first save of a new job.
-      const { data: refreshed } = await supabase
+      // public_token which is set by a DB DEFAULT on first INSERT and
+      // would be missing from stale in-memory state.
+      const { data: refreshed, error: fetchErr } = await supabase
         .from('jobs').select('*').eq('id', id).single()
+      if (fetchErr) throw new Error(`[jobs refetch] ${fetchErr.message}`)
       if (refreshed) setJob(refreshed as Job)
 
       toast.success(lang === 'es' ? '¡Presupuesto guardado!' : 'Estimate saved!')
+      return true
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : t('common.error'))
+      const msg = err instanceof Error ? err.message : String(err)
+      toast.error(`${lang === 'es' ? 'Error al guardar' : 'Save failed'}: ${msg}`)
+      return false
     } finally {
       setSaving(false)
     }
   }
 
   async function handleAccepted() {
-    await handleSave()
-    await supabase.from('jobs').update({
+    const saved = await handleSave()
+    if (!saved) return  // save already showed the error toast, bail out
+
+    const { error: apprErr } = await supabase.from('jobs').update({
       status: 'approved',
       workflow_stage: 'approved',
       client_status: 'approved',
       approved_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }).eq('id', id)
+
+    if (apprErr) {
+      toast.error(`${lang === 'es' ? 'Error al aprobar' : 'Approval failed'}: ${apprErr.message}`)
+      return
+    }
+
     toast.success(lang === 'es' ? '¡Presupuesto aprobado!' : 'Estimate approved!')
-    // router.refresh() busts Next.js router cache so the job detail page
-    // re-fetches from Supabase instead of serving the stale cached version.
+    // router.refresh() invalidates Next.js router cache so /jobs/[id]
+    // re-fetches from Supabase and shows the Execution Dashboard.
     router.refresh()
     router.push(`/jobs/${id}`)
   }
