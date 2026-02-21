@@ -43,15 +43,20 @@ function getDaysLeft(expiresAt: string | null): number | null {
 export function BillingClient({ profile, reason, success, canceled }: BillingClientProps) {
   const [loading, setLoading] = useState(false)
 
+  // NOTE: when success=true, the server-rendered profile may still show
+  // 'trialing' because the Stripe webhook hasn't fired yet. We treat
+  // success=true as the authoritative source of truth for the UI.
+  const effectivelyActive = success || profile?.subscription_status === 'active'
+
   const status = profile?.subscription_status ?? 'trialing'
-  const isActive = status === 'active'
-  const isTrialing = status === 'trialing'
-  const isCanceled = status === 'canceled'
-  const isPastDue = status === 'past_due'
+  const isActive = effectivelyActive
+  const isTrialing = !effectivelyActive && status === 'trialing'
+  const isCanceled = !effectivelyActive && status === 'canceled'
+  const isPastDue = !effectivelyActive && status === 'past_due'
 
   const daysLeft = isTrialing ? getDaysLeft(profile?.trial_expires_at ?? null) : null
   const trialExpired = isTrialing && daysLeft !== null && daysLeft <= 0
-  const trialExpiredByReason = reason === 'trial_expired'
+  const trialExpiredByReason = !success && reason === 'trial_expired'
 
   async function handleUpgrade() {
     setLoading(true)
@@ -71,6 +76,48 @@ export function BillingClient({ profile, reason, success, canceled }: BillingCli
     }
   }
 
+  // ── SUCCESS SCREEN — shown immediately after Stripe redirects back ─────────
+  // This takes over the entire page so stale profile data is never visible.
+  if (success) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-6" style={{ backgroundColor: '#0F1117' }}>
+        <div className="max-w-sm w-full text-center space-y-6">
+          {/* Big green checkmark */}
+          <div className="flex justify-center">
+            <div className="w-20 h-20 rounded-full bg-[#A8FF3E]/10 flex items-center justify-center">
+              <CheckCircle className="h-10 w-10 text-[#A8FF3E]" />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold text-white">¡Suscripción Activada!</h1>
+            <p className="text-[#9CA3AF] text-sm leading-relaxed">
+              Tu cuenta ha sido actualizada a RoofBack Pro.<br />
+              Ya tenés acceso completo a todas las funciones.
+            </p>
+          </div>
+
+          {/* "Go to dashboard" — uses window.location.href for a hard reload
+              so the middleware sees the updated subscription_status */}
+          <button
+            onClick={() => { window.location.href = '/jobs' }}
+            className="btn-lime w-full h-13 rounded-xl font-bold text-base flex items-center justify-center gap-2 py-3.5"
+          >
+            <Zap className="h-5 w-5" />
+            Ir al Dashboard
+          </button>
+
+          <p className="text-[11px] text-[#4B5563]">
+            ¿Preguntas?{' '}
+            <a href="mailto:hello@roofback.app" className="underline hover:text-[#A8FF3E] transition-colors">
+              hello@roofback.app
+            </a>
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#0F1117' }}>
       <div className="max-w-lg mx-auto px-6 py-10">
@@ -86,21 +133,8 @@ export function BillingClient({ profile, reason, success, canceled }: BillingCli
           </Link>
         )}
 
-        {/* ── Success banner ──────────────────────────────────────────────── */}
-        {success && (
-          <div className="mb-6 p-4 rounded-2xl bg-[#A8FF3E]/10 border border-[#A8FF3E]/30 flex items-start gap-3">
-            <CheckCircle className="h-5 w-5 text-[#A8FF3E] flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-[#A8FF3E] text-sm">Subscription activated!</p>
-              <p className="text-[#9CA3AF] text-xs mt-0.5">
-                Welcome to RoofBack Pro. You now have full access.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* ── Canceled banner ─────────────────────────────────────────────── */}
-        {canceled && !success && (
+        {/* ── Canceled checkout banner ─────────────────────────────────────── */}
+        {canceled && (
           <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
             <p className="text-amber-300 text-sm">Checkout was canceled. You have not been charged.</p>
@@ -108,7 +142,7 @@ export function BillingClient({ profile, reason, success, canceled }: BillingCli
         )}
 
         {/* ── Trial expired warning (redirected from middleware) ───────────── */}
-        {(trialExpiredByReason || (isTrialing && trialExpired)) && !success && (
+        {(trialExpiredByReason || (isTrialing && trialExpired)) && (
           <div className="mb-6 p-5 rounded-2xl bg-red-500/10 border border-red-500/30">
             <div className="flex items-center gap-3 mb-2">
               <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0" />
@@ -122,7 +156,7 @@ export function BillingClient({ profile, reason, success, canceled }: BillingCli
         )}
 
         {/* ── Canceled subscription warning ────────────────────────────────── */}
-        {(isCanceled || reason === 'canceled') && !success && (
+        {(isCanceled || reason === 'canceled') && (
           <div className="mb-6 p-5 rounded-2xl bg-red-500/10 border border-red-500/30">
             <div className="flex items-center gap-3 mb-2">
               <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0" />
@@ -268,7 +302,7 @@ export function BillingClient({ profile, reason, success, canceled }: BillingCli
               To update your payment method, change your plan, or cancel, use the Stripe customer portal.
             </p>
             <a
-              href="https://billing.stripe.com/p/login/test_00g00000000000000"
+              href="https://billing.stripe.com/p/login/test_eVqdR861Ce7rbGl0I9ew800"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-sm text-[#A8FF3E] hover:text-white transition-colors underline underline-offset-4"
