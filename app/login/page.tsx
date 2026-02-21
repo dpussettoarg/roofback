@@ -183,7 +183,7 @@ export default function LoginPage() {
       <div className="mb-8 text-center relative z-10">
         <div className="flex items-center justify-center">
           <Image
-            src={lang === 'es' ? '/LOGO/3.png' : '/LOGO/4.png'}
+            src="/LOGO/1.png"
             alt="RoofBack"
             width={280}
             height={80}

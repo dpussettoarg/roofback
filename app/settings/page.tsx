@@ -264,7 +264,7 @@ export default function SettingsPage() {
           </h3>
           {profile.subscription_status !== 'active' ? (
             <PricingCard
-              priceId={process.env.NEXT_PUBLIC_STRIPE_PRICE_ID || 'price_TEST'}
+              priceId="price_1T2ODTBiIxuQmwGuua83OmC0"
               title={lang === 'es' ? 'Pro' : 'Pro'}
               price="$9"
               period={lang === 'es' ? '/mes' : '/month'}

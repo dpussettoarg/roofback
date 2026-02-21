@@ -47,7 +47,7 @@ export default function ResetPasswordPage() {
       <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-20 blur-3xl pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(168,255,62,0.3), transparent)' }} />
 
       <div className="mb-8 text-center relative z-10">
-        <Image src="/LOGO/3.png" alt="RoofBack" width={200} height={56} className="h-12 w-auto mx-auto" />
+        <Image src="/LOGO/1.png" alt="RoofBack" width={200} height={56} className="h-12 w-auto mx-auto" />
       </div>
 
       <div className="w-full max-w-sm relative z-10">

@@ -115,7 +115,7 @@ export default function NewJobPage() {
   const update = (field: string, value: string) => setForm((f) => ({ ...f, [field]: value }))
 
   return (
-    <div className="min-h-screen pb-32" style={{ backgroundColor: '#0F1117' }}>
+    <div className="min-h-screen pb-40" style={{ backgroundColor: '#0F1117' }}>
       {/* ── HEADER ── */}
       <div className="sticky top-0 z-30 px-4 pt-12 pb-4" style={{ backgroundColor: '#0F1117', borderBottom: '1px solid #2A2D35' }}>
         <div className="mx-auto w-full" style={{ maxWidth: 430 }}>
@@ -127,7 +127,7 @@ export default function NewJobPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="mx-auto w-full px-4 py-5 space-y-5" style={{ maxWidth: 430 }}>
+      <form id="new-job-form" onSubmit={handleSubmit} className="mx-auto w-full px-4 py-5 space-y-5" style={{ maxWidth: 430 }}>
 
         {/* ══════════════════════════════════════════════
             SECTION 1 — CLIENT INFO
@@ -301,25 +301,15 @@ export default function NewJobPage() {
 
       {/* ── STICKY BOTTOM CTA ── */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-6 pt-3"
-        style={{ background: 'linear-gradient(to top, #0F1117 70%, transparent)' }}
+        className="fixed left-0 right-0 z-50 px-4 pt-3 pb-20"
+        style={{ bottom: 0, background: 'linear-gradient(to top, #0F1117 60%, transparent)' }}
       >
         <div className="mx-auto w-full" style={{ maxWidth: 430 }}>
           <button
             type="submit"
-            form={undefined}
+            form="new-job-form"
             disabled={loading}
-            onClick={(e) => {
-              e.preventDefault()
-              const formEl = document.querySelector('form')
-              if (formEl) formEl.requestSubmit()
-            }}
             className="btn-lime w-full h-14 rounded-xl text-base font-bold transition-all active:scale-[0.98] disabled:opacity-50"
-            style={{
-              backgroundColor: '#A8FF3E',
-              color: '#0F1117',
-              border: 'none',
-            }}
           >
             {loading
               ? (lang === 'es' ? 'Creando...' : 'Creating...')

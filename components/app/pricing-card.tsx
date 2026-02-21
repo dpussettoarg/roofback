@@ -1,13 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { createCheckoutSession } from '@/app/actions/stripe'
 import { Loader2, Check } from 'lucide-react'
 import { toast } from 'sonner'
-
-const DEFAULT_PRICE_ID = 'price_TEST'
 
 interface PricingCardProps {
   priceId?: string
@@ -17,12 +13,11 @@ interface PricingCardProps {
   features: string[]
   highlighted?: boolean
   lang?: 'es' | 'en'
-  /** "Actualizar a Pro" | "Suscribirse" - texto del botón */
   buttonLabel?: 'upgrade' | 'subscribe'
 }
 
 export function PricingCard({
-  priceId = DEFAULT_PRICE_ID,
+  priceId = 'price_1T2ODTBiIxuQmwGuua83OmC0',
   title,
   price,
   period = '/month',
@@ -50,7 +45,7 @@ export function PricingCard({
         window.location.href = url
         return
       }
-      throw new Error(lang === 'es' ? 'No se pudo crear la sesión' : 'Could not create session')
+      throw new Error(lang === 'es' ? 'No se pudo crear la sesion' : 'Could not create session')
     } catch (err) {
       console.error('Checkout error:', err)
       toast.error(err instanceof Error ? err.message : (lang === 'es' ? 'Error al procesar' : 'Checkout failed'))
@@ -60,48 +55,47 @@ export function PricingCard({
   }
 
   return (
-    <Card
-      className={`border-0 shadow-sm rounded-2xl overflow-hidden transition-all ${
+    <div
+      className={`rounded-2xl overflow-hidden transition-all ${
         highlighted
-          ? 'ring-2 ring-[#008B99] bg-gradient-to-b from-[#008B99]/5 to-transparent'
-          : 'bg-white'
+          ? 'ring-2 ring-[#A8FF3E]/40 bg-gradient-to-b from-[#A8FF3E]/5 to-transparent'
+          : ''
       }`}
+      style={{ backgroundColor: '#16191F', border: '1px solid #2A2D35' }}
     >
-      <CardContent className="p-6 space-y-6">
+      <div className="p-5 space-y-5">
         <div>
-          <h3 className="text-lg font-bold text-slate-900">{title}</h3>
+          <h3 className="text-lg font-bold text-white">{title}</h3>
           <div className="mt-2 flex items-baseline gap-1">
-            <span className="text-3xl font-bold text-slate-900">{price}</span>
-            <span className="text-slate-500 text-sm">{period}</span>
+            <span className="text-3xl font-bold text-white">{price}</span>
+            <span className="text-[#6B7280] text-sm">{period}</span>
           </div>
         </div>
 
-        <ul className="space-y-2">
+        <ul className="space-y-2.5">
           {features.map((feature, i) => (
-            <li key={i} className="flex items-center gap-2 text-sm text-slate-600">
-              <Check className="h-4 w-4 text-[#78BE20] shrink-0" />
+            <li key={i} className="flex items-center gap-2.5 text-sm text-[#9CA3AF]">
+              <Check className="h-4 w-4 text-[#A8FF3E] shrink-0" />
               {feature}
             </li>
           ))}
         </ul>
 
-        <Button
+        <button
           onClick={handleSubscribe}
           disabled={loading}
-          className={`w-full h-12 rounded-xl font-medium ${
-            highlighted ? 'btn-gradient' : 'bg-slate-900 hover:bg-slate-800 text-white'
-          }`}
+          className="btn-lime w-full h-12 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
         >
           {loading ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              <Loader2 className="h-4 w-4 animate-spin" />
               {lang === 'es' ? 'Redirigiendo...' : 'Redirecting...'}
             </>
           ) : (
             buttonText
           )}
-        </Button>
-      </CardContent>
-    </Card>
+        </button>
+      </div>
+    </div>
   )
 }
