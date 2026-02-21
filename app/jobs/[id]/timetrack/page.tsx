@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo, useRef } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -13,13 +13,14 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import {
   ArrowLeft, Plus, Trash2, Loader2, Clock, Receipt,
-  Camera, ClipboardList, Image as ImageIcon, X, ChevronDown, ChevronUp,
+  Camera, ClipboardList, ChevronDown, ChevronUp,
   AlertTriangle, Package, CheckCircle2
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Job, TimeEntry, Expense, ActivityLog } from '@/lib/types'
 import { format } from 'date-fns'
 import Image from 'next/image'
+import { ImageUploader } from '@/components/app/image-uploader'
 
 function formatMoney(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(n)
@@ -64,10 +65,8 @@ export default function TimeTrackPage() {
   const [activityDesc, setActivityDesc] = useState('')
   const [activityType, setActivityType] = useState<'progress' | 'issue' | 'delivery' | 'completion'>('progress')
   const [activityPhotos, setActivityPhotos] = useState<string[]>([])
-  const [uploadingActivityPhoto, setUploadingActivityPhoto] = useState(false)
   const [savingActivity, setSavingActivity] = useState(false)
   const [showTimeSection, setShowTimeSection] = useState(true)
-  const activityFileRef = useRef<HTMLInputElement>(null)
 
   const today = format(new Date(), 'yyyy-MM-dd')
 
@@ -163,30 +162,6 @@ export default function TimeTrackPage() {
     () => expenses.reduce((s, e) => s + e.amount, 0),
     [expenses]
   )
-
-  async function handleActivityPhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files
-    if (!files || files.length === 0) return
-    setUploadingActivityPhoto(true)
-    try {
-      const newUrls: string[] = []
-      for (const file of Array.from(files)) {
-        const ext = file.name.split('.').pop()
-        const path = `${id}/activity_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
-        const { error } = await supabase.storage.from('job-photos').upload(path, file)
-        if (error) throw error
-        const { data: urlData } = supabase.storage.from('job-photos').getPublicUrl(path)
-        newUrls.push(urlData.publicUrl)
-      }
-      setActivityPhotos(prev => [...prev, ...newUrls])
-      toast.success(lang === 'es' ? 'Foto subida' : 'Photo uploaded')
-    } catch {
-      toast.error(lang === 'es' ? 'Error subiendo foto' : 'Error uploading photo')
-    } finally {
-      setUploadingActivityPhoto(false)
-      if (activityFileRef.current) activityFileRef.current.value = ''
-    }
-  }
 
   async function handleSaveActivity() {
     if (!activityDesc.trim()) {
@@ -343,34 +318,16 @@ export default function TimeTrackPage() {
                 />
 
                 {/* Photos */}
-                {activityPhotos.length > 0 && (
-                  <div className="flex gap-2 flex-wrap">
-                    {activityPhotos.map((url, i) => (
-                      <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden bg-[#16191F]">
-                        <Image src={url} alt="" fill className="object-cover" sizes="80px" />
-                        <button
-                          onClick={() => setActivityPhotos(prev => prev.filter((_, idx) => idx !== i))}
-                          className="absolute top-0.5 right-0.5 p-0.5 bg-black/60 rounded-full text-white"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <input ref={activityFileRef} type="file" accept="image/*" capture="environment" multiple onChange={handleActivityPhotoUpload} className="hidden" />
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => activityFileRef.current?.click()}
-                    disabled={uploadingActivityPhoto}
-                    className="flex-1 h-12 border-2 border-dashed border-[#2A2D35] rounded-xl text-[#6B7280] hover:border-[#A8FF3E] hover:text-[#A8FF3E] transition-colors flex items-center justify-center gap-2"
-                  >
-                    {uploadingActivityPhoto ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-                    <span className="text-xs">{uploadingActivityPhoto ? (lang === 'es' ? 'Subiendo...' : 'Uploading...') : (lang === 'es' ? 'Tomar / subir foto' : 'Take / upload photo')}</span>
-                  </button>
-                </div>
+                {/* Photo uploader — camera mode opens native OS bottom sheet */}
+                <ImageUploader
+                  urls={activityPhotos}
+                  onChange={setActivityPhotos}
+                  storagePath={`${id}/activity`}
+                  bucketName="job-photos"
+                  maxPhotos={5}
+                  cameraMode
+                  lang={lang}
+                />
 
                 <div className="flex gap-2 pt-1">
                   <button

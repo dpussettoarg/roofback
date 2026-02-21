@@ -16,7 +16,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   ArrowLeft, Plus, Trash2, Download, CheckCircle, Loader2,
   Send, Zap, List, Sparkles, CalendarDays, Clock, CreditCard,
-  Globe, Camera, X, ImageIcon, Wand2, Lock
+  Globe, Wand2, Lock
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { JOB_TEMPLATES, scaleTemplateItems } from '@/lib/templates'
@@ -24,6 +24,7 @@ import { PAYMENT_TERMS_OPTIONS, translateMaterialName, formatJobNumber, formatEs
 import type { Job, EstimateItem, JobType, Profile } from '@/lib/types'
 import { pdf } from '@react-pdf/renderer'
 import { EstimatePDF } from '@/components/pdf/estimate-pdf'
+import { ImageUploader } from '@/components/app/image-uploader'
 
 function formatMoney(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(n)
@@ -58,7 +59,6 @@ export default function EstimatePage() {
   const router = useRouter()
   const { t, lang } = useI18n()
   const supabase = createClient()
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [job, setJob] = useState<Job | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -85,7 +85,6 @@ export default function EstimatePage() {
   const [paymentTerms, setPaymentTerms] = useState('50/50')
   const [languageOutput, setLanguageOutput] = useState<'es' | 'en'>('es')
   const [photos, setPhotos] = useState<string[]>([])
-  const [uploadingPhoto, setUploadingPhoto] = useState(false)
 
   // AI Proposal state
   const [aiNotes, setAiNotes] = useState('')
@@ -201,35 +200,6 @@ export default function EstimatePage() {
 
   const finalTotal = mode === 'simple' ? simpleTotal : calc.total
   const isLocked = job?.client_status === 'approved' || !!job?.approved_at
-
-  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files
-    if (!files || files.length === 0) return
-    setUploadingPhoto(true)
-
-    try {
-      const newUrls: string[] = []
-      for (const file of Array.from(files)) {
-        const ext = file.name.split('.').pop()
-        const path = `${id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
-        const { error } = await supabase.storage.from('job-photos').upload(path, file)
-        if (error) throw error
-        const { data: urlData } = supabase.storage.from('job-photos').getPublicUrl(path)
-        newUrls.push(urlData.publicUrl)
-      }
-      setPhotos(prev => [...prev, ...newUrls])
-      toast.success(lang === 'es' ? 'Foto(s) subida(s)' : 'Photo(s) uploaded')
-    } catch {
-      toast.error(lang === 'es' ? 'Error subiendo foto. Creá el bucket "job-photos" en Supabase Storage.' : 'Error uploading. Create "job-photos" bucket in Supabase Storage.')
-    } finally {
-      setUploadingPhoto(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
-    }
-  }
-
-  function removePhoto(idx: number) {
-    setPhotos(prev => prev.filter((_, i) => i !== idx))
-  }
 
   async function handleImproveDescription() {
     if (!simpleDescription.trim() || !job) return
@@ -1145,37 +1115,18 @@ export default function EstimatePage() {
         {/* ===== PHOTOS SECTION ===== */}
         <div className={`bg-[#1E2228] border border-[#2A2D35] rounded-[12px] p-5 space-y-3 ${isLocked ? 'opacity-80' : ''}`}>
           <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-            <Camera className="h-4 w-4 text-[#A8FF3E]" />
+            <span className="text-[#A8FF3E]">📷</span>
             {lang === 'es' ? 'Fotos del trabajo' : 'Job Photos'}
           </h3>
-          {photos.length > 0 && (
-            <div className="grid grid-cols-3 gap-2">
-              {photos.map((url, i) => (
-                <div key={i} className="relative group rounded-[8px] overflow-hidden aspect-square bg-[#16191F]">
-                  <Image src={url} alt="" fill className="object-cover" sizes="120px" />
-                  <button
-                    onClick={() => removePhoto(i)}
-                    className="absolute top-1 right-1 p-1 bg-black/60 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          {!isLocked && (
-            <>
-              <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handlePhotoUpload} className="hidden" />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingPhoto}
-                className="w-full h-20 border-2 border-dashed border-[#2A2D35] rounded-[10px] text-[#6B7280] hover:border-[#A8FF3E] hover:text-[#A8FF3E] transition-colors flex flex-col items-center justify-center gap-1"
-              >
-                {uploadingPhoto ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImageIcon className="h-5 w-5" />}
-                <span className="text-xs">{uploadingPhoto ? (lang === 'es' ? 'Subiendo...' : 'Uploading...') : (lang === 'es' ? 'Subir fotos' : 'Upload photos')}</span>
-              </button>
-            </>
-          )}
+          <ImageUploader
+            urls={photos}
+            onChange={setPhotos}
+            storagePath={id}
+            bucketName="job-photos"
+            maxPhotos={10}
+            disabled={isLocked}
+            lang={lang}
+          />
         </div>
 
         {/* ===== SUMMARY CARD ===== */}
