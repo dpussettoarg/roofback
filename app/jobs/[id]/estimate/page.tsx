@@ -328,6 +328,13 @@ export default function EstimatePage() {
         updated_at: new Date().toISOString(),
       }).eq('id', id)
 
+      // Re-fetch so React state has the latest DB row, including
+      // public_token (set by DB trigger) that may not have been in the
+      // initial load if this is the first save of a new job.
+      const { data: refreshed } = await supabase
+        .from('jobs').select('*').eq('id', id).single()
+      if (refreshed) setJob(refreshed as Job)
+
       toast.success(lang === 'es' ? '¡Presupuesto guardado!' : 'Estimate saved!')
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : t('common.error'))
@@ -346,6 +353,9 @@ export default function EstimatePage() {
       updated_at: new Date().toISOString(),
     }).eq('id', id)
     toast.success(lang === 'es' ? '¡Presupuesto aprobado!' : 'Estimate approved!')
+    // router.refresh() busts Next.js router cache so the job detail page
+    // re-fetches from Supabase instead of serving the stale cached version.
+    router.refresh()
     router.push(`/jobs/${id}`)
   }
 

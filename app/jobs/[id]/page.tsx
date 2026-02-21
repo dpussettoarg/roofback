@@ -328,7 +328,35 @@ export default function JobDetailPage() {
         ═══════════════════════════════════════════ */}
         {isApproved && (
           <>
-            {/* Signed contract card */}
+            {/* ── Prominent "View Contract" CTA ── */}
+            <div className="flex gap-2">
+              <Link
+                href={job.public_token ? `/proposal/${job.public_token}` : `/jobs/${id}/estimate`}
+                target={job.public_token ? '_blank' : undefined}
+                rel={job.public_token ? 'noopener noreferrer' : undefined}
+                className="flex-1"
+              >
+                <button className="w-full h-12 rounded-[10px] bg-[#A8FF3E] text-[#0F1117] font-bold text-sm flex items-center justify-center gap-2 hover:brightness-110 transition-all">
+                  <FileText className="h-4 w-4" />
+                  {lang === 'es' ? 'Ver Contrato Aprobado' : 'View Approved Contract'}
+                </button>
+              </Link>
+              {job.public_token && (
+                <button
+                  onClick={() => {
+                    const url = `${window.location.origin}/proposal/${job.public_token}`
+                    navigator.clipboard.writeText(url)
+                    toast.success(lang === 'es' ? '¡Link copiado!' : 'Link copied!')
+                  }}
+                  className="h-12 px-4 rounded-[10px] border border-[#2A2D35] bg-transparent text-[#6B7280] hover:bg-[#1E2228] hover:text-[#A8FF3E] transition-colors flex items-center justify-center"
+                  title={lang === 'es' ? 'Copiar link del contrato' : 'Copy contract link'}
+                >
+                  <Copy className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Signed contract meta card */}
             <div className="bg-[#1E2228] rounded-[12px] overflow-hidden border border-[#A8FF3E]/30">
               <div className="h-1 bg-[#A8FF3E]" />
               <div className="p-4 space-y-3">
@@ -345,13 +373,26 @@ export default function JobDetailPage() {
                     <span>{lang === 'es' ? 'Firmado por: ' : 'Signed by: '}{job.client_signature}</span>
                   </div>
                 )}
-                <Link
-                  href={`/jobs/${id}/estimate`}
-                  className="flex items-center gap-2 text-xs text-[#A8FF3E] hover:underline font-medium"
-                >
-                  <Lock className="h-3 w-3" />
-                  {lang === 'es' ? 'Ver presupuesto aprobado (solo lectura)' : 'View approved estimate (read only)'}
-                </Link>
+                <div className="flex items-center gap-3">
+                  <Link
+                    href={`/jobs/${id}/estimate`}
+                    className="flex items-center gap-1.5 text-xs text-[#A8FF3E] hover:underline font-medium"
+                  >
+                    <Lock className="h-3 w-3" />
+                    {lang === 'es' ? 'Vista interna (solo lectura)' : 'Internal view (read only)'}
+                  </Link>
+                  {job.public_token && (
+                    <Link
+                      href={`/proposal/${job.public_token}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-xs text-[#6B7280] hover:text-[#A8FF3E] hover:underline font-medium transition-colors"
+                    >
+                      <Link2 className="h-3 w-3" />
+                      {lang === 'es' ? 'Link público' : 'Public link'}
+                    </Link>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -520,10 +561,16 @@ export default function JobDetailPage() {
             </div>
             <div className="space-y-2">
               <label className="text-[#6B7280] text-sm block">{lang === 'es' ? 'Link de propuesta' : 'Proposal link'}</label>
-              <div className="flex gap-2">
-                <input readOnly value={getProposalUrl() || ''} className="flex-1 h-10 rounded-[8px] bg-[#0F1117] border border-[#2A2D35] px-3 text-xs text-[#6B7280] focus:outline-none" />
-                <button onClick={handleCopyLink} className="h-10 px-3 rounded-[8px] border border-[#2A2D35] bg-transparent text-[#6B7280] hover:bg-[#252830]"><Copy className="h-3.5 w-3.5" /></button>
-              </div>
+              {getProposalUrl() ? (
+                <div className="flex gap-2">
+                  <input readOnly value={getProposalUrl()!} className="flex-1 h-10 rounded-[8px] bg-[#0F1117] border border-[#2A2D35] px-3 text-xs text-[#A8FF3E] focus:outline-none" />
+                  <button onClick={handleCopyLink} className="h-10 px-3 rounded-[8px] border border-[#2A2D35] bg-transparent text-[#6B7280] hover:bg-[#252830]"><Copy className="h-3.5 w-3.5" /></button>
+                </div>
+              ) : (
+                <p className="text-xs text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-[8px] px-3 py-2">
+                  {lang === 'es' ? 'Abrí el presupuesto y guardalo para generar el link.' : 'Open the estimate and save it to generate the link.'}
+                </p>
+              )}
             </div>
             <div className="flex gap-2 pt-2">
               <button onClick={() => setShowSendDialog(false)} className="flex-1 h-12 rounded-[8px] border border-[#2A2D35] bg-transparent text-[#6B7280] text-sm font-medium hover:bg-[#252830]">
