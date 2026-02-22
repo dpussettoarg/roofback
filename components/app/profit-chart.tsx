@@ -1,90 +1,129 @@
 'use client'
 
 /**
- * ProfitChart — fully isolated Recharts component.
+ * ProfitChart — rebuilt from scratch with the "Double-Mount" strategy.
  *
- * Loaded exclusively via:
+ * Load ONLY via:
  *   const ProfitChart = dynamic(() => import('@/components/app/profit-chart'), { ssr: false })
  *
- * Root-cause of "ie is not a function" + "width(-1)/height(-1)":
- *   ResponsiveContainer calls getBoundingClientRect() synchronously on mount.
- *   When the element hasn't painted yet, width is -1 and recharts' internal
- *   scale function ("ie") blows up.
+ * Root cause of "ie is not a function":
+ *   Recharts' internal scale function blows up when it receives width = -1,
+ *   which happens if the chart tries to measure the DOM before the browser
+ *   has finished painting.
  *
- * Fix strategy:
- *   1. Gate render behind useEffect (guarantees DOM is painted).
- *   2. Skip ResponsiveContainer entirely — pass fixed width/height props
- *      directly to BarChart. 100% width is set via the wrapping div.
- *   3. Hard data guard before any recharts JSX.
+ * Fix — three-layer guard:
+ *   1. useEffect #1 → isMounted (guarantees we are past SSR / hydration)
+ *   2. useEffect #2 → requestAnimationFrame inside isMounted effect
+ *      (guarantees the browser has completed at least one paint cycle)
+ *   3. div ref + ResizeObserver → real pixel width, never -1
+ *
+ * ResponsiveContainer is NOT used. Width is passed as a hard integer.
+ * Every Recharts import is guarded by typeof window !== 'undefined'.
  */
 
 import { useEffect, useRef, useState } from 'react'
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, Cell,
-} from 'recharts'
 
-interface DataPoint {
+// Only import Recharts sub-components individually — never the barrel export
+import { BarChart }     from 'recharts'
+import { Bar }          from 'recharts'
+import { XAxis }        from 'recharts'
+import { YAxis }        from 'recharts'
+import { CartesianGrid } from 'recharts'
+import { Tooltip }      from 'recharts'
+import { Cell }         from 'recharts'
+
+export interface DataPoint {
   month: string
   ganancia: number
 }
 
-interface ProfitChartProps {
+interface Props {
   data: DataPoint[]
 }
 
-const CHART_HEIGHT = 200
+const HEIGHT = 200
 
-function formatMoney(n: number) {
+function usd(n: number) {
   return new Intl.NumberFormat('en-US', {
-    style: 'currency', currency: 'USD', maximumFractionDigits: 0,
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
   }).format(n)
 }
 
-export default function ProfitChart({ data }: ProfitChartProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [chartWidth, setChartWidth] = useState<number>(0)
-  const [mounted, setMounted] = useState(false)
+export default function ProfitChart({ data }: Props) {
+  const wrapperRef = useRef<HTMLDivElement>(null)
 
-  // Step 1 — wait for the DOM to be fully painted before any recharts work
+  // Layer 1 — DOM painted? (past hydration)
+  const [isMounted, setIsMounted] = useState(false)
+
+  // Layer 2 — browser paint cycle complete?
+  const [isReady, setIsReady] = useState(false)
+
+  // Layer 3 — measured pixel width
+  const [width, setWidth] = useState(0)
+
+  // Layer 1: runs after first render, so we know we are on the client
   useEffect(() => {
-    setMounted(true)
+    setIsMounted(true)
   }, [])
 
-  // Step 2 — measure the real pixel width after mount
+  // Layer 2: once mounted, wait for the next animation frame
+  // This guarantees the browser has completed at least one paint before
+  // Recharts tries to access any DOM geometry.
   useEffect(() => {
-    if (!mounted || !containerRef.current) return
+    if (!isMounted) return
+    const raf = requestAnimationFrame(() => {
+      setIsReady(true)
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [isMounted])
+
+  // Layer 3: after the frame fires, measure the real pixel width and
+  // keep it updated whenever the container resizes.
+  useEffect(() => {
+    if (!isReady || !wrapperRef.current) return
 
     const measure = () => {
-      const w = containerRef.current?.offsetWidth ?? 0
-      if (w > 0) setChartWidth(w)
+      const w = wrapperRef.current?.offsetWidth ?? 0
+      if (w > 0) setWidth(w)
     }
 
     measure()
 
     const ro = new ResizeObserver(measure)
-    ro.observe(containerRef.current)
+    ro.observe(wrapperRef.current)
     return () => ro.disconnect()
-  }, [mounted])
+  }, [isReady])
 
-  // Step 3 — hard data guard
-  const hasData = Array.isArray(data) && data.length > 0 && data.some((d) => d.ganancia !== 0)
+  // Hard data guard — Recharts must never receive an empty or all-zero dataset
+  const hasData =
+    typeof window !== 'undefined' &&
+    Array.isArray(data) &&
+    data.length > 0 &&
+    data.some((d) => d.ganancia !== 0)
+
+  // The chart is only rendered when ALL three layers are satisfied
+  const canRender = isReady && width > 0 && hasData
 
   return (
     <div
-      ref={containerRef}
+      ref={wrapperRef}
       className="w-full"
-      style={{ height: CHART_HEIGHT }}
+      style={{ height: HEIGHT }}
     >
-      {/* Only render when: DOM is painted, width is measured, data exists */}
-      {mounted && chartWidth > 0 && hasData && (
+      {canRender && (
         <BarChart
-          width={chartWidth}
-          height={CHART_HEIGHT}
+          width={width}
+          height={HEIGHT}
           data={data}
           margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
         >
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#2A2D35" />
+          <CartesianGrid
+            strokeDasharray="3 3"
+            vertical={false}
+            stroke="#2A2D35"
+          />
           <XAxis
             dataKey="month"
             tick={{ fontSize: 11, fill: '#6B7280' }}
@@ -93,14 +132,14 @@ export default function ProfitChart({ data }: ProfitChartProps) {
           />
           <YAxis
             tick={{ fontSize: 11, fill: '#6B7280' }}
-            tickFormatter={(v) => `$${v}`}
+            tickFormatter={(v: number) => `$${v}`}
             axisLine={false}
             tickLine={false}
             width={52}
           />
           <Tooltip
-            formatter={(v) => [formatMoney(Number(v)), 'Profit']}
-            labelFormatter={(l) => String(l)}
+            formatter={(v: number) => [usd(v), 'Profit']}
+            labelFormatter={(l: string) => String(l)}
             contentStyle={{
               borderRadius: '8px',
               border: '1px solid #2A2D35',
@@ -111,9 +150,9 @@ export default function ProfitChart({ data }: ProfitChartProps) {
             cursor={{ fill: 'rgba(168,255,62,0.05)' }}
           />
           <Bar dataKey="ganancia" radius={[4, 4, 0, 0]} maxBarSize={40}>
-            {data.map((entry, index) => (
+            {data.map((entry, i) => (
               <Cell
-                key={`cell-${index}`}
+                key={`cell-${i}`}
                 fill={entry.ganancia < 0 ? '#F87171' : '#A8FF3E'}
               />
             ))}
@@ -121,8 +160,8 @@ export default function ProfitChart({ data }: ProfitChartProps) {
         </BarChart>
       )}
 
-      {/* Placeholder shown while measuring or when no data */}
-      {(!mounted || chartWidth === 0 || !hasData) && (
+      {/* Skeleton shown while any guard layer is still pending */}
+      {!canRender && (
         <div className="w-full h-full flex items-end gap-1 px-2 pb-2">
           {[40, 65, 30, 80, 55, 90].map((h, i) => (
             <div

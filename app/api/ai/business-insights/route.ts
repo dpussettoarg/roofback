@@ -4,6 +4,32 @@ import { cookies } from 'next/headers'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
 
+// ── In-memory rate limiter (5 calls / 60s per user) ──────────────────────────
+const rateMap = new Map<string, { count: number; resetAt: number }>()
+const RATE_LIMIT = 5
+const RATE_WINDOW_MS = 60_000
+
+function isRateLimited(userId: string): boolean {
+  const now = Date.now()
+  const entry = rateMap.get(userId)
+  if (!entry || now > entry.resetAt) {
+    rateMap.set(userId, { count: 1, resetAt: now + RATE_WINDOW_MS })
+    return false
+  }
+  if (entry.count >= RATE_LIMIT) return true
+  entry.count++
+  return false
+}
+
+// ── Strip prompt-injection attempts from user-controlled strings ──────────────
+function sanitizeClientName(name: string): string {
+  return (name || '')
+    .slice(0, 80)
+    .replace(/[<>{}[\]]/g, '')
+    .replace(/\b(ignore|disregard|forget|override|jailbreak|DAN|system\s*prompt)\b.*/gi, '[REDACTED]')
+    .trim()
+}
+
 export interface BusinessInsight {
   type: 'risk' | 'opportunity' | 'action'
   icon: '⚠️' | '💡' | '✅'
@@ -144,6 +170,14 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+    // ── RATE LIMITING ───────────────────────────────────────────────────────
+    if (isRateLimited(user.id)) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please wait a minute and try again.' },
+        { status: 429, headers: { 'Retry-After': '60' } }
+      )
+    }
+
     const body = await req.json() as { lang?: string; orgId?: string }
     const lang = body.lang || 'en'
 
@@ -236,7 +270,7 @@ export async function POST(req: NextRequest) {
       const jobMilestones = milestones.filter((m) => m.job_id === j.id)
       const pendingMs = jobMilestones.filter((m) => m.scheduled_date && !m.completed_date)
       return {
-        client: j.client_name,
+        client: sanitizeClientName(j.client_name),
         stage: j.workflow_stage,
         contract: Number(j.estimated_total),
         budget,

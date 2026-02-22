@@ -165,10 +165,8 @@ export async function POST(request: Request) {
         orgName, role, acceptUrl, lang,
       })
 
-      await supabase.auth.admin // only available server-side via service role
-      // Send via Supabase's built-in email (uses their SMTP)
-      // We use the Auth admin API to send a magic link to register + join
-      // Fallback: just return the URL so the owner can share it manually
+      // Fallback insert path — return URL for owner to share manually
+      console.log('[INVITE] Fallback insert for org:', orgId, '| role:', role)
       return NextResponse.json({ token, acceptUrl, html })
     }
 
@@ -180,9 +178,10 @@ export async function POST(request: Request) {
       orgName, role, acceptUrl, lang,
     })
 
-    // Send email via Supabase Edge Function or Resend if configured
-    // For now: return the URL — owner can share it, and the HTML is logged
-    console.log('[INVITE]', acceptUrl)
+    // Invitation token is a secret — never log it.
+    // The acceptUrl is returned to the owner so they can share it manually.
+    // TODO: wire to an email provider (Resend/Mailgun) when ready.
+    console.log('[INVITE] Invitation created for org:', orgId, '| role:', role)
 
     return NextResponse.json({ token, acceptUrl })
   } catch (err: unknown) {

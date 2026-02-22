@@ -40,8 +40,9 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/terms') ||
     pathname.startsWith('/privacy') ||
     pathname.startsWith('/invite') ||
-    pathname.startsWith('/api/webhooks/stripe') ||
-    pathname.startsWith('/debug')
+    pathname.startsWith('/api/webhooks/stripe')
+    // NOTE: /debug is intentionally removed — it now blocks itself in production
+    // NOTE: /api/ai/* routes are NOT public — each handler verifies auth internally
 
   // Billing/pricing pages are always accessible to authenticated users
   // so they can upgrade even after trial expires
