@@ -138,8 +138,8 @@ export default function ProfitChart({ data }: Props) {
             width={52}
           />
           <Tooltip
-            formatter={(v: number) => [usd(v), 'Profit']}
-            labelFormatter={(l: string) => String(l)}
+            formatter={(v: number | undefined) => [usd(v ?? 0), 'Profit']}
+            labelFormatter={(l: unknown) => String(l)}
             contentStyle={{
               borderRadius: '8px',
               border: '1px solid #2A2D35',
