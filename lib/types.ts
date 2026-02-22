@@ -11,6 +11,7 @@ export interface Organization {
   business_address?: string | null
   business_phone?: string | null
   business_email?: string | null
+  website?: string | null
 }
 
 export interface Customer {

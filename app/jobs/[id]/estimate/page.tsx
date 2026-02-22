@@ -68,6 +68,7 @@ export default function EstimatePage() {
   const [orgAddress, setOrgAddress] = useState<string | null>(null)
   const [orgPhone, setOrgPhone] = useState<string | null>(null)
   const [orgEmail, setOrgEmail] = useState<string | null>(null)
+  const [orgWebsite, setOrgWebsite] = useState<string | null>(null)
   const [mode, setMode] = useState<'simple' | 'itemized'>('simple')
   const [items, setItems] = useState<LocalItem[]>([])
   const [overheadPct, setOverheadPct] = useState(15)
@@ -112,7 +113,7 @@ export default function EstimatePage() {
           if (profileData.organization_id) {
             const { data: orgData } = await supabase
               .from('organizations')
-              .select('logo_url,business_address,business_phone,business_email')
+              .select('logo_url,business_address,business_phone,business_email,website')
               .eq('id', profileData.organization_id)
               .single()
             if (orgData) {
@@ -120,6 +121,7 @@ export default function EstimatePage() {
               setOrgAddress(orgData.business_address || null)
               setOrgPhone(orgData.business_phone || null)
               setOrgEmail(orgData.business_email || null)
+              setOrgWebsite(orgData.website || null)
             }
           }
         }
@@ -464,7 +466,7 @@ export default function EstimatePage() {
           contractorCompany={contractorCompany}
           contractorPhone={contractorPhone}
           contractorEmail={contractorEmail}
-          contractorWebsite={contractorWebsite}
+          contractorWebsite={orgWebsite || contractorWebsite}
           companyLogoUrl={orgLogo}
           businessAddress={orgAddress}
           businessPhone={orgPhone}
@@ -544,8 +546,8 @@ export default function EstimatePage() {
   if (job?.client_status === 'approved' || !!job?.approved_at) {
     return (
       <div className="min-h-screen bg-[#0F1117] pb-24 font-[Inter,sans-serif]">
-        <div className="bg-[#0F1117] border-b border-[#2A2D35] px-5 pt-12 pb-4">
-          <div className="w-full max-w-5xl mx-auto">
+        <div className="bg-[#0F1117] border-b border-[#2A2D35] px-4 md:px-8 pt-12 pb-4">
+          <div className="w-full max-w-screen-xl mx-auto">
             <Link href={`/jobs/${id}`} className="inline-flex items-center text-sm text-[#6B7280] hover:text-[#A8FF3E] transition-colors mb-3">
               <ArrowLeft className="h-4 w-4 mr-1" />
               {job?.client_name}
@@ -561,7 +563,7 @@ export default function EstimatePage() {
           </div>
         </div>
 
-        <div className="w-full max-w-5xl mx-auto px-5 py-5 space-y-4">
+        <div className="w-full max-w-screen-xl mx-auto px-4 md:px-8 py-5 space-y-4">
           {/* Approved badge */}
           <div className="bg-[#A8FF3E]/10 border border-[#A8FF3E]/40 rounded-[12px] p-4 flex items-start gap-3">
             <Lock className="h-5 w-5 text-[#A8FF3E] mt-0.5 flex-shrink-0" />
@@ -776,8 +778,8 @@ export default function EstimatePage() {
   return (
     <div className="min-h-screen bg-[#0F1117] pb-28 font-[Inter,sans-serif]">
       {/* ===== HEADER ===== */}
-      <div className="bg-[#0F1117] border-b border-[#2A2D35] px-5 pt-12 pb-4">
-        <div className="w-full max-w-5xl mx-auto">
+      <div className="bg-[#0F1117] border-b border-[#2A2D35] px-4 md:px-8 pt-12 pb-4">
+        <div className="w-full max-w-screen-xl mx-auto">
           <Link
             href={`/jobs/${id}`}
             className="inline-flex items-center text-sm text-[#6B7280] hover:text-[#A8FF3E] transition-colors mb-2"
@@ -797,7 +799,7 @@ export default function EstimatePage() {
       </div>
 
       {/* ===== MAIN CONTENT ===== */}
-      <div className="w-full max-w-5xl mx-auto px-5 py-5 space-y-4">
+      <div className="w-full max-w-screen-xl mx-auto px-4 md:px-8 py-5 space-y-4">
 
         {/* ===== LANGUAGE OUTPUT TOGGLE (moved to top) ===== */}
         <div className="flex items-center justify-between bg-[#1E2228] border border-[#2A2D35] rounded-[12px] p-4">

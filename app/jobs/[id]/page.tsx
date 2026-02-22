@@ -551,19 +551,19 @@ export default function JobDetailPage() {
                     </div>
                   </button>
 
-                  {/* Always-visible progress bar */}
-                  <div className="px-4 pb-3">
-                    <div className="flex items-center">
+                  {/* Always-visible progress bar — flex-col on mobile to prevent text overlap */}
+                  <div className="px-4 pb-5">
+                    <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-0 sm:items-center">
                       {STAGES.map((s, i) => {
                         const done = i < stepIndex
                         const active = i === stepIndex
                         const Icon = s.icon
                         return (
-                          <div key={s.key} className="flex items-center flex-1 min-w-0">
-                            <div className="flex flex-col items-center flex-shrink-0">
+                          <div key={s.key} className="flex sm:flex-1 sm:min-w-0 items-center gap-2 sm:justify-center">
+                            <div className="flex flex-col items-center flex-shrink-0 min-w-0">
                               <button
                                 onClick={() => setExpandedStage(showTimeline && expandedStage === i ? null : i)}
-                                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
                                   active  ? 'bg-[#A8FF3E] text-[#0F1117] ring-2 ring-[#A8FF3E]/40'
                                   : done  ? 'bg-[#A8FF3E]/20 text-[#A8FF3E]'
                                   :         'bg-[#0F1117] text-[#4B5563] border border-[#2A2D35]'
@@ -571,14 +571,14 @@ export default function JobDetailPage() {
                               >
                                 <Icon className="h-4 w-4" />
                               </button>
-                              <span className={`mt-1 text-[10px] font-semibold text-center leading-tight max-w-[56px] ${
+                              <span className={`mt-1.5 text-[10px] font-semibold text-center leading-tight max-w-[70px] break-words ${
                                 active ? 'text-[#A8FF3E]' : done ? 'text-[#9CA3AF]' : 'text-[#4B5563]'
                               }`}>
                                 {lang === 'es' ? s.label_es : s.label_en}
                               </span>
                             </div>
                             {i < STAGES.length - 1 && (
-                              <div className={`flex-1 h-0.5 mx-1 mb-5 rounded-full transition-all ${
+                              <div className={`hidden sm:block flex-1 h-0.5 mx-1 mb-6 self-center rounded-full transition-all ${
                                 i < stepIndex ? 'bg-[#A8FF3E]' : 'bg-[#2A2D35]'
                               }`} />
                             )}
@@ -646,7 +646,7 @@ export default function JobDetailPage() {
                                 ) : (
                                   /* Not finished — show date pickers + notify button */
                                   <>
-                                    <div className="grid grid-cols-2 gap-2">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                       <div className="space-y-1">
                                         <p className="text-[11px] text-[#6B7280] font-medium uppercase">
                                           {lang === 'es' ? 'Fecha programada' : 'Scheduled date'}

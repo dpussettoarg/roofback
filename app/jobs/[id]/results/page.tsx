@@ -144,8 +144,8 @@ export default function ResultsPage() {
 
   return (
     <div className="min-h-screen bg-[#0F1117] pb-24">
-      <div className="mx-auto max-w-[430px]">
-        <div className="border-b border-[#2A2D35] px-4 pt-12 pb-4">
+      <div className="w-full max-w-screen-xl px-4 md:px-8 mx-auto">
+        <div className="border-b border-[#2A2D35] pt-12 pb-4">
           <Link href={`/jobs/${id}`} className="inline-flex items-center text-sm text-[#6B7280] mb-2">
             <ArrowLeft className="h-4 w-4 mr-1" />
             {job?.client_name}
@@ -153,7 +153,7 @@ export default function ResultsPage() {
           <h1 className="text-2xl font-bold text-white">{t('results.title')}</h1>
         </div>
 
-        <div className="px-4 py-4 space-y-4">
+        <div className="py-4 space-y-4">
           {/* Profit indicator */}
           <Card className={`border shadow-md ${profitBg} bg-[#1E2228]`} style={{ backgroundColor: undefined }}>
             <CardContent className="p-5 text-center">

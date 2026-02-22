@@ -73,14 +73,17 @@ export default function SettingsPage() {
           .order('created_at')
         setTemplates((tmpl as Template[]) || [])
 
-        // Load org branding for owners
+        // Load org branding for owners — sync company name from org as source of truth
         if (data.role === 'owner' && data.organization_id) {
           const { data: orgData } = await supabase
             .from('organizations')
             .select('*')
             .eq('id', data.organization_id)
             .single()
-          if (orgData) setOrgBranding(orgData as Organization)
+          if (orgData) {
+            setOrgBranding(orgData as Organization)
+            if (orgData.name) setProfile((p) => ({ ...p, company_name: orgData.name }))
+          }
         }
       }
       setLoading(false)
@@ -226,14 +229,27 @@ export default function SettingsPage() {
       const { error: upErr } = await supabase.storage
         .from('org-logos')
         .upload(path, file, { upsert: true, contentType: file.type })
-      if (upErr) throw upErr
+      if (upErr) {
+        console.error('[Settings] Logo upload error:', upErr)
+        const msg = upErr.message?.includes('Bucket not found') || upErr.message?.includes('not found')
+          ? (lang === 'es' ? 'Creá el bucket "org-logos" en Supabase Storage primero.' : 'Create the "org-logos" bucket in Supabase Storage first.')
+          : upErr.message
+        throw new Error(msg)
+      }
       const { data: urlData } = supabase.storage.from('org-logos').getPublicUrl(path)
       const logoUrl = urlData.publicUrl + `?t=${Date.now()}`
       setOrgBranding((b) => ({ ...b, logo_url: logoUrl }))
-      await supabase.from('organizations').update({ logo_url: logoUrl }).eq('id', orgId)
+      const { error: dbErr } = await supabase.from('organizations').update({ logo_url: logoUrl, updated_at: new Date().toISOString() }).eq('id', orgId)
+      if (dbErr) {
+        console.error('[Settings] DB update logo_url error:', dbErr)
+        throw new Error(dbErr.message)
+      }
+      invalidate()
       toast.success(lang === 'es' ? 'Logo actualizado' : 'Logo updated')
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Upload failed')
+      const message = err instanceof Error ? err.message : 'Upload failed'
+      console.error('[Settings] handleUploadLogo:', err)
+      toast.error(message)
     } finally {
       setUploadingLogo(false)
     }
@@ -244,20 +260,25 @@ export default function SettingsPage() {
     if (!orgId) return
     setSavingBranding(true)
     try {
-      const { error } = await supabase
-        .from('organizations')
-        .update({
-          business_address: orgBranding.business_address || null,
-          business_phone:   orgBranding.business_phone   || null,
-          business_email:   orgBranding.business_email   || null,
-          updated_at:       new Date().toISOString(),
-        })
-        .eq('id', orgId)
-      if (error) throw error
+      const payload = {
+        name: (profile.company_name || orgBranding.name || '').trim() || null,
+        business_address: orgBranding.business_address?.trim() || null,
+        business_phone:   orgBranding.business_phone?.trim()   || null,
+        business_email:   orgBranding.business_email?.trim()   || null,
+        website:          orgBranding.website?.trim()          || null,
+        updated_at:       new Date().toISOString(),
+      }
+      const { error } = await supabase.from('organizations').update(payload).eq('id', orgId)
+      if (error) {
+        console.error('[Settings] handleSaveBranding DB error:', error)
+        throw new Error(error.message)
+      }
       invalidate()
       toast.success(lang === 'es' ? '¡Empresa actualizada!' : 'Company profile updated!')
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Error')
+      const message = err instanceof Error ? err.message : (lang === 'es' ? 'Algo falló al guardar.' : 'Something went wrong.')
+      console.error('[Settings] handleSaveBranding:', err)
+      toast.error(message)
     } finally {
       setSavingBranding(false)
     }
@@ -273,7 +294,6 @@ export default function SettingsPage() {
           company_name: profile.company_name,
           phone: profile.phone,
           contact_email: profile.contact_email,
-          website: profile.website,
           default_hourly_rate: profile.default_hourly_rate,
           default_overhead_pct: profile.default_overhead_pct,
           default_margin_pct: profile.default_margin_pct,
@@ -283,10 +303,24 @@ export default function SettingsPage() {
         })
         .eq('id', profile.id)
 
-      if (error) throw error
+      if (error) {
+        console.error('[Settings] handleSave profiles error:', error)
+        throw new Error(error.message)
+      }
+      // Sync company name to organization when user is owner
+      if (profile.organization_id && profile.role === 'owner' && profile.company_name) {
+        const { error: orgErr } = await supabase
+          .from('organizations')
+          .update({ name: profile.company_name.trim(), updated_at: new Date().toISOString() })
+          .eq('id', profile.organization_id)
+        if (orgErr) console.error('[Settings] org name sync error:', orgErr)
+        else invalidate()
+      }
       toast.success(t('settings.saved'))
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : t('common.error'))
+      const message = err instanceof Error ? err.message : t('common.error')
+      console.error('[Settings] handleSave:', err)
+      toast.error(message)
     } finally {
       setSaving(false)
     }
@@ -301,7 +335,7 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0F1117] flex items-center justify-center">
-        <div className="w-full max-w-[430px] mx-auto px-5 space-y-4">
+        <div className="w-full max-w-screen-xl px-4 md:px-8 mx-auto space-y-4">
           {/* Skeleton header */}
           <div className="pt-12 pb-4 space-y-2">
             <div className="h-7 w-40 bg-[#1E2228] rounded-lg animate-pulse" />
@@ -320,7 +354,7 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-[#0F1117] pb-24">
       {/* Header */}
-      <div className="w-full max-w-[430px] mx-auto px-5 pt-12 pb-4">
+      <div className="w-full max-w-screen-xl px-4 md:px-8 mx-auto pt-12 pb-4">
         <h1 className="text-2xl font-bold text-white">{t('settings.title')}</h1>
         <p className="text-sm text-[#6B7280] mt-1">
           {lang === 'es'
@@ -329,7 +363,7 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <div className="w-full max-w-[430px] mx-auto px-5 space-y-4">
+      <div className="w-full max-w-screen-xl px-4 md:px-8 mx-auto space-y-4">
 
         {/* ── Company Profile (Owners only) ─────────────────────────── */}
         {isOwner && (
@@ -379,6 +413,24 @@ export default function SettingsPage() {
               </div>
             </div>
 
+            {/* Company name (synced with org) */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-[#6B7280] flex items-center gap-1.5">
+                <Building2 className="h-3.5 w-3.5" />
+                {lang === 'es' ? 'Nombre de la empresa' : 'Company name'}
+              </Label>
+              <Input
+                value={profile.company_name || orgBranding.name || ''}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setProfile((p) => ({ ...p, company_name: v }))
+                  setOrgBranding((b) => ({ ...b, name: v }))
+                }}
+                placeholder={lang === 'es' ? 'Ej: Techos Perez LLC' : 'E.g.: Perez Roofing LLC'}
+                className="input-dark h-12 rounded-lg bg-[#16191F] border-[#2A2D35] text-white placeholder:text-[#3A3F4B] focus:border-[#A8FF3E] focus:ring-[#A8FF3E]/20"
+              />
+            </div>
+
             {/* Business address */}
             <div className="space-y-1.5">
               <Label className="text-xs text-[#6B7280] flex items-center gap-1.5">
@@ -423,6 +475,19 @@ export default function SettingsPage() {
               />
             </div>
 
+            {/* Website (moved from My Profile) */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-[#6B7280] flex items-center gap-1.5">
+                {lang === 'es' ? 'Sitio web' : 'Website'}
+              </Label>
+              <Input
+                value={orgBranding.website ?? profile.website ?? ''}
+                onChange={(e) => setOrgBranding((b) => ({ ...b, website: e.target.value }))}
+                placeholder="www.myroofing.com"
+                className="input-dark h-12 rounded-lg bg-[#16191F] border-[#2A2D35] text-white placeholder:text-[#3A3F4B] focus:border-[#A8FF3E] focus:ring-[#A8FF3E]/20"
+              />
+            </div>
+
             <button
               onClick={handleSaveBranding}
               disabled={savingBranding}
@@ -451,15 +516,17 @@ export default function SettingsPage() {
             />
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-xs text-[#6B7280]">{t('settings.company')}</Label>
-            <Input
-              value={profile.company_name || ''}
-              onChange={(e) => update('company_name', e.target.value)}
-              placeholder={lang === 'es' ? 'Ej: Techos Perez LLC' : 'E.g.: Perez Roofing LLC'}
-              className="input-dark h-12 rounded-lg bg-[#16191F] border-[#2A2D35] text-white placeholder:text-[#3A3F4B] focus:border-[#A8FF3E] focus:ring-[#A8FF3E]/20"
-            />
-          </div>
+          {!isOwner && (
+            <div className="space-y-1.5">
+              <Label className="text-xs text-[#6B7280]">{t('settings.company')}</Label>
+              <Input
+                value={profile.company_name || ''}
+                onChange={(e) => update('company_name', e.target.value)}
+                placeholder={lang === 'es' ? 'Ej: Techos Perez LLC' : 'E.g.: Perez Roofing LLC'}
+                className="input-dark h-12 rounded-lg bg-[#16191F] border-[#2A2D35] text-white placeholder:text-[#3A3F4B] focus:border-[#A8FF3E] focus:ring-[#A8FF3E]/20"
+              />
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label className="text-xs text-[#6B7280]">{t('settings.phone')}</Label>
@@ -485,17 +552,6 @@ export default function SettingsPage() {
             />
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-xs text-[#6B7280]">
-              {lang === 'es' ? 'Pagina web' : 'Website'}
-            </Label>
-            <Input
-              value={profile.website || ''}
-              onChange={(e) => update('website', e.target.value)}
-              placeholder="www.myroofing.com"
-              className="input-dark h-12 rounded-lg bg-[#16191F] border-[#2A2D35] text-white placeholder:text-[#3A3F4B] focus:border-[#A8FF3E] focus:ring-[#A8FF3E]/20"
-            />
-          </div>
         </div>
 
         {/* Defaults Card */}

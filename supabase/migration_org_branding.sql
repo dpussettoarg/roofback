@@ -8,10 +8,11 @@ BEGIN;
 
 -- Add branding / contact columns to organizations
 ALTER TABLE public.organizations
-  ADD COLUMN IF NOT EXISTS logo_url        TEXT,
+  ADD COLUMN IF NOT EXISTS logo_url         TEXT,
   ADD COLUMN IF NOT EXISTS business_address TEXT,
   ADD COLUMN IF NOT EXISTS business_phone   TEXT,
-  ADD COLUMN IF NOT EXISTS business_email   TEXT;
+  ADD COLUMN IF NOT EXISTS business_email   TEXT,
+  ADD COLUMN IF NOT EXISTS website          TEXT;
 
 -- Storage bucket for company logos (public read, authenticated upload)
 -- Run this only once — it errors if bucket already exists, which is fine.
