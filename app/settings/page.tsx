@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useI18n } from '@/lib/i18n/context'
 import { MobileNav } from '@/components/app/mobile-nav'
+import { AppHeader } from '@/components/app/app-header'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { Loader2, LogOut, Globe, Building2, CreditCard, Package, Plus, Trash2, X, ChevronDown, ChevronUp, ShieldCheck } from 'lucide-react'
+import { Loader2, LogOut, Globe, Building2, CreditCard, Package, Plus, Trash2, X, ChevronDown, ChevronUp, ShieldCheck, Users, UserPlus, Mail, Shield, Copy, Check, UserX } from 'lucide-react'
 import { useProfile } from '@/lib/hooks/useProfile'
+import { useOrganization, type OrgMember } from '@/lib/hooks/useOrganization'
 import { toast } from 'sonner'
 import type { Profile } from '@/lib/types'
 import { PricingCard } from '@/components/app/pricing-card'
@@ -17,12 +19,21 @@ import { PricingCard } from '@/components/app/pricing-card'
 export default function SettingsPage() {
   const { t, lang, setLang } = useI18n()
   const { isOwner } = useProfile()
+  const { members, loadMembers, invalidate } = useOrganization()
   const supabase = createClient()
   const router = useRouter()
 
   const [profile, setProfile] = useState<Partial<Profile>>({})
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  // Team management
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState<'owner' | 'ops'>('ops')
+  const [sendingInvite, setSendingInvite] = useState(false)
+  const [inviteLink, setInviteLink] = useState('')
+  const [copiedLink, setCopiedLink] = useState(false)
+  const [removingMember, setRemovingMember] = useState<string | null>(null)
 
   // Material templates
   interface TemplateItem { name: string; quantity_needed: number; unit: string; provider?: string }
@@ -58,6 +69,9 @@ export default function SettingsPage() {
         setTemplates((tmpl as Template[]) || [])
       }
       setLoading(false)
+
+      // Load team members if owner
+      if (data?.role === 'owner') loadMembers()
     }
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -133,6 +147,57 @@ export default function SettingsPage() {
       toast.error(err instanceof Error ? err.message : 'Error')
     } finally {
       setSavingTemplate(false)
+    }
+  }
+
+  async function handleInvite() {
+    if (!inviteEmail.trim()) { toast.error(lang === 'es' ? 'Ingresá un email' : 'Enter an email'); return }
+    setSendingInvite(true)
+    try {
+      const res = await fetch('/api/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
+      })
+      const json = await res.json() as { error?: string; acceptUrl?: string }
+      if (!res.ok || json.error) throw new Error(json.error || 'Error')
+      setInviteLink(json.acceptUrl || '')
+      setInviteEmail('')
+      toast.success(lang === 'es' ? '¡Invitación creada! Compartí el link.' : 'Invitation created! Share the link.')
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Error')
+    } finally {
+      setSendingInvite(false)
+    }
+  }
+
+  async function copyInviteLink() {
+    if (!inviteLink) return
+    try {
+      await navigator.clipboard.writeText(inviteLink)
+      setCopiedLink(true)
+      setTimeout(() => setCopiedLink(false), 2000)
+    } catch {
+      toast.error('Could not copy')
+    }
+  }
+
+  async function handleRemoveMember(memberId: string) {
+    if (!confirm(lang === 'es' ? '¿Remover a este miembro?' : 'Remove this member?')) return
+    setRemovingMember(memberId)
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ organization_id: null, role: 'ops' })
+        .eq('id', memberId)
+      if (error) throw error
+      invalidate()
+      loadMembers()
+      toast.success(lang === 'es' ? 'Miembro removido' : 'Member removed')
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Error')
+    } finally {
+      setRemovingMember(null)
     }
   }
 
@@ -340,6 +405,129 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
+
+        {/* ── Team Management — owners only ──────────────────────────── */}
+        {isOwner && (
+          <div className="bg-[#1E2228] border border-[#2A2D35] rounded-2xl p-5 space-y-4">
+            <div className="flex items-center gap-2.5">
+              <Users className="h-5 w-5 text-[#A8FF3E]" />
+              <h3 className="text-sm font-semibold text-white">
+                {lang === 'es' ? 'Equipo' : 'Team'}
+              </h3>
+            </div>
+
+            {/* Member list */}
+            {members.length > 0 && (
+              <div className="space-y-2">
+                {members.map((m: OrgMember) => (
+                  <div
+                    key={m.id}
+                    className="flex items-center gap-3 px-3 py-2.5 bg-[#16191F] rounded-xl border border-[#2A2D35]"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-[#A8FF3E]/10 flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-bold text-[#A8FF3E]">
+                        {(m.full_name || m.email || '?')[0].toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{m.full_name || m.email}</p>
+                      <p className="text-xs text-[#6B7280] truncate">{m.email}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                        m.role === 'owner'
+                          ? 'bg-[#A8FF3E]/10 text-[#A8FF3E]'
+                          : 'bg-blue-500/10 text-blue-400'
+                      }`}>
+                        {m.role === 'owner'
+                          ? (lang === 'es' ? 'Propietario' : 'Owner')
+                          : (lang === 'es' ? 'Operaciones' : 'Ops')}
+                      </span>
+                      {m.id !== profile.id && (
+                        <button
+                          onClick={() => handleRemoveMember(m.id)}
+                          disabled={removingMember === m.id}
+                          className="p-1.5 rounded text-[#4B5563] hover:text-red-400 hover:bg-red-400/10 transition-colors disabled:opacity-50"
+                          title={lang === 'es' ? 'Remover miembro' : 'Remove member'}
+                        >
+                          {removingMember === m.id
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : <UserX className="h-3.5 w-3.5" />}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Invite form */}
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center gap-1.5">
+                <UserPlus className="h-3.5 w-3.5 text-[#6B7280]" />
+                <span className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider">
+                  {lang === 'es' ? 'Invitar miembro' : 'Invite member'}
+                </span>
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleInvite()}
+                  placeholder={lang === 'es' ? 'Email del nuevo miembro' : "New member's email"}
+                  className="flex-1 h-10 rounded-lg bg-[#0F1117] border border-[#2A2D35] px-3 text-white text-sm placeholder:text-[#4B5563] focus:outline-none focus:border-[#A8FF3E] transition-colors"
+                />
+                <select
+                  value={inviteRole}
+                  onChange={(e) => setInviteRole(e.target.value as 'owner' | 'ops')}
+                  className="h-10 px-3 rounded-lg bg-[#0F1117] border border-[#2A2D35] text-white text-sm focus:outline-none focus:border-[#A8FF3E] transition-colors"
+                >
+                  <option value="ops">{lang === 'es' ? 'Operaciones' : 'Operations'}</option>
+                  <option value="owner">{lang === 'es' ? 'Propietario' : 'Owner'}</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Shield className="h-3.5 w-3.5 text-[#6B7280]" />
+                <p className="text-[11px] text-[#6B7280]">
+                  {inviteRole === 'ops'
+                    ? (lang === 'es' ? 'Ops: ve trabajos y materiales, no ve ganancias.' : 'Ops: sees jobs & materials, not profit.')
+                    : (lang === 'es' ? 'Propietario: acceso completo igual que vos.' : 'Owner: full access, same as you.')}
+                </p>
+              </div>
+
+              <button
+                onClick={handleInvite}
+                disabled={sendingInvite || !inviteEmail.trim()}
+                className="w-full h-10 rounded-lg border border-[#A8FF3E]/40 text-[#A8FF3E] text-sm font-semibold flex items-center justify-center gap-1.5 hover:bg-[#A8FF3E]/5 disabled:opacity-40 transition-all"
+              >
+                {sendingInvite
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <Mail className="h-3.5 w-3.5" />}
+                {lang === 'es' ? 'Generar link de invitación' : 'Generate invite link'}
+              </button>
+
+              {inviteLink && (
+                <div className="bg-[#0F1117] rounded-xl border border-[#2A2D35] p-3 space-y-2">
+                  <p className="text-[11px] text-[#6B7280] font-medium uppercase tracking-wider">
+                    {lang === 'es' ? 'Link de invitación (válido 7 días):' : 'Invite link (valid 7 days):'}
+                  </p>
+                  <p className="text-xs text-white break-all">{inviteLink}</p>
+                  <button
+                    onClick={copyInviteLink}
+                    className="flex items-center gap-1.5 text-xs text-[#A8FF3E] font-semibold hover:underline"
+                  >
+                    {copiedLink
+                      ? <><Check className="h-3 w-3" /> {lang === 'es' ? '¡Copiado!' : 'Copied!'}</>
+                      : <><Copy className="h-3 w-3" /> {lang === 'es' ? 'Copiar link' : 'Copy link'}</>}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ── Material Templates ──────────────────────────────────────── */}
         <div className="bg-[#1E2228] border border-[#2A2D35] rounded-2xl p-5 space-y-4">
@@ -555,6 +743,7 @@ export default function SettingsPage() {
         </button>
       </div>
 
+      <AppHeader />
       <MobileNav />
     </div>
   )

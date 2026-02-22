@@ -39,6 +39,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/proposal') ||
     pathname.startsWith('/terms') ||
     pathname.startsWith('/privacy') ||
+    pathname.startsWith('/invite') ||
     pathname.startsWith('/api/webhooks/stripe') ||
     pathname.startsWith('/debug')
 

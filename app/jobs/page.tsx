@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useI18n } from '@/lib/i18n/context'
 import { useProfile } from '@/lib/hooks/useProfile'
 import { MobileNav } from '@/components/app/mobile-nav'
+import { AppHeader } from '@/components/app/app-header'
 import { Plus, ChevronRight, Search, Hammer, FileText, HardHat, CheckCircle2 } from 'lucide-react'
 import { JOB_TYPE_OPTIONS } from '@/lib/templates'
 import { formatJobNumber } from '@/lib/types'
@@ -99,13 +100,13 @@ export default function JobsPage() {
         schema: 'public',
         table: 'jobs',
         filter: `organization_id=eq.${orgId}`,
-      }, (payload) => {
+      }, (payload: { eventType: string; new: Job; old: Job }) => {
         if (payload.eventType === 'INSERT') {
-          setJobs(prev => [payload.new as Job, ...prev])
+          setJobs(prev => [payload.new, ...prev])
         } else if (payload.eventType === 'UPDATE') {
-          setJobs(prev => prev.map(j => j.id === (payload.new as Job).id ? payload.new as Job : j))
+          setJobs(prev => prev.map(j => j.id === payload.new.id ? payload.new : j))
         } else if (payload.eventType === 'DELETE') {
-          setJobs(prev => prev.filter(j => j.id !== (payload.old as Job).id))
+          setJobs(prev => prev.filter(j => j.id !== payload.old.id))
         }
       })
       .subscribe()
@@ -138,6 +139,7 @@ export default function JobsPage() {
         <div className="px-5 space-y-2">
           {[1,2,3].map((i) => <div key={i} className="skeleton h-20 w-full" />)}
         </div>
+        <AppHeader />
         <MobileNav />
       </div>
     )
@@ -255,6 +257,7 @@ export default function JobsPage() {
         )}
       </div>
 
+      <AppHeader />
       <MobileNav />
     </div>
   )

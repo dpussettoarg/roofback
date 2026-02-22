@@ -25,8 +25,8 @@ export function MobileNav() {
               ? pathname === '/dashboard'
               : pathname.startsWith(item.href)
           const label = 'labelKey' in item
-            ? t(item.labelKey)
-            : (lang === 'es' ? item.label_es : item.label_en)
+            ? t((item as { labelKey: string }).labelKey)
+            : (lang === 'es' ? (item as { label_es: string }).label_es : (item as { label_en: string }).label_en)
           return (
             <Link
               key={item.href}

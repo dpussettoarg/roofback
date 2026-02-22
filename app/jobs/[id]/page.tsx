@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useI18n } from '@/lib/i18n/context'
 import { MobileNav } from '@/components/app/mobile-nav'
+import { AppHeader } from '@/components/app/app-header'
 import {
   ArrowLeft, FileText, CheckSquare, Clock, BarChart3, Trash2,
   MapPin, Phone, Send, CheckCircle, Link2, Copy, ChevronRight,
@@ -18,6 +19,7 @@ import { toast } from 'sonner'
 import { JOB_TYPE_OPTIONS, ROOF_TYPE_OPTIONS } from '@/lib/templates'
 import { formatJobNumber } from '@/lib/types'
 import { useProfile } from '@/lib/hooks/useProfile'
+import { usePermissions } from '@/lib/hooks/usePermissions'
 import type { Job } from '@/lib/types'
 
 function formatMoney(n: number) {
@@ -57,10 +59,15 @@ export default function JobDetailPage() {
   const [loading, setLoading] = useState(true)
   const [showSendDialog, setShowSendDialog] = useState(false)
   const [showContactModal, setShowContactModal] = useState(false)
-  const [showTimeline, setShowTimeline] = useState(false)
+  const [showTimeline, setShowTimeline] = useState(true)
+  const [expandedStage, setExpandedStage] = useState<number | null>(null)
   const [clientEmail, setClientEmail] = useState('')
   const [startDate, setStartDate] = useState('')
   const [savingDate, setSavingDate] = useState(false)
+
+  // Milestone dates per stage
+  const [milestoneDates, setMilestoneDates] = useState<Record<string, { scheduled?: string; completed?: string }>>({})
+  const [savingMilestone, setSavingMilestone] = useState<string | null>(null)
 
   // Live financial data for execution dashboard
   const [budgetMat, setBudgetMat] = useState(0)
@@ -75,6 +82,7 @@ export default function JobDetailPage() {
   const router = useRouter()
   const { lang } = useI18n()
   const { canSeeFinancials } = useProfile()
+  const { canSeeProfit, canSeeContractTotal } = usePermissions()
   const supabase = createClient()
 
   useEffect(() => {
@@ -123,6 +131,19 @@ export default function JobDetailPage() {
         }
       }
 
+      // Load milestone dates
+      const { data: milestones } = await supabase
+        .from('job_milestones')
+        .select('stage, scheduled_date, completed_date')
+        .eq('job_id', id)
+      if (milestones) {
+        const map: Record<string, { scheduled?: string; completed?: string }> = {}
+        ;(milestones as { stage: string; scheduled_date?: string; completed_date?: string }[]).forEach((m) => {
+          map[m.stage] = { scheduled: m.scheduled_date || '', completed: m.completed_date || '' }
+        })
+        setMilestoneDates(map)
+      }
+
       setLoading(false)
     }
     load()
@@ -143,6 +164,23 @@ export default function JobDetailPage() {
     setJob((j) => j ? { ...j, start_date: startDate } : j)
     setSavingDate(false)
     toast.success(lang === 'es' ? 'Fecha guardada' : 'Date saved')
+  }
+
+  async function saveMilestone(stage: string, field: 'scheduled_date' | 'completed_date', value: string, orgId: string | null) {
+    setSavingMilestone(stage)
+    try {
+      const payload = { job_id: id, organization_id: orgId, stage, [field]: value || null, updated_at: new Date().toISOString() }
+      const { error } = await supabase
+        .from('job_milestones')
+        .upsert(payload, { onConflict: 'job_id,stage' })
+      if (error) throw error
+      setMilestoneDates((prev) => ({ ...prev, [stage]: { ...prev[stage], [field === 'scheduled_date' ? 'scheduled' : 'completed']: value } }))
+      toast.success(lang === 'es' ? 'Fecha guardada' : 'Date saved')
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Error')
+    } finally {
+      setSavingMilestone(null)
+    }
   }
 
   function getProposalUrl() {
@@ -264,7 +302,7 @@ export default function JobDetailPage() {
               )}
             </div>
           </div>
-          {canSeeFinancials && Number(job.estimated_total) > 0 && (
+          {canSeeContractTotal && Number(job.estimated_total) > 0 && (
             <p className="text-xl font-bold text-white tabular-nums ml-3">
               {formatMoney(Number(job.estimated_total))}
             </p>
@@ -422,121 +460,242 @@ export default function JobDetailPage() {
               </div>
             </div>
 
-            {/* Scheduling & Notify */}
-            <div className="bg-[#1E2228] rounded-[12px] border border-[#2A2D35] p-4 space-y-3">
-              <div className="flex items-center gap-2 mb-1">
-                <CalendarDays className="h-4 w-4 text-[#A8FF3E]" />
-                <h3 className="text-sm font-bold text-white">{lang === 'es' ? 'Programación' : 'Scheduling'}</h3>
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="flex-1 h-11 rounded-lg input-dark text-sm px-3"
-                />
-                <button
-                  onClick={handleSaveStartDate}
-                  disabled={savingDate || !startDate}
-                  className="h-11 px-4 rounded-lg btn-lime text-sm font-bold disabled:opacity-50"
-                >
-                  {savingDate ? '...' : lang === 'es' ? 'Guardar' : 'Save'}
-                </button>
-              </div>
-              <button
-                onClick={handleNotifyClient}
-                disabled={!startDate}
-                className="w-full h-11 rounded-lg border border-[#2A2D35] bg-transparent text-sm font-semibold text-white flex items-center justify-center gap-2 hover:bg-[#252830] transition-colors disabled:opacity-40"
-              >
-                <MessageSquare className="h-4 w-4 text-[#A8FF3E]" />
-                {lang === 'es' ? 'Notificar al cliente' : 'Notify client'}
-              </button>
-            </div>
-
-            {/* ── Mini Gantt / Timeline ── */}
+            {/* ── Unified Milestone Tracker ── */}
             {(() => {
-              const stage = job.workflow_stage || 'draft'
-              const stages = [
-                { key: 'approved',           icon: ClipboardList,    label_es: 'Contrato',   label_en: 'Contract'  },
-                { key: 'materials_ordered',  icon: HardDriveDownload, label_es: 'Materiales', label_en: 'Materials' },
-                { key: 'in_progress',        icon: Wrench,           label_es: 'En obra',    label_en: 'Job Site'  },
-                { key: 'completed',          icon: Flag,             label_es: 'Terminado',  label_en: 'Finished'  },
+              const currentStage = job.workflow_stage || 'approved'
+              const STAGES = [
+                { key: 'contract',   wfKey: 'approved',          icon: ClipboardList,    label_es: 'Contrato',   label_en: 'Contract'  },
+                { key: 'materials',  wfKey: 'materials_ordered',  icon: HardDriveDownload, label_es: 'Materiales', label_en: 'Materials' },
+                { key: 'jobsite',    wfKey: 'in_progress',       icon: Wrench,           label_es: 'En Obra',    label_en: 'Job Site'  },
+                { key: 'completed',  wfKey: 'completed',         icon: Flag,             label_es: 'Finalizado', label_en: 'Finished'  },
               ]
-              // Map workflow stage to 0-based step index
-              const stepIndex = stage === 'completed' || stage === 'invoiced' || stage === 'paid' ? 3
-                : stage === 'in_progress' ? 2
-                : stage === 'materials_ordered' ? 1
-                : 0 // approved / any other approved state
+              const stepIndex = currentStage === 'completed' || currentStage === 'invoiced' || currentStage === 'paid' ? 3
+                : currentStage === 'in_progress' ? 2
+                : currentStage === 'materials_ordered' ? 1
+                : 0
+
               return (
-                <div className="bg-[#1E2228] rounded-[12px] border border-[#2A2D35] overflow-hidden">
+                <div className="bg-[#1E2228] rounded-[14px] border border-[#2A2D35] overflow-hidden">
+                  {/* Collapsible header */}
                   <button
                     onClick={() => setShowTimeline(!showTimeline)}
-                    className="w-full flex items-center justify-between p-4 text-left hover:bg-[#252830] transition-colors"
+                    className="w-full flex items-center justify-between px-4 py-3.5 text-left hover:bg-[#252830] transition-colors"
                   >
                     <div className="flex items-center gap-2">
                       <CalendarDays className="h-4 w-4 text-[#A8FF3E]" />
-                      <span className="text-sm font-bold text-white">{lang === 'es' ? 'Cronograma' : 'Timeline'}</span>
+                      <span className="text-sm font-bold text-white">
+                        {lang === 'es' ? 'Cronograma de Obra' : 'Milestone Tracker'}
+                      </span>
                     </div>
-                    {showTimeline
-                      ? <ChevronUp className="h-4 w-4 text-[#6B7280]" />
-                      : <ChevronDown className="h-4 w-4 text-[#6B7280]" />
-                    }
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-[#A8FF3E] font-semibold">
+                        {lang === 'es' ? STAGES[stepIndex].label_es : STAGES[stepIndex].label_en}
+                      </span>
+                      {showTimeline ? <ChevronUp className="h-4 w-4 text-[#6B7280]" /> : <ChevronDown className="h-4 w-4 text-[#6B7280]" />}
+                    </div>
                   </button>
-                  {showTimeline && (
-                    <div className="px-4 pb-5">
-                      {/* Step indicator */}
-                      <div className="flex items-center gap-0">
-                        {stages.map((s, i) => {
-                          const Icon = s.icon
-                          const done = i <= stepIndex
-                          const active = i === stepIndex
-                          return (
-                            <div key={s.key} className="flex items-center flex-1 min-w-0">
-                              <div className="flex flex-col items-center flex-shrink-0">
-                                <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+
+                  {/* Always-visible progress bar */}
+                  <div className="px-4 pb-3">
+                    <div className="flex items-center">
+                      {STAGES.map((s, i) => {
+                        const done = i < stepIndex
+                        const active = i === stepIndex
+                        const Icon = s.icon
+                        return (
+                          <div key={s.key} className="flex items-center flex-1 min-w-0">
+                            <div className="flex flex-col items-center flex-shrink-0">
+                              <button
+                                onClick={() => setExpandedStage(showTimeline && expandedStage === i ? null : i)}
+                                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
                                   active  ? 'bg-[#A8FF3E] text-[#0F1117] ring-2 ring-[#A8FF3E]/40'
                                   : done  ? 'bg-[#A8FF3E]/20 text-[#A8FF3E]'
                                   :         'bg-[#0F1117] text-[#4B5563] border border-[#2A2D35]'
-                                }`}>
-                                  <Icon className="h-4 w-4" />
-                                </div>
-                                <span className={`mt-1.5 text-[10px] font-semibold text-center leading-tight max-w-[52px] ${
-                                  active ? 'text-[#A8FF3E]' : done ? 'text-[#9CA3AF]' : 'text-[#4B5563]'
-                                }`}>
-                                  {lang === 'es' ? s.label_es : s.label_en}
-                                </span>
-                              </div>
-                              {i < stages.length - 1 && (
-                                <div className={`flex-1 h-0.5 mx-1 mb-5 rounded-full ${
-                                  i < stepIndex ? 'bg-[#A8FF3E]' : 'bg-[#2A2D35]'
-                                }`} />
-                              )}
+                                }`}
+                              >
+                                <Icon className="h-4 w-4" />
+                              </button>
+                              <span className={`mt-1 text-[10px] font-semibold text-center leading-tight max-w-[56px] ${
+                                active ? 'text-[#A8FF3E]' : done ? 'text-[#9CA3AF]' : 'text-[#4B5563]'
+                              }`}>
+                                {lang === 'es' ? s.label_es : s.label_en}
+                              </span>
                             </div>
-                          )
-                        })}
-                      </div>
-                      {/* Stage update buttons */}
-                      <div className="mt-4 grid grid-cols-2 gap-2">
-                        {stages.map((s, i) => (
-                          <button
-                            key={s.key}
-                            disabled={i === stepIndex}
-                            onClick={async () => {
-                              const newStage = s.key as import('@/lib/types').WorkflowStage
-                              await supabase.from('jobs').update({ workflow_stage: newStage, updated_at: new Date().toISOString() }).eq('id', id)
-                              setJob(j => j ? { ...j, workflow_stage: newStage } : j)
-                              toast.success(lang === 'es' ? 'Etapa actualizada' : 'Stage updated')
-                            }}
-                            className={`h-9 rounded-lg text-xs font-semibold transition-all ${
-                              i === stepIndex
-                                ? 'bg-[#A8FF3E] text-[#0F1117] cursor-default'
-                                : 'border border-[#2A2D35] bg-transparent text-[#6B7280] hover:bg-[#252830] hover:text-white'
-                            }`}
-                          >
-                            {lang === 'es' ? s.label_es : s.label_en}
-                          </button>
-                        ))}
-                      </div>
+                            {i < STAGES.length - 1 && (
+                              <div className={`flex-1 h-0.5 mx-1 mb-5 rounded-full transition-all ${
+                                i < stepIndex ? 'bg-[#A8FF3E]' : 'bg-[#2A2D35]'
+                              }`} />
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Accordion detail rows */}
+                  {showTimeline && (
+                    <div className="border-t border-[#2A2D35]">
+                      {STAGES.map((s, i) => {
+                        const isActive = i === stepIndex
+                        const isFinished = i < stepIndex
+                        const md = milestoneDates[s.key] || {}
+                        const open = expandedStage === i
+
+                        return (
+                          <div key={s.key} className={`border-b border-[#2A2D35] last:border-b-0 ${isActive ? 'bg-[#A8FF3E]/5' : ''}`}>
+                            <button
+                              onClick={() => setExpandedStage(open ? null : i)}
+                              className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#252830] transition-colors"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                  isActive ? 'bg-[#A8FF3E] text-[#0F1117]'
+                                  : isFinished ? 'bg-[#A8FF3E]/20 text-[#A8FF3E]'
+                                  : 'bg-[#0F1117] text-[#4B5563] border border-[#2A2D35]'
+                                }`}>
+                                  <s.icon className="h-3 w-3" />
+                                </div>
+                                <div className="text-left">
+                                  <p className={`text-sm font-semibold ${isActive ? 'text-[#A8FF3E]' : 'text-white'}`}>
+                                    {lang === 'es' ? s.label_es : s.label_en}
+                                  </p>
+                                  {md.scheduled && (
+                                    <p className="text-[11px] text-[#6B7280]">
+                                      {lang === 'es' ? 'Prog: ' : 'Sched: '}
+                                      {new Date(md.scheduled + 'T12:00').toLocaleDateString(lang === 'es' ? 'es' : 'en-US', { month: 'short', day: 'numeric' })}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {isActive && (
+                                  <span className="text-[10px] bg-[#A8FF3E] text-[#0F1117] font-bold px-2 py-0.5 rounded-full">
+                                    {lang === 'es' ? 'ACTUAL' : 'CURRENT'}
+                                  </span>
+                                )}
+                                {open ? <ChevronUp className="h-4 w-4 text-[#6B7280]" /> : <ChevronDown className="h-4 w-4 text-[#6B7280]" />}
+                              </div>
+                            </button>
+
+                            {open && (
+                              <div className="px-4 pb-4 space-y-3">
+                                {isFinished ? (
+                                  /* Finished stage — show completion info */
+                                  <div className="flex items-center gap-2 text-sm text-[#9CA3AF] bg-[#0F1117] rounded-xl px-3 py-2.5">
+                                    <CheckCircle className="h-4 w-4 text-[#A8FF3E]" />
+                                    {md.completed
+                                      ? `${lang === 'es' ? 'Completado el' : 'Completed on'} ${new Date(md.completed + 'T12:00').toLocaleDateString(lang === 'es' ? 'es' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`
+                                      : (lang === 'es' ? 'Etapa completada' : 'Stage completed')}
+                                  </div>
+                                ) : (
+                                  /* Not finished — show date pickers + notify button */
+                                  <>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div className="space-y-1">
+                                        <p className="text-[11px] text-[#6B7280] font-medium uppercase">
+                                          {lang === 'es' ? 'Fecha programada' : 'Scheduled date'}
+                                        </p>
+                                        <div className="flex gap-1.5">
+                                          <input
+                                            type="date"
+                                            defaultValue={md.scheduled || ''}
+                                            onChange={(e) => setMilestoneDates(prev => ({
+                                              ...prev, [s.key]: { ...prev[s.key], scheduled: e.target.value }
+                                            }))}
+                                            className="flex-1 h-9 rounded-lg bg-[#0F1117] border border-[#2A2D35] px-2 text-white text-xs focus:outline-none focus:border-[#A8FF3E] transition-colors"
+                                          />
+                                          <button
+                                            onClick={() => saveMilestone(s.key, 'scheduled_date', md.scheduled || '', job.organization_id)}
+                                            disabled={savingMilestone === s.key}
+                                            className="h-9 px-2.5 rounded-lg bg-[#A8FF3E] text-[#0F1117] text-xs font-bold disabled:opacity-50"
+                                          >
+                                            {savingMilestone === s.key ? '…' : lang === 'es' ? 'Ok' : 'Ok'}
+                                          </button>
+                                        </div>
+                                      </div>
+                                      <div className="space-y-1">
+                                        <p className="text-[11px] text-[#6B7280] font-medium uppercase">
+                                          {lang === 'es' ? 'Fecha real' : 'Completion date'}
+                                        </p>
+                                        <div className="flex gap-1.5">
+                                          <input
+                                            type="date"
+                                            defaultValue={md.completed || ''}
+                                            onChange={(e) => setMilestoneDates(prev => ({
+                                              ...prev, [s.key]: { ...prev[s.key], completed: e.target.value }
+                                            }))}
+                                            className="flex-1 h-9 rounded-lg bg-[#0F1117] border border-[#2A2D35] px-2 text-white text-xs focus:outline-none focus:border-[#A8FF3E] transition-colors"
+                                          />
+                                          <button
+                                            onClick={() => saveMilestone(s.key, 'completed_date', md.completed || '', job.organization_id)}
+                                            disabled={savingMilestone === s.key}
+                                            className="h-9 px-2.5 rounded-lg border border-[#2A2D35] text-[#6B7280] text-xs font-bold disabled:opacity-50 hover:bg-[#252830]"
+                                          >
+                                            {savingMilestone === s.key ? '…' : '✓'}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Notify client button */}
+                                    <button
+                                      onClick={() => {
+                                        const dateStr = md.scheduled
+                                          ? new Date(md.scheduled + 'T12:00').toLocaleDateString(lang === 'es' ? 'es' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+                                          : ''
+                                        const stageLabel = lang === 'es' ? s.label_es : s.label_en
+                                        const msg = lang === 'es'
+                                          ? `Hola ${job.client_name}, te informamos que la etapa "${stageLabel}" está programada para el ${dateStr}. ¡Gracias!`
+                                          : `Hi ${job.client_name}, we're letting you know the "${stageLabel}" milestone is scheduled for ${dateStr}. Thank you!`
+                                        const phone = job.client_phone?.replace(/\D/g, '') || ''
+                                        setStartDate(md.scheduled || '')
+                                        // Build SMS or WhatsApp — open contact modal
+                                        if (phone) {
+                                          window.open(`sms:${phone}?body=${encodeURIComponent(msg)}`, '_blank')
+                                        } else {
+                                          window.open(`mailto:${job.client_email}?subject=${encodeURIComponent(stageLabel)}&body=${encodeURIComponent(msg)}`, '_blank')
+                                        }
+                                      }}
+                                      disabled={!md.scheduled}
+                                      className="w-full h-10 rounded-xl border border-[#2A2D35] bg-transparent text-sm text-white flex items-center justify-center gap-2 hover:bg-[#252830] disabled:opacity-40 transition-colors"
+                                    >
+                                      <MessageCircle className="h-4 w-4 text-[#A8FF3E]" />
+                                      {lang === 'es' ? 'Notificar cliente' : 'Notify client'}
+                                    </button>
+
+                                    {/* Advance workflow stage button */}
+                                    {!isFinished && i >= stepIndex && (
+                                      <button
+                                        onClick={async () => {
+                                          const newStage = s.wfKey as import('@/lib/types').WorkflowStage
+                                          const { error } = await supabase
+                                            .from('jobs')
+                                            .update({ workflow_stage: newStage, updated_at: new Date().toISOString() })
+                                            .eq('id', id)
+                                          if (!error) {
+                                            setJob(j => j ? { ...j, workflow_stage: newStage } : j)
+                                            toast.success(lang === 'es' ? '¡Etapa avanzada!' : 'Stage advanced!')
+                                            setExpandedStage(null)
+                                          } else {
+                                            toast.error(error.message)
+                                          }
+                                        }}
+                                        className={`w-full h-10 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors ${
+                                          isActive
+                                            ? 'bg-[#0F1117] border border-[#A8FF3E]/40 text-[#A8FF3E] hover:bg-[#A8FF3E]/5'
+                                            : 'border border-[#2A2D35] text-[#6B7280] hover:bg-[#252830]'
+                                        }`}
+                                      >
+                                        {lang === 'es' ? `Marcar "${s.label_es}" como actual` : `Set "${s.label_en}" as current stage`}
+                                      </button>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
@@ -568,8 +727,8 @@ export default function JobDetailPage() {
               </div>
             </Link>
 
-            {/* Budget vs Actual Tracker — owners only */}
-            {canSeeFinancials && <div className="bg-[#1E2228] rounded-[12px] overflow-hidden border border-[#2A2D35]">
+            {/* Budget vs Actual Tracker — all roles see costs, only owners see profit row */}
+            <div className="bg-[#1E2228] rounded-[12px] overflow-hidden border border-[#2A2D35]">
               <div className="h-1 bg-[#A8FF3E]" />
               <div className="p-4 space-y-4">
                 <div className="flex items-center justify-between">
@@ -590,16 +749,18 @@ export default function JobDetailPage() {
                       <BudgetBar label={lang === 'es' ? 'Otros gastos' : 'Other expenses'} budgeted={budgetOther} actual={actualOther} lang={lang} />
                     )}
 
-                    <div className="pt-2 border-t border-[#2A2D35]">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-[#6B7280]">{lang === 'es' ? 'Ganancia proyectada' : 'Projected profit'}</span>
-                        <div className={`flex items-center gap-1 text-sm font-bold tabular-nums ${liveProfit >= 0 ? 'text-[#A8FF3E]' : 'text-red-400'}`}>
-                          {liveProfit >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-                          {formatMoney(Math.abs(liveProfit))}
-                          <span className="text-xs font-normal">({liveProfitPct.toFixed(0)}%)</span>
+                    {canSeeProfit && (
+                      <div className="pt-2 border-t border-[#2A2D35]">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-[#6B7280]">{lang === 'es' ? 'Ganancia proyectada' : 'Projected profit'}</span>
+                          <div className={`flex items-center gap-1 text-sm font-bold tabular-nums ${liveProfit >= 0 ? 'text-[#A8FF3E]' : 'text-red-400'}`}>
+                            {liveProfit >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+                            {formatMoney(Math.abs(liveProfit))}
+                            <span className="text-xs font-normal">({liveProfitPct.toFixed(0)}%)</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )}
                   </>
                 ) : (
                   <div className="flex items-center gap-2 text-xs text-[#6B7280]">
@@ -608,7 +769,7 @@ export default function JobDetailPage() {
                   </div>
                 )}
               </div>
-            </div>}
+            </div>
 
             {/* Execution action cards */}
             <div className="space-y-2">
@@ -738,6 +899,7 @@ export default function JobDetailPage() {
         </div>
       )}
 
+      <AppHeader />
       <MobileNav />
     </div>
   )

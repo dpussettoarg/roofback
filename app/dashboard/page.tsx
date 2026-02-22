@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useI18n } from '@/lib/i18n/context'
 import { MobileNav } from '@/components/app/mobile-nav'
+import { AppHeader } from '@/components/app/app-header'
 import { useProfile } from '@/lib/hooks/useProfile'
 import { Briefcase, DollarSign, TrendingUp, Percent, Plus, ChevronRight, Users } from 'lucide-react'
 import { STATUS_CONFIG } from '@/lib/templates'
@@ -24,6 +25,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const { t, lang } = useI18n()
   const { profile, canSeeFinancials } = useProfile()
+  // Fine-grained: profit hidden from ops, contract total visible to all
+  const canSeeProfit = canSeeFinancials  // isOwner only
   const supabase = createClient()
 
   useEffect(() => {
@@ -77,13 +80,13 @@ export default function DashboardPage() {
         schema: 'public',
         table: 'jobs',
         filter: `organization_id=eq.${profile.organization_id}`,
-      }, (payload) => {
+      }, (payload: { eventType: string; new: Job; old: Job }) => {
         if (payload.eventType === 'INSERT') {
-          setJobs(prev => [payload.new as Job, ...prev])
+          setJobs(prev => [payload.new, ...prev])
         } else if (payload.eventType === 'UPDATE') {
-          setJobs(prev => prev.map(j => j.id === (payload.new as Job).id ? payload.new as Job : j))
+          setJobs(prev => prev.map(j => j.id === payload.new.id ? payload.new : j))
         } else if (payload.eventType === 'DELETE') {
-          setJobs(prev => prev.filter(j => j.id !== (payload.old as Job).id))
+          setJobs(prev => prev.filter(j => j.id !== payload.old.id))
         }
       })
       .subscribe()
@@ -159,6 +162,7 @@ export default function DashboardPage() {
           <div className="skeleton h-14 w-full" />
           <div className="skeleton h-20 w-full" />
         </div>
+        <AppHeader />
         <MobileNav />
       </div>
     )
@@ -182,7 +186,7 @@ export default function DashboardPage() {
 
       <div className="px-5 space-y-5">
         {/* Financial hero card — owners only */}
-        {canSeeFinancials && (
+        {canSeeProfit && (
           <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-5">
             <p className="text-[#A8FF3E] text-xs font-bold uppercase tracking-widest mb-2">
               {t('dashboard.profitThisMonth')}
@@ -200,7 +204,7 @@ export default function DashboardPage() {
         )}
 
         {/* Stats grid */}
-        <div className={`grid gap-3 ${canSeeFinancials ? 'grid-cols-4' : 'grid-cols-2'}`}>
+        <div className={`grid gap-3 ${canSeeProfit ? 'grid-cols-4' : 'grid-cols-2'}`}>
           <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4">
             <Briefcase className="h-5 w-5 text-[#A8FF3E] mb-2" />
             <p className="text-2xl font-bold tabular-nums text-white">{activeJobs}</p>
@@ -215,7 +219,7 @@ export default function DashboardPage() {
               </p>
             </div>
           </Link>
-          {canSeeFinancials && (
+          {canSeeProfit && (
             <>
               <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4">
                 <DollarSign className="h-5 w-5 text-[#3B82F6] mb-2" />
@@ -240,7 +244,7 @@ export default function DashboardPage() {
         </Link>
 
         {/* Profit chart — owners only */}
-        {canSeeFinancials && jobs.some((j) => j.status === 'completed') && (
+        {canSeeProfit && jobs.some((j) => j.status === 'completed') && (
           <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-5">
             <h3 className="text-sm font-semibold text-white mb-4">{t('dashboard.profitChart')}</h3>
             <div className="h-40">
@@ -309,6 +313,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      <AppHeader />
       <MobileNav />
     </div>
   )
