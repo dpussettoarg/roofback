@@ -19,7 +19,7 @@ function formatMoney(n: number) {
 type Tab = 'leads' | 'active' | 'completed'
 
 const TAB_CONFIG: { key: Tab; label_es: string; label_en: string; icon: React.ElementType }[] = [
-  { key: 'leads',     label_es: 'Leads',        label_en: 'Leads',       icon: FileText    },
+  { key: 'leads',     label_es: 'Cotizaciones', label_en: 'Quotations',  icon: FileText    },
   { key: 'active',    label_es: 'En proceso',   label_en: 'In Progress', icon: HardHat     },
   { key: 'completed', label_es: 'Completados',  label_en: 'Completed',   icon: CheckCircle2 },
 ]
@@ -53,7 +53,7 @@ function borderClass(job: Job) {
 export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [search, setSearch] = useState('')
-  const [activeTab, setActiveTab] = useState<Tab>('leads')
+  const [activeTab, setActiveTab] = useState<Tab>('active')
   const [loading, setLoading] = useState(true)
   const { lang } = useI18n()
   const { profile, canSeeFinancials } = useProfile()
@@ -146,7 +146,7 @@ export default function JobsPage() {
   }
 
   const emptyMsg = {
-    leads:     { es: 'Sin leads abiertos', en: 'No open leads', cta_es: 'Crear presupuesto', cta_en: 'Create estimate' },
+    leads:     { es: 'Sin cotizaciones abiertas', en: 'No open quotations', cta_es: 'Crear presupuesto', cta_en: 'Create estimate' },
     active:    { es: 'Sin proyectos en proceso', en: 'No projects in progress', cta_es: 'Crear presupuesto', cta_en: 'Create estimate' },
     completed: { es: 'Sin trabajos completados', en: 'No completed jobs', cta_es: 'Ver en proceso', cta_en: 'View in progress' },
   }[activeTab]

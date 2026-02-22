@@ -63,6 +63,11 @@ export default function EstimatePage() {
 
   const [job, setJob] = useState<Job | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
+  // Org branding for PDF header
+  const [orgLogo, setOrgLogo] = useState<string | null>(null)
+  const [orgAddress, setOrgAddress] = useState<string | null>(null)
+  const [orgPhone, setOrgPhone] = useState<string | null>(null)
+  const [orgEmail, setOrgEmail] = useState<string | null>(null)
   const [mode, setMode] = useState<'simple' | 'itemized'>('simple')
   const [items, setItems] = useState<LocalItem[]>([])
   const [overheadPct, setOverheadPct] = useState(15)
@@ -102,7 +107,22 @@ export default function EstimatePage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-        if (profileData) setProfile(profileData as Profile)
+        if (profileData) {
+          setProfile(profileData as Profile)
+          if (profileData.organization_id) {
+            const { data: orgData } = await supabase
+              .from('organizations')
+              .select('logo_url,business_address,business_phone,business_email')
+              .eq('id', profileData.organization_id)
+              .single()
+            if (orgData) {
+              setOrgLogo(orgData.logo_url || null)
+              setOrgAddress(orgData.business_address || null)
+              setOrgPhone(orgData.business_phone || null)
+              setOrgEmail(orgData.business_email || null)
+            }
+          }
+        }
       }
 
       const { data: jobData } = await supabase.from('jobs').select('*').eq('id', id).single()
@@ -445,6 +465,10 @@ export default function EstimatePage() {
           contractorPhone={contractorPhone}
           contractorEmail={contractorEmail}
           contractorWebsite={contractorWebsite}
+          companyLogoUrl={orgLogo}
+          businessAddress={orgAddress}
+          businessPhone={orgPhone}
+          businessEmail={orgEmail}
           jobId={job.id}
           jobNumber={job.job_number}
           estimateVersion={job.estimate_version || 1}
@@ -476,6 +500,24 @@ export default function EstimatePage() {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
       toast.success(lang === 'es' ? 'PDF descargado' : 'PDF downloaded')
+      // Log the PDF generation in activity log
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user && job) {
+          const jobNum = job.job_number ? `#J${String(job.job_number).padStart(4, '0')}` : ''
+          await supabase.from('job_activity_log').insert({
+            job_id: job.id,
+            user_id: user.id,
+            log_type: 'note',
+            note: isEn
+              ? `Quote ${jobNum} PDF generated`
+              : `PDF de cotización ${jobNum} generado`,
+            created_at: new Date().toISOString(),
+          })
+        }
+      } catch {
+        // non-critical — don't fail the PDF download
+      }
     } catch (err: unknown) {
       const detail = err instanceof Error ? err.message : String(err)
       console.error('[PDF generation] error:', detail, err)

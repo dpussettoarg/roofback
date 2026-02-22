@@ -128,8 +128,10 @@ export default function ResultsPage() {
     return <Minus className="h-4 w-4 text-[#6B7280]" />
   }
 
+  // RED when actual expenses exceed the contract price (losing money)
+  const isOverBudget = calc.actCost > calc.charged && calc.charged > 0
   const profitColor = calc.actProfit > 0 ? 'text-[#A8FF3E]' : calc.actProfit < 0 ? 'text-[#EF4444]' : 'text-[#F59E0B]'
-  const profitBg = calc.actProfit > 0 ? 'bg-[#A8FF3E]/10 border-[#A8FF3E]/30' : calc.actProfit < 0 ? 'bg-[#EF4444]/10 border-[#EF4444]/30' : 'bg-[#F59E0B]/10 border-[#F59E0B]/30'
+  const profitBg    = calc.actProfit > 0 ? 'bg-[#A8FF3E]/10 border-[#A8FF3E]/30' : calc.actProfit < 0 ? 'bg-[#EF4444]/10 border-[#EF4444]/30' : 'bg-[#F59E0B]/10 border-[#F59E0B]/30'
   const profitMessage = calc.actProfit > 200 ? t('results.great') : calc.actProfit >= 0 ? t('results.ok') : t('results.bad')
 
   if (loading) {
@@ -155,13 +157,25 @@ export default function ResultsPage() {
           {/* Profit indicator */}
           <Card className={`border shadow-md ${profitBg} bg-[#1E2228]`} style={{ backgroundColor: undefined }}>
             <CardContent className="p-5 text-center">
+              {isOverBudget && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EF4444] text-white text-xs font-bold mb-3">
+                  <TrendingUp className="h-3.5 w-3.5" />
+                  {lang === 'es' ? '⚠ PÉRDIDA — Gastos superiores al contrato' : '⚠ LOSS — Expenses exceed contract price'}
+                </div>
+              )}
               <p className={`text-4xl font-bold ${profitColor}`}>
                 {formatMoney(calc.actProfit)}
               </p>
               <p className={`text-lg font-semibold ${profitColor} mt-1`}>
                 {calc.actMargin.toFixed(1)}% {lang === 'es' ? 'margen' : 'margin'}
               </p>
-              <p className="text-sm text-[#6B7280] mt-2">{profitMessage}</p>
+              {/* Formula display */}
+              <p className="text-xs text-[#6B7280] mt-2">
+                {lang === 'es'
+                  ? `Precio contrato (${formatMoney(calc.charged)}) − Gastos reales (${formatMoney(calc.actCost)})`
+                  : `Contract price (${formatMoney(calc.charged)}) − Actual costs (${formatMoney(calc.actCost)})`}
+              </p>
+              <p className="text-sm text-[#6B7280] mt-1">{profitMessage}</p>
             </CardContent>
           </Card>
 

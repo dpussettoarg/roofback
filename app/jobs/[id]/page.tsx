@@ -232,7 +232,20 @@ export default function JobDetailPage() {
     setShowContactModal(true)
   }
 
-  function handleSendToClient() {
+  async function logActivity(note: string) {
+    if (!job) return
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    await supabase.from('job_activity_log').insert({
+      job_id: job.id,
+      user_id: user.id,
+      log_type: 'note',
+      note,
+      created_at: new Date().toISOString(),
+    })
+  }
+
+  async function handleSendToClient() {
     const url = getProposalUrl()
     if (!url) { toast.error(lang === 'es' ? 'Guardá el presupuesto primero' : 'Save the estimate first'); return }
     const subject = encodeURIComponent(lang === 'es' ? `Presupuesto - ${job?.client_name}` : `Estimate - ${job?.client_name}`)
@@ -244,6 +257,36 @@ export default function JobDetailPage() {
     window.open(`mailto:${clientEmail}?subject=${subject}&body=${body}`, '_blank')
     setShowSendDialog(false)
     toast.success(lang === 'es' ? 'Se abrió tu app de email' : 'Email app opened')
+    // Log the send action
+    const jobNum = job?.job_number ? `#J${String(job.job_number).padStart(4, '0')}` : ''
+    void logActivity(lang === 'es'
+      ? `Cotización ${jobNum} enviada al cliente`
+      : `Quote ${jobNum} sent to client`)
+    // Mark as sent in workflow_stage
+    if (job && job.workflow_stage !== 'sent' && job.workflow_stage !== 'approved') {
+      await supabase.from('jobs').update({ workflow_stage: 'sent', updated_at: new Date().toISOString() }).eq('id', job.id)
+      setJob(j => j ? { ...j, workflow_stage: 'sent' } : j)
+    }
+  }
+
+  function handleFollowUp() {
+    if (!job) return
+    const jobNum = job.job_number ? `#J${String(job.job_number).padStart(4, '0')}` : ''
+    const address = job.client_address || ''
+    const msg = encodeURIComponent(
+      `Hey, just checking in on the last quotation ${jobNum} for ${address}, let me know if we can do something else to move forward.`
+    )
+    const phone = job.client_phone?.replace(/\D/g, '') || ''
+    if (phone) {
+      window.open(`sms:${phone}?body=${msg}`, '_blank')
+    } else {
+      // Fallback: copy to clipboard
+      navigator.clipboard.writeText(decodeURIComponent(msg))
+      toast.success(lang === 'es' ? 'Mensaje copiado al portapapeles' : 'Message copied to clipboard')
+    }
+    void logActivity(lang === 'es'
+      ? `Follow-up enviado para cotización ${jobNum}`
+      : `Follow-up sent for quote ${jobNum}`)
   }
 
   if (loading) {
@@ -368,21 +411,34 @@ export default function JobDetailPage() {
 
             {/* Send to client */}
             {Number(job.estimated_total) > 0 && (
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowSendDialog(true)}
-                  className="flex-1 h-12 rounded-[8px] btn-lime font-semibold text-sm flex items-center justify-center gap-2"
-                >
-                  <Send className="h-4 w-4" />
-                  {lang === 'es' ? 'Enviar al cliente' : 'Send to client'}
-                </button>
-                <button
-                  onClick={handleCopyLink}
-                  className="h-12 px-4 rounded-[8px] border border-[#2A2D35] bg-transparent text-[#6B7280] hover:bg-[#1E2228] transition-colors"
-                >
-                  <Link2 className="h-4 w-4" />
-                </button>
-              </div>
+              <>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowSendDialog(true)}
+                    className="flex-1 h-12 rounded-[8px] btn-lime font-semibold text-sm flex items-center justify-center gap-2"
+                  >
+                    <Send className="h-4 w-4" />
+                    {lang === 'es' ? 'Enviar al cliente' : 'Send to client'}
+                  </button>
+                  <button
+                    onClick={handleCopyLink}
+                    className="h-12 px-4 rounded-[8px] border border-[#2A2D35] bg-transparent text-[#6B7280] hover:bg-[#1E2228] transition-colors"
+                  >
+                    <Link2 className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {/* Follow-up button — shown only after quote was sent */}
+                {(job.workflow_stage === 'sent') && (
+                  <button
+                    onClick={handleFollowUp}
+                    className="w-full h-11 rounded-[8px] border border-[#F59E0B]/40 text-[#F59E0B] text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#F59E0B]/5 transition-all"
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    {lang === 'es' ? 'Hacer seguimiento' : 'Send follow-up'}
+                  </button>
+                )}
+              </>
             )}
           </>
         )}
@@ -773,7 +829,15 @@ export default function JobDetailPage() {
                     )}
 
                     {canSeeProfit && (
-                      <div className="pt-2 border-t border-[#2A2D35]">
+                      <div className="pt-2 border-t border-[#2A2D35] space-y-1.5">
+                        {liveProfit < 0 && totalActual > 0 && (
+                          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/20">
+                            <TrendingDown className="h-3.5 w-3.5 text-red-400 flex-shrink-0" />
+                            <span className="text-[11px] font-bold text-red-400">
+                              {lang === 'es' ? 'PÉRDIDA — gastos superan el precio del contrato' : 'LOSS — expenses exceed contract price'}
+                            </span>
+                          </div>
+                        )}
                         <div className="flex justify-between items-center">
                           <span className="text-xs text-[#6B7280]">{lang === 'es' ? 'Ganancia proyectada' : 'Projected profit'}</span>
                           <div className={`flex items-center gap-1 text-sm font-bold tabular-nums ${liveProfit >= 0 ? 'text-[#A8FF3E]' : 'text-red-400'}`}>

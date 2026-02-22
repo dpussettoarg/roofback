@@ -9,23 +9,28 @@ import { AppHeader } from '@/components/app/app-header'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { Loader2, LogOut, Globe, Building2, CreditCard, Package, Plus, Trash2, X, ChevronDown, ChevronUp, ShieldCheck, Users, UserPlus, Mail, Shield, Copy, Check, UserX } from 'lucide-react'
+import { Loader2, LogOut, Globe, Building2, CreditCard, Package, Plus, Trash2, X, ChevronDown, ChevronUp, ShieldCheck, Users, UserPlus, Mail, Shield, Copy, Check, UserX, ImagePlus, MapPin, Phone } from 'lucide-react'
 import { useProfile } from '@/lib/hooks/useProfile'
 import { useOrganization, type OrgMember } from '@/lib/hooks/useOrganization'
 import { toast } from 'sonner'
-import type { Profile } from '@/lib/types'
+import type { Profile, Organization } from '@/lib/types'
 import { PricingCard } from '@/components/app/pricing-card'
 
 export default function SettingsPage() {
   const { t, lang, setLang } = useI18n()
   const { isOwner } = useProfile()
-  const { members, loadMembers, invalidate } = useOrganization()
+  const { org, members, loadMembers, invalidate } = useOrganization()
   const supabase = createClient()
   const router = useRouter()
 
   const [profile, setProfile] = useState<Partial<Profile>>({})
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  // Company branding (org-level, owners only)
+  const [orgBranding, setOrgBranding] = useState<Partial<Organization>>({})
+  const [savingBranding, setSavingBranding] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
 
   // Team management
   const [inviteEmail, setInviteEmail] = useState('')
@@ -67,6 +72,16 @@ export default function SettingsPage() {
           .eq('user_id', user.id)
           .order('created_at')
         setTemplates((tmpl as Template[]) || [])
+
+        // Load org branding for owners
+        if (data.role === 'owner' && data.organization_id) {
+          const { data: orgData } = await supabase
+            .from('organizations')
+            .select('*')
+            .eq('id', data.organization_id)
+            .single()
+          if (orgData) setOrgBranding(orgData as Organization)
+        }
       }
       setLoading(false)
 
@@ -201,6 +216,53 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleUploadLogo(file: File) {
+    const orgId = profile.organization_id
+    if (!orgId) return
+    setUploadingLogo(true)
+    try {
+      const ext = file.name.split('.').pop() || 'png'
+      const path = `${orgId}/logo.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('org-logos')
+        .upload(path, file, { upsert: true, contentType: file.type })
+      if (upErr) throw upErr
+      const { data: urlData } = supabase.storage.from('org-logos').getPublicUrl(path)
+      const logoUrl = urlData.publicUrl + `?t=${Date.now()}`
+      setOrgBranding((b) => ({ ...b, logo_url: logoUrl }))
+      await supabase.from('organizations').update({ logo_url: logoUrl }).eq('id', orgId)
+      toast.success(lang === 'es' ? 'Logo actualizado' : 'Logo updated')
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setUploadingLogo(false)
+    }
+  }
+
+  async function handleSaveBranding() {
+    const orgId = profile.organization_id
+    if (!orgId) return
+    setSavingBranding(true)
+    try {
+      const { error } = await supabase
+        .from('organizations')
+        .update({
+          business_address: orgBranding.business_address || null,
+          business_phone:   orgBranding.business_phone   || null,
+          business_email:   orgBranding.business_email   || null,
+          updated_at:       new Date().toISOString(),
+        })
+        .eq('id', orgId)
+      if (error) throw error
+      invalidate()
+      toast.success(lang === 'es' ? '¡Empresa actualizada!' : 'Company profile updated!')
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Error')
+    } finally {
+      setSavingBranding(false)
+    }
+  }
+
   async function handleSave() {
     setSaving(true)
     try {
@@ -268,6 +330,110 @@ export default function SettingsPage() {
       </div>
 
       <div className="w-full max-w-[430px] mx-auto px-5 space-y-4">
+
+        {/* ── Company Profile (Owners only) ─────────────────────────── */}
+        {isOwner && (
+          <div className="bg-[#1E2228] border border-[#2A2D35] rounded-2xl p-5 space-y-4">
+            <div className="flex items-center gap-2.5">
+              <Building2 className="h-5 w-5 text-[#A8FF3E]" />
+              <h3 className="text-sm font-semibold text-white">
+                {lang === 'es' ? 'Perfil de la empresa' : 'Company Profile'}
+              </h3>
+            </div>
+
+            {/* Logo uploader */}
+            <div className="flex items-center gap-4">
+              {orgBranding.logo_url ? (
+                <img
+                  src={orgBranding.logo_url}
+                  alt="Logo"
+                  className="w-20 h-20 object-contain rounded-xl bg-white p-1 border border-[#2A2D35]"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-xl bg-[#16191F] border border-dashed border-[#2A2D35] flex items-center justify-center">
+                  <ImagePlus className="h-7 w-7 text-[#4B5563]" />
+                </div>
+              )}
+              <div className="flex-1">
+                <p className="text-xs text-[#6B7280] mb-2">
+                  {lang === 'es' ? 'Logo de la empresa (PNG/JPG)' : 'Company logo (PNG/JPG)'}
+                </p>
+                <label className="cursor-pointer">
+                  <span className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg border border-[#A8FF3E]/40 text-[#A8FF3E] text-xs font-semibold hover:bg-[#A8FF3E]/5 transition-all">
+                    {uploadingLogo
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <ImagePlus className="h-3.5 w-3.5" />}
+                    {lang === 'es' ? 'Subir logo' : 'Upload logo'}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploadingLogo}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0]
+                      if (f) handleUploadLogo(f)
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Business address */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-[#6B7280] flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5" />
+                {lang === 'es' ? 'Dirección de la empresa' : 'Business address'}
+              </Label>
+              <Input
+                value={orgBranding.business_address || ''}
+                onChange={(e) => setOrgBranding((b) => ({ ...b, business_address: e.target.value }))}
+                placeholder={lang === 'es' ? 'Ej: 123 Main St, Miami FL 33101' : 'E.g.: 123 Main St, Miami FL 33101'}
+                className="input-dark h-12 rounded-lg bg-[#16191F] border-[#2A2D35] text-white placeholder:text-[#3A3F4B] focus:border-[#A8FF3E] focus:ring-[#A8FF3E]/20"
+              />
+            </div>
+
+            {/* Business phone */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-[#6B7280] flex items-center gap-1.5">
+                <Phone className="h-3.5 w-3.5" />
+                {lang === 'es' ? 'Teléfono de la empresa' : 'Business phone'}
+              </Label>
+              <Input
+                value={orgBranding.business_phone || ''}
+                onChange={(e) => setOrgBranding((b) => ({ ...b, business_phone: e.target.value }))}
+                placeholder="(555) 000-1234"
+                type="tel"
+                className="input-dark h-12 rounded-lg bg-[#16191F] border-[#2A2D35] text-white placeholder:text-[#3A3F4B] focus:border-[#A8FF3E] focus:ring-[#A8FF3E]/20"
+              />
+            </div>
+
+            {/* Business email */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-[#6B7280] flex items-center gap-1.5">
+                <Mail className="h-3.5 w-3.5" />
+                {lang === 'es' ? 'Email de la empresa' : 'Business email'}
+              </Label>
+              <Input
+                value={orgBranding.business_email || ''}
+                onChange={(e) => setOrgBranding((b) => ({ ...b, business_email: e.target.value }))}
+                placeholder="info@myroofing.com"
+                type="email"
+                className="input-dark h-12 rounded-lg bg-[#16191F] border-[#2A2D35] text-white placeholder:text-[#3A3F4B] focus:border-[#A8FF3E] focus:ring-[#A8FF3E]/20"
+              />
+            </div>
+
+            <button
+              onClick={handleSaveBranding}
+              disabled={savingBranding}
+              className="w-full h-10 rounded-lg bg-[#A8FF3E] text-[#0F1117] text-sm font-bold flex items-center justify-center gap-1.5 disabled:opacity-50"
+            >
+              {savingBranding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              {lang === 'es' ? 'Guardar datos de empresa' : 'Save company profile'}
+            </button>
+          </div>
+        )}
+
         {/* Business Info Card */}
         <div className="bg-[#1E2228] border border-[#2A2D35] rounded-2xl p-5 space-y-4">
           <div className="flex items-center gap-2.5">
