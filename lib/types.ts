@@ -1,3 +1,25 @@
+export type UserRole = 'owner' | 'ops' | 'cs'
+
+export interface Organization {
+  id: string
+  name: string
+  owner_id: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Customer {
+  id: string
+  organization_id: string
+  full_name: string
+  address: string
+  phone: string
+  email: string
+  notes: string
+  created_at: string
+  updated_at: string
+}
+
 export interface Profile {
   id: string
   email: string
@@ -13,6 +35,9 @@ export interface Profile {
   language_preference: 'es' | 'en'
   created_at: string
   updated_at: string
+  // Organization & RBAC
+  organization_id: string | null
+  role: UserRole
   // Billing
   subscription_status: 'trialing' | 'active' | 'canceled' | 'past_due'
   trial_expires_at: string | null
@@ -25,6 +50,8 @@ export interface Profile {
 export interface Job {
   id: string
   user_id: string
+  organization_id: string | null
+  customer_id: string | null
   client_name: string
   client_phone: string
   client_email: string

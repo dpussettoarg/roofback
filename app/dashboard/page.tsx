@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useI18n } from '@/lib/i18n/context'
 import { MobileNav } from '@/components/app/mobile-nav'
-import { Briefcase, DollarSign, TrendingUp, Percent, Plus, ChevronRight } from 'lucide-react'
+import { useProfile } from '@/lib/hooks/useProfile'
+import { Briefcase, DollarSign, TrendingUp, Percent, Plus, ChevronRight, Users } from 'lucide-react'
 import { STATUS_CONFIG } from '@/lib/templates'
 import type { Job } from '@/lib/types'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
@@ -19,8 +20,10 @@ export default function DashboardPage() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [profileName, setProfileName] = useState('')
   const [companyName, setCompanyName] = useState('')
+  const [customerCount, setCustomerCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const { t, lang } = useI18n()
+  const { profile, canSeeFinancials } = useProfile()
   const supabase = createClient()
 
   useEffect(() => {
@@ -28,24 +31,65 @@ export default function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const { data: profile } = await supabase
+      const { data: prof } = await supabase
         .from('profiles')
-        .select('full_name, company_name')
+        .select('full_name, company_name, organization_id, role')
         .eq('id', user.id)
         .single()
-      setProfileName(profile?.full_name || user.email?.split('@')[0] || '')
-      setCompanyName(profile?.company_name || '')
 
-      const { data } = await supabase
-        .from('jobs')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+      setProfileName(prof?.full_name || user.email?.split('@')[0] || '')
+      setCompanyName(prof?.company_name || '')
+
+      const orgId = prof?.organization_id
+
+      // Fetch jobs for the whole organization (or fall back to user_id)
+      let jobQuery = supabase.from('jobs').select('*').order('created_at', { ascending: false })
+      if (orgId) {
+        jobQuery = jobQuery.eq('organization_id', orgId)
+      } else {
+        jobQuery = jobQuery.eq('user_id', user.id)
+      }
+      const { data } = await jobQuery
       setJobs((data as Job[]) || [])
+
+      // Customer count
+      if (orgId) {
+        const { count } = await supabase
+          .from('customers')
+          .select('*', { count: 'exact', head: true })
+          .eq('organization_id', orgId)
+        setCustomerCount(count || 0)
+      }
+
       setLoading(false)
     }
     load()
-  }, [supabase])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Realtime for jobs (org-wide)
+  useEffect(() => {
+    if (!profile?.organization_id) return
+    const channel = supabase
+      .channel('dashboard-jobs')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'jobs',
+        filter: `organization_id=eq.${profile.organization_id}`,
+      }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setJobs(prev => [payload.new as Job, ...prev])
+        } else if (payload.eventType === 'UPDATE') {
+          setJobs(prev => prev.map(j => j.id === (payload.new as Job).id ? payload.new as Job : j))
+        } else if (payload.eventType === 'DELETE') {
+          setJobs(prev => prev.filter(j => j.id !== (payload.old as Job).id))
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.organization_id])
 
   const now = new Date()
   const monthStart = startOfMonth(now)
@@ -65,8 +109,7 @@ export default function DashboardPage() {
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
       const key = format(d, 'yyyy-MM')
-      const label = format(d, 'MMM')
-      months[key] = { month: label, ganancia: 0 }
+      months[key] = { month: format(d, 'MMM'), ganancia: 0 }
     }
     jobs
       .filter((j) => j.status === 'completed' && j.completed_at)
@@ -101,7 +144,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0F1117] pb-24 max-w-[430px] mx-auto">
+      <div className="min-h-screen bg-[#0F1117] pb-24 max-w-2xl mx-auto">
         <div className="px-5 pt-14 pb-5">
           <div className="skeleton h-4 w-20 mb-2" />
           <div className="skeleton h-8 w-48" />
@@ -115,7 +158,6 @@ export default function DashboardPage() {
           </div>
           <div className="skeleton h-14 w-full" />
           <div className="skeleton h-20 w-full" />
-          <div className="skeleton h-20 w-full" />
         </div>
         <MobileNav />
       </div>
@@ -123,48 +165,73 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0F1117] pb-24 max-w-[430px] mx-auto">
+    <div className="min-h-screen bg-[#0F1117] pb-24 max-w-2xl mx-auto">
       <div className="px-5 pt-14 pb-5">
         <p className="text-[#6B7280] text-sm">{t('dashboard.welcome')}</p>
-        <h1 className="text-[32px] font-bold text-white leading-tight mt-0.5">
-          {companyName || profileName || 'RoofBack'}
-        </h1>
+        <div className="flex items-end justify-between">
+          <h1 className="text-[32px] font-bold text-white leading-tight mt-0.5">
+            {companyName || profileName || 'RoofBack'}
+          </h1>
+          {profile?.role && profile.role !== 'owner' && (
+            <span className="text-xs font-semibold text-[#6B7280] bg-[#1E2228] border border-[#2A2D35] px-2 py-1 rounded-full capitalize mb-1">
+              {profile.role}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="px-5 space-y-5">
-        <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-5">
-          <p className="text-[#A8FF3E] text-xs font-bold uppercase tracking-widest mb-2">
-            {t('dashboard.profitThisMonth')}
-          </p>
-          <p className={`text-[56px] font-black tabular-nums leading-none ${monthProfit >= 0 ? 'text-white' : 'text-red-400'}`}>
-            {formatMoney(monthProfit)}
-          </p>
-          <div className="flex items-center gap-1.5 mt-3">
-            <TrendingUp className="h-4 w-4 text-[#6B7280]" />
-            <span className="text-sm text-[#6B7280]">
-              {avgMargin.toFixed(1)}% {t('dashboard.margin')}
-            </span>
+        {/* Financial hero card — owners only */}
+        {canSeeFinancials && (
+          <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-5">
+            <p className="text-[#A8FF3E] text-xs font-bold uppercase tracking-widest mb-2">
+              {t('dashboard.profitThisMonth')}
+            </p>
+            <p className={`text-[56px] font-black tabular-nums leading-none ${monthProfit >= 0 ? 'text-white' : 'text-red-400'}`}>
+              {formatMoney(monthProfit)}
+            </p>
+            <div className="flex items-center gap-1.5 mt-3">
+              <TrendingUp className="h-4 w-4 text-[#6B7280]" />
+              <span className="text-sm text-[#6B7280]">
+                {avgMargin.toFixed(1)}% {t('dashboard.margin')}
+              </span>
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="grid grid-cols-3 gap-3">
+        {/* Stats grid */}
+        <div className={`grid gap-3 ${canSeeFinancials ? 'grid-cols-4' : 'grid-cols-2'}`}>
           <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4">
             <Briefcase className="h-5 w-5 text-[#A8FF3E] mb-2" />
             <p className="text-2xl font-bold tabular-nums text-white">{activeJobs}</p>
             <p className="text-[11px] text-[#6B7280] mt-1">{t('dashboard.activeJobs')}</p>
           </div>
-          <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4">
-            <DollarSign className="h-5 w-5 text-[#3B82F6] mb-2" />
-            <p className="text-2xl font-bold tabular-nums text-white">{formatMoney(monthRevenue)}</p>
-            <p className="text-[11px] text-[#6B7280] mt-1">{t('dashboard.monthRevenue')}</p>
-          </div>
-          <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4">
-            <Percent className="h-5 w-5 text-[#6B7280] mb-2" />
-            <p className="text-2xl font-bold tabular-nums text-white">{avgMargin.toFixed(1)}%</p>
-            <p className="text-[11px] text-[#6B7280] mt-1">{t('dashboard.avgMargin')}</p>
-          </div>
+          <Link href="/customers">
+            <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4 hover:border-[#3A3D45] transition-colors cursor-pointer">
+              <Users className="h-5 w-5 text-[#A8FF3E] mb-2" />
+              <p className="text-2xl font-bold tabular-nums text-white">{customerCount}</p>
+              <p className="text-[11px] text-[#6B7280] mt-1">
+                {lang === 'es' ? 'Clientes' : 'Customers'}
+              </p>
+            </div>
+          </Link>
+          {canSeeFinancials && (
+            <>
+              <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4">
+                <DollarSign className="h-5 w-5 text-[#3B82F6] mb-2" />
+                <p className="text-xl font-bold tabular-nums text-white">{formatMoney(monthRevenue)}</p>
+                <p className="text-[11px] text-[#6B7280] mt-1">{t('dashboard.monthRevenue')}</p>
+              </div>
+              <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4">
+                <Percent className="h-5 w-5 text-[#6B7280] mb-2" />
+                <p className="text-2xl font-bold tabular-nums text-white">{avgMargin.toFixed(1)}%</p>
+                <p className="text-[11px] text-[#6B7280] mt-1">{t('dashboard.avgMargin')}</p>
+              </div>
+            </>
+          )}
         </div>
 
+        {/* New job CTA */}
         <Link href="/jobs/new">
           <button className="w-full h-14 text-base font-bold rounded-xl btn-lime flex items-center justify-center gap-2">
             <Plus className="h-5 w-5" />
@@ -172,7 +239,8 @@ export default function DashboardPage() {
           </button>
         </Link>
 
-        {jobs.some((j) => j.status === 'completed') && (
+        {/* Profit chart — owners only */}
+        {canSeeFinancials && jobs.some((j) => j.status === 'completed') && (
           <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-5">
             <h3 className="text-sm font-semibold text-white mb-4">{t('dashboard.profitChart')}</h3>
             <div className="h-40">
@@ -193,6 +261,7 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* Recent jobs */}
         <div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-white">{t('dashboard.recentJobs')}</h3>
@@ -223,7 +292,7 @@ export default function DashboardPage() {
                           <span className={statusDotClass(job.status)}>
                             {lang === 'es' ? sc?.label_es : sc?.label_en}
                           </span>
-                          {Number(job.estimated_total) > 0 && (
+                          {canSeeFinancials && Number(job.estimated_total) > 0 && (
                             <span className="text-xs text-[#6B7280] tabular-nums font-medium">
                               {formatMoney(Number(job.estimated_total))}
                             </span>

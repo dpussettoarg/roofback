@@ -8,13 +8,15 @@ import { MobileNav } from '@/components/app/mobile-nav'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { Loader2, LogOut, Globe, Building2, CreditCard, Package, Plus, Trash2, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { Loader2, LogOut, Globe, Building2, CreditCard, Package, Plus, Trash2, X, ChevronDown, ChevronUp, ShieldCheck } from 'lucide-react'
+import { useProfile } from '@/lib/hooks/useProfile'
 import { toast } from 'sonner'
 import type { Profile } from '@/lib/types'
 import { PricingCard } from '@/components/app/pricing-card'
 
 export default function SettingsPage() {
   const { t, lang, setLang } = useI18n()
+  const { isOwner } = useProfile()
   const supabase = createClient()
   const router = useRouter()
 
@@ -481,40 +483,55 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Subscription Card */}
-        <div className="bg-[#1E2228] border border-[#2A2D35] rounded-2xl p-5">
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2.5 mb-4">
-            <CreditCard className="h-5 w-5 text-[#A8FF3E]" />
-            {lang === 'es' ? 'Plan' : 'Plan'}
-            {profile.subscription_status === 'active' && (
-              <span className="ml-auto text-xs font-medium px-2.5 py-0.5 rounded-full bg-[#A8FF3E]/10 text-[#A8FF3E]">
-                {lang === 'es' ? 'Activo' : 'Active'}
-              </span>
+        {/* Subscription Card — owners only */}
+        {isOwner && (
+          <div className="bg-[#1E2228] border border-[#2A2D35] rounded-2xl p-5">
+            <h3 className="text-sm font-semibold text-white flex items-center gap-2.5 mb-4">
+              <CreditCard className="h-5 w-5 text-[#A8FF3E]" />
+              {lang === 'es' ? 'Plan' : 'Plan'}
+              {profile.subscription_status === 'active' && (
+                <span className="ml-auto text-xs font-medium px-2.5 py-0.5 rounded-full bg-[#A8FF3E]/10 text-[#A8FF3E]">
+                  {lang === 'es' ? 'Activo' : 'Active'}
+                </span>
+              )}
+            </h3>
+            {profile.subscription_status !== 'active' ? (
+              <PricingCard
+                priceId="price_1T2ODTBiIxuQmwGuua83OmC0"
+                title={lang === 'es' ? 'Pro' : 'Pro'}
+                price="$9"
+                period={lang === 'es' ? '/mes' : '/month'}
+                features={
+                  lang === 'es'
+                    ? ['Presupuestos ilimitados', 'PDF profesional', 'App movil optimizada']
+                    : ['Unlimited estimates', 'Professional PDFs', 'Mobile-optimized app']
+                }
+                highlighted
+                lang={lang as 'es' | 'en'}
+                buttonLabel="subscribe"
+              />
+            ) : (
+              <p className="text-sm text-[#6B7280]">
+                {lang === 'es'
+                  ? 'Tu suscripcion esta activa. Gracias por elegir RoofBack.'
+                  : 'Your subscription is active. Thanks for choosing RoofBack.'}
+              </p>
             )}
-          </h3>
-          {profile.subscription_status !== 'active' ? (
-            <PricingCard
-              priceId="price_1T2ODTBiIxuQmwGuua83OmC0"
-              title={lang === 'es' ? 'Pro' : 'Pro'}
-              price="$9"
-              period={lang === 'es' ? '/mes' : '/month'}
-              features={
-                lang === 'es'
-                  ? ['Presupuestos ilimitados', 'PDF profesional', 'App movil optimizada']
-                  : ['Unlimited estimates', 'Professional PDFs', 'Mobile-optimized app']
-              }
-              highlighted
-              lang={lang as 'es' | 'en'}
-              buttonLabel="subscribe"
-            />
-          ) : (
-            <p className="text-sm text-[#6B7280]">
-              {lang === 'es'
-                ? 'Tu suscripcion esta activa. Gracias por elegir RoofBack.'
-                : 'Your subscription is active. Thanks for choosing RoofBack.'}
-            </p>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* Role badge for non-owners */}
+        {!isOwner && profile.role && (
+          <div className="bg-[#1E2228] border border-[#2A2D35] rounded-2xl p-4 flex items-center gap-3">
+            <ShieldCheck className="h-5 w-5 text-[#A8FF3E]" />
+            <div>
+              <p className="text-sm font-semibold text-white capitalize">{profile.role}</p>
+              <p className="text-xs text-[#6B7280]">
+                {lang === 'es' ? 'Tu rol en la organización' : 'Your role in the organization'}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Save Button */}
         <button

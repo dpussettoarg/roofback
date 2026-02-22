@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useI18n } from '@/lib/i18n/context'
+import { useProfile } from '@/lib/hooks/useProfile'
 import { MobileNav } from '@/components/app/mobile-nav'
 import { Plus, ChevronRight, Search, Hammer, FileText, HardHat, CheckCircle2 } from 'lucide-react'
 import { JOB_TYPE_OPTIONS } from '@/lib/templates'
@@ -54,23 +55,63 @@ export default function JobsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('leads')
   const [loading, setLoading] = useState(true)
   const { lang } = useI18n()
+  const { profile, canSeeFinancials } = useProfile()
   const supabase = createClient()
+  const orgIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data } = await supabase
-        .from('jobs')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single()
+
+      const orgId = prof?.organization_id
+      orgIdRef.current = orgId || null
+
+      let q = supabase.from('jobs').select('*').order('created_at', { ascending: false })
+      if (orgId) {
+        q = q.eq('organization_id', orgId)
+      } else {
+        q = q.eq('user_id', user.id)
+      }
+
+      const { data } = await q
       setJobs((data as Job[]) || [])
       setLoading(false)
     }
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Realtime subscription
+  useEffect(() => {
+    const orgId = profile?.organization_id
+    if (!orgId) return
+    const channel = supabase
+      .channel('jobs-list-realtime')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'jobs',
+        filter: `organization_id=eq.${orgId}`,
+      }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setJobs(prev => [payload.new as Job, ...prev])
+        } else if (payload.eventType === 'UPDATE') {
+          setJobs(prev => prev.map(j => j.id === (payload.new as Job).id ? payload.new as Job : j))
+        } else if (payload.eventType === 'DELETE') {
+          setJobs(prev => prev.filter(j => j.id !== (payload.old as Job).id))
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.organization_id])
 
   const searchLower = search.toLowerCase()
   const filtered = jobs.filter(
@@ -200,7 +241,7 @@ export default function JobsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 ml-3 flex-shrink-0">
-                    {Number(job.estimated_total) > 0 && (
+                    {canSeeFinancials && Number(job.estimated_total) > 0 && (
                       <span className="text-sm font-bold text-white tabular-nums">
                         {formatMoney(Number(job.estimated_total))}
                       </span>

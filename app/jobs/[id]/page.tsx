@@ -17,6 +17,7 @@ import {
 import { toast } from 'sonner'
 import { JOB_TYPE_OPTIONS, ROOF_TYPE_OPTIONS } from '@/lib/templates'
 import { formatJobNumber } from '@/lib/types'
+import { useProfile } from '@/lib/hooks/useProfile'
 import type { Job } from '@/lib/types'
 
 function formatMoney(n: number) {
@@ -73,6 +74,7 @@ export default function JobDetailPage() {
 
   const router = useRouter()
   const { lang } = useI18n()
+  const { canSeeFinancials } = useProfile()
   const supabase = createClient()
 
   useEffect(() => {
@@ -262,7 +264,7 @@ export default function JobDetailPage() {
               )}
             </div>
           </div>
-          {Number(job.estimated_total) > 0 && (
+          {canSeeFinancials && Number(job.estimated_total) > 0 && (
             <p className="text-xl font-bold text-white tabular-nums ml-3">
               {formatMoney(Number(job.estimated_total))}
             </p>
@@ -566,8 +568,8 @@ export default function JobDetailPage() {
               </div>
             </Link>
 
-            {/* Budget vs Actual Tracker */}
-            <div className="bg-[#1E2228] rounded-[12px] overflow-hidden border border-[#2A2D35]">
+            {/* Budget vs Actual Tracker — owners only */}
+            {canSeeFinancials && <div className="bg-[#1E2228] rounded-[12px] overflow-hidden border border-[#2A2D35]">
               <div className="h-1 bg-[#A8FF3E]" />
               <div className="p-4 space-y-4">
                 <div className="flex items-center justify-between">
@@ -606,7 +608,7 @@ export default function JobDetailPage() {
                   </div>
                 )}
               </div>
-            </div>
+            </div>}
 
             {/* Execution action cards */}
             <div className="space-y-2">

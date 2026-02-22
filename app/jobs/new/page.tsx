@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useI18n } from '@/lib/i18n/context'
@@ -8,11 +8,12 @@ import { MobileNav } from '@/components/app/mobile-nav'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Search, User, Plus, X, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
-import { JOB_TYPE_OPTIONS, ROOF_TYPE_OPTIONS, PITCH_OPTIONS } from '@/lib/templates'
+import { JOB_TYPE_OPTIONS, ROOF_TYPE_OPTIONS } from '@/lib/templates'
 import Link from 'next/link'
 import { AddressInput } from '@/components/app/address-input'
+import type { Customer } from '@/lib/types'
 
 const FILTERED_JOB_TYPES = JOB_TYPE_OPTIONS.filter((o) =>
   ['repair', 'reroof', 'new_roof', 'other'].includes(o.value)
@@ -32,15 +33,11 @@ const PITCH_VISUAL_OPTIONS = [
 
 function PitchIcon({ angle, active }: { angle: number; active: boolean }) {
   const stroke = active ? '#A8FF3E' : '#6B7280'
-  const endX = 40 - Math.cos((angle * Math.PI) / 180) * 30
   const endY = 30 - Math.sin((angle * Math.PI) / 180) * 30
   return (
     <svg width="48" height="36" viewBox="0 0 48 36" fill="none">
-      {/* base line */}
       <line x1="6" y1="30" x2="42" y2="30" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
-      {/* vertical wall */}
       <line x1="6" y1="30" x2="6" y2={endY + 2} stroke={stroke} strokeWidth="2" strokeLinecap="round" />
-      {/* roof slope */}
       <line x1="6" y1={endY + 2} x2="42" y2="30" stroke={stroke} strokeWidth="2.5" strokeLinecap="round" />
     </svg>
   )
@@ -65,6 +62,99 @@ export default function NewJobPage() {
   const { t, lang } = useI18n()
   const supabase = createClient()
 
+  // Customer selection state
+  const [orgId, setOrgId] = useState<string | null>(null)
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
+  const [showNewCustomerForm, setShowNewCustomerForm] = useState(false)
+  const [newCustomerName, setNewCustomerName] = useState('')
+  const [newCustomerPhone, setNewCustomerPhone] = useState('')
+  const [newCustomerEmail, setNewCustomerEmail] = useState('')
+  const [creatingCustomer, setCreatingCustomer] = useState(false)
+  const customerSearchRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    async function loadOrg() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single()
+      if (profile?.organization_id) {
+        setOrgId(profile.organization_id)
+        const { data: custs } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('organization_id', profile.organization_id)
+          .order('full_name')
+        setCustomers((custs as Customer[]) || [])
+      }
+    }
+    loadOrg()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Sync form fields from selected customer
+  function selectCustomer(c: Customer) {
+    setSelectedCustomer(c)
+    setForm(f => ({
+      ...f,
+      client_name: c.full_name,
+      client_phone: c.phone,
+      client_email: c.email,
+      client_address: c.address,
+    }))
+    setShowCustomerDropdown(false)
+    setCustomerSearch('')
+  }
+
+  function clearCustomer() {
+    setSelectedCustomer(null)
+    setForm(f => ({ ...f, client_name: '', client_phone: '', client_email: '', client_address: '' }))
+  }
+
+  async function handleCreateCustomer() {
+    if (!newCustomerName.trim() || !orgId) return
+    setCreatingCustomer(true)
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .insert({
+          organization_id: orgId,
+          full_name: newCustomerName.trim(),
+          phone: newCustomerPhone.trim(),
+          email: newCustomerEmail.trim(),
+          address: '',
+          notes: '',
+        })
+        .select()
+        .single()
+      if (error) throw error
+      const c = data as Customer
+      setCustomers(prev => [...prev, c].sort((a, b) => a.full_name.localeCompare(b.full_name)))
+      selectCustomer(c)
+      setShowNewCustomerForm(false)
+      setNewCustomerName('')
+      setNewCustomerPhone('')
+      setNewCustomerEmail('')
+      toast.success(lang === 'es' ? 'Cliente creado' : 'Customer created')
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Error')
+    } finally {
+      setCreatingCustomer(false)
+    }
+  }
+
+  const filteredCustomers = customers.filter(c =>
+    c.full_name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+    c.phone.includes(customerSearch) ||
+    c.email.toLowerCase().includes(customerSearch.toLowerCase())
+  )
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
@@ -79,12 +169,14 @@ export default function NewJobPage() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('default_overhead_pct, default_margin_pct')
+        .select('default_overhead_pct, default_margin_pct, organization_id')
         .eq('id', user.id)
         .maybeSingle()
 
       const insertPayload: Record<string, unknown> = {
         user_id: user.id,
+        organization_id: profile?.organization_id || null,
+        customer_id: selectedCustomer?.id || null,
         client_name: form.client_name.trim(),
         client_phone: form.client_phone,
         client_email: form.client_email,
@@ -127,7 +219,7 @@ export default function NewJobPage() {
     <div className="min-h-screen pb-40" style={{ backgroundColor: '#0F1117' }}>
       {/* ── HEADER ── */}
       <div className="sticky top-0 z-30 px-4 pt-12 pb-4" style={{ backgroundColor: '#0F1117', borderBottom: '1px solid #2A2D35' }}>
-        <div className="mx-auto w-full" style={{ maxWidth: 430 }}>
+        <div className="mx-auto w-full max-w-2xl">
           <Link href="/jobs" className="inline-flex items-center text-sm mb-2" style={{ color: '#6B7280' }}>
             <ArrowLeft className="h-4 w-4 mr-1" />
             {t('jobs.back')}
@@ -136,17 +228,152 @@ export default function NewJobPage() {
         </div>
       </div>
 
-      <form id="new-job-form" onSubmit={handleSubmit} className="mx-auto w-full px-4 py-5 space-y-5" style={{ maxWidth: 430 }}>
+      <form id="new-job-form" onSubmit={handleSubmit} className="mx-auto w-full px-4 py-5 space-y-5 max-w-2xl">
 
         {/* ══════════════════════════════════════════════
-            SECTION 1 — CLIENT INFO
+            SECTION 0 — CUSTOMER SELECTOR (CRM)
+           ══════════════════════════════════════════════ */}
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: '#A8FF3E' }}>
+            {lang === 'es' ? 'Cliente' : 'Customer'}
+          </p>
+          <div className="rounded-xl p-4 space-y-3" style={{ backgroundColor: '#1E2228', border: '1px solid #2A2D35' }}>
+            {selectedCustomer ? (
+              /* Selected customer card */
+              <div className="flex items-center gap-3 bg-[#0F1117] border border-[#A8FF3E]/30 rounded-xl px-4 py-3">
+                <div className="w-9 h-9 rounded-full bg-[#A8FF3E]/10 flex items-center justify-center flex-shrink-0">
+                  <User className="h-4 w-4 text-[#A8FF3E]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-white">{selectedCustomer.full_name}</p>
+                  {selectedCustomer.phone && <p className="text-xs text-[#6B7280]">{selectedCustomer.phone}</p>}
+                </div>
+                <button type="button" onClick={clearCustomer} className="text-[#6B7280] hover:text-white p-1">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              /* Picker */
+              <div className="space-y-2">
+                {/* Search input */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B7280]" />
+                  <input
+                    ref={customerSearchRef}
+                    type="text"
+                    value={customerSearch}
+                    onChange={(e) => { setCustomerSearch(e.target.value); setShowCustomerDropdown(true) }}
+                    onFocus={() => setShowCustomerDropdown(true)}
+                    placeholder={lang === 'es' ? 'Buscar cliente existente...' : 'Search existing customer...'}
+                    className="w-full h-11 pl-10 pr-4 rounded-lg bg-[#0F1117] border border-[#2A2D35] text-white text-sm placeholder:text-[#4B5563] focus:outline-none focus:border-[#A8FF3E] transition-colors"
+                  />
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B7280]" />
+                </div>
+
+                {/* Dropdown results */}
+                {showCustomerDropdown && (
+                  <div className="relative z-10">
+                    <div
+                      className="absolute left-0 right-0 top-0 max-h-48 overflow-y-auto rounded-xl border border-[#2A2D35] bg-[#16191F] shadow-xl"
+                      onMouseDown={(e) => e.preventDefault()}
+                    >
+                      {filteredCustomers.length === 0 && (
+                        <p className="px-4 py-3 text-xs text-[#6B7280]">
+                          {lang === 'es' ? 'Sin resultados' : 'No results'}
+                        </p>
+                      )}
+                      {filteredCustomers.map(c => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => selectCustomer(c)}
+                          className="w-full text-left px-4 py-2.5 hover:bg-[#252830] transition-colors border-b border-[#2A2D35] last:border-0"
+                        >
+                          <p className="text-sm font-medium text-white">{c.full_name}</p>
+                          {c.phone && <p className="text-xs text-[#6B7280]">{c.phone}</p>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Or create new */}
+                <button
+                  type="button"
+                  onClick={() => { setShowNewCustomerForm(!showNewCustomerForm); setShowCustomerDropdown(false) }}
+                  className="w-full h-10 rounded-lg border border-dashed border-[#2A2D35] text-[#A8FF3E] text-sm font-medium flex items-center justify-center gap-2 hover:bg-[#A8FF3E]/5 transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  {lang === 'es' ? 'Crear nuevo cliente' : 'Create new customer'}
+                </button>
+
+                {/* Inline new customer mini-form */}
+                {showNewCustomerForm && (
+                  <div className="bg-[#0F1117] border border-[#2A2D35] rounded-xl p-4 space-y-3 mt-1">
+                    <p className="text-xs font-semibold text-[#A8FF3E]">
+                      {lang === 'es' ? 'Nuevo cliente' : 'New customer'}
+                    </p>
+                    <input
+                      autoFocus
+                      value={newCustomerName}
+                      onChange={e => setNewCustomerName(e.target.value)}
+                      placeholder={lang === 'es' ? 'Nombre completo *' : 'Full name *'}
+                      className="w-full h-11 rounded-lg bg-[#1E2228] border border-[#2A2D35] px-3 text-white text-sm placeholder:text-[#4B5563] focus:outline-none focus:border-[#A8FF3E]"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        value={newCustomerPhone}
+                        onChange={e => setNewCustomerPhone(e.target.value)}
+                        placeholder={lang === 'es' ? 'Teléfono' : 'Phone'}
+                        type="tel"
+                        className="h-11 rounded-lg bg-[#1E2228] border border-[#2A2D35] px-3 text-white text-sm placeholder:text-[#4B5563] focus:outline-none focus:border-[#A8FF3E]"
+                      />
+                      <input
+                        value={newCustomerEmail}
+                        onChange={e => setNewCustomerEmail(e.target.value)}
+                        placeholder="Email"
+                        type="email"
+                        className="h-11 rounded-lg bg-[#1E2228] border border-[#2A2D35] px-3 text-white text-sm placeholder:text-[#4B5563] focus:outline-none focus:border-[#A8FF3E]"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowNewCustomerForm(false)}
+                        className="flex-1 h-10 rounded-lg border border-[#2A2D35] bg-transparent text-[#6B7280] text-sm"
+                      >
+                        {lang === 'es' ? 'Cancelar' : 'Cancel'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCreateCustomer}
+                        disabled={creatingCustomer || !newCustomerName.trim()}
+                        className="flex-1 h-10 rounded-lg bg-[#A8FF3E] text-[#0F1117] font-bold text-sm disabled:opacity-50"
+                      >
+                        {creatingCustomer ? '...' : (lang === 'es' ? 'Crear' : 'Create')}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-xs text-[#4B5563] text-center">
+                  {lang === 'es'
+                    ? 'O completá los datos manualmente abajo'
+                    : 'Or fill in details manually below'}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ══════════════════════════════════════════════
+            SECTION 1 — CLIENT INFO (manual / override)
            ══════════════════════════════════════════════ */}
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: '#A8FF3E' }}>
             {t('jobs.sectionClient')}
           </p>
           <div className="rounded-xl p-4 space-y-4" style={{ backgroundColor: '#1E2228', border: '1px solid #2A2D35' }}>
-            {/* Cliente */}
             <div className="space-y-1.5">
               <Label className="text-xs" style={{ color: '#6B7280' }}>{t('jobs.client')} *</Label>
               <Input
@@ -158,8 +385,6 @@ export default function NewJobPage() {
                 style={{ backgroundColor: '#16191F', borderColor: '#2A2D35', color: '#FFFFFF' }}
               />
             </div>
-
-            {/* Teléfono */}
             <div className="space-y-1.5">
               <Label className="text-xs" style={{ color: '#6B7280' }}>{t('jobs.phone')}</Label>
               <Input
@@ -171,8 +396,6 @@ export default function NewJobPage() {
                 style={{ backgroundColor: '#16191F', borderColor: '#2A2D35', color: '#FFFFFF' }}
               />
             </div>
-
-            {/* Dirección */}
             <div className="space-y-1.5">
               <Label className="text-xs" style={{ color: '#6B7280' }}>{t('jobs.address')} *</Label>
               <AddressInput
@@ -195,8 +418,7 @@ export default function NewJobPage() {
             {t('jobs.sectionJob')}
           </p>
           <div className="rounded-xl p-4 space-y-5" style={{ backgroundColor: '#1E2228', border: '1px solid #2A2D35' }}>
-
-            {/* Job Type — Segmented Control */}
+            {/* Job Type chips */}
             <div className="space-y-1.5">
               <Label className="text-xs" style={{ color: '#6B7280' }}>{t('jobs.jobType')}</Label>
               <div className="flex flex-wrap gap-2">
@@ -222,7 +444,7 @@ export default function NewJobPage() {
               </div>
             </div>
 
-            {/* Roof Type — Horizontal Scroll Chips */}
+            {/* Roof Type chips */}
             <div className="space-y-1.5">
               <Label className="text-xs" style={{ color: '#6B7280' }}>{t('jobs.roofType')}</Label>
               <div className="overflow-x-auto flex gap-2 pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'none' }}>
@@ -248,7 +470,7 @@ export default function NewJobPage() {
               </div>
             </div>
 
-            {/* Square Footage */}
+            {/* Square footage */}
             <div className="space-y-1.5">
               <Label className="text-xs" style={{ color: '#6B7280' }}>{t('jobs.sqft')}</Label>
               <Input
@@ -262,7 +484,7 @@ export default function NewJobPage() {
               />
             </div>
 
-            {/* Pitch — Visual Slope Selector */}
+            {/* Pitch selector */}
             <div className="space-y-1.5">
               <Label className="text-xs" style={{ color: '#6B7280' }}>{t('jobs.pitch')}</Label>
               <div className="grid grid-cols-4 gap-2">
@@ -280,10 +502,7 @@ export default function NewJobPage() {
                       }}
                     >
                       <PitchIcon angle={p.angle} active={isActive} />
-                      <span
-                        className="text-xs font-medium mt-1"
-                        style={{ color: isActive ? '#A8FF3E' : '#6B7280' }}
-                      >
+                      <span className="text-xs font-medium mt-1" style={{ color: isActive ? '#A8FF3E' : '#6B7280' }}>
                         {p.value === '8/12' ? '8/12+' : p.value}
                       </span>
                     </button>
@@ -309,11 +528,8 @@ export default function NewJobPage() {
       </form>
 
       {/* ── STICKY BOTTOM CTA ── */}
-      <div
-        className="fixed left-0 right-0 z-50 px-4 pt-3 pb-20"
-        style={{ bottom: 0, background: 'linear-gradient(to top, #0F1117 60%, transparent)' }}
-      >
-        <div className="mx-auto w-full" style={{ maxWidth: 430 }}>
+      <div className="fixed left-0 right-0 z-50 px-4 pt-3 pb-20" style={{ bottom: 0, background: 'linear-gradient(to top, #0F1117 60%, transparent)' }}>
+        <div className="mx-auto w-full max-w-2xl">
           <button
             type="submit"
             form="new-job-form"
@@ -322,8 +538,7 @@ export default function NewJobPage() {
           >
             {loading
               ? (lang === 'es' ? 'Creando...' : 'Creating...')
-              : (lang === 'es' ? 'Crear Trabajo \u2192' : 'Create Job \u2192')
-            }
+              : (lang === 'es' ? 'Crear Trabajo →' : 'Create Job →')}
           </button>
         </div>
       </div>
