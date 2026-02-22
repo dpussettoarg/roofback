@@ -4,6 +4,8 @@ import Link from 'next/link'
 import './globals.css'
 import { Providers } from '@/components/providers'
 
+const SITE_URL = 'https://roofback.app'
+
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-geist-sans',
@@ -12,8 +14,73 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'RoofBack',
-  description: 'Job management and quoting for roofing contractors.',
+  metadataBase: new URL(SITE_URL),
+
+  title: {
+    default: 'RoofBack | Software de Roofing por Techistas con 20 años de Experiencia',
+    template: '%s | RoofBack',
+  },
+  description:
+    'Optimizá tus presupuestos, controlá gastos y organizá tu equipo con la herramienta diseñada en el techo. Basada en 20 años de experiencia en USA y Latam. Probá gratis 14 días.',
+
+  keywords: [
+    'roofing software',
+    'software para techistas',
+    'roofing estimating app',
+    'presupuestos de techos',
+    'roofing contractor app',
+    'gestión de trabajos de techo',
+    'roofing CRM',
+    'estimados de techado',
+    'roofing business management',
+    'aplicación para techistas',
+  ],
+
+  authors: [{ name: 'RoofBack', url: SITE_URL }],
+  creator: 'RoofBack',
+  publisher: 'RoofBack',
+
+  // Canonical URL — prevents duplicate content penalties
+  alternates: {
+    canonical: SITE_URL,
+    languages: {
+      'en-US': `${SITE_URL}`,
+      'es-419': `${SITE_URL}`,
+    },
+  },
+
+  // Open Graph — controls how the link looks when shared on WhatsApp, LinkedIn, Slack, etc.
+  openGraph: {
+    type: 'website',
+    locale: 'es_419',
+    alternateLocale: ['en_US'],
+    url: SITE_URL,
+    siteName: 'RoofBack',
+    title: 'RoofBack | Software de Roofing por Techistas con 20 años de Experiencia',
+    description:
+      'Controlá gastos, cronograma y equipo desde el celular. Presupuestos con IA en segundos. Firma digital del cliente incluida. Gratis 14 días.',
+    images: [
+      {
+        url: '/og?title=Control%20total%20de%20tu%20negocio%20de%20techado&sub=Presupuestos%20con%20IA%2C%20cronograma%20visual%20y%20control%20de%20gastos%20en%20tiempo%20real.',
+        width: 1200,
+        height: 630,
+        alt: 'RoofBack — Owner Dashboard con control de gastos y AI Advisor',
+      },
+    ],
+  },
+
+  // Twitter / X card
+  twitter: {
+    card: 'summary_large_image',
+    site: '@roofbackapp',
+    creator: '@roofbackapp',
+    title: 'RoofBack | Software de Roofing por Techistas con 20 años de Experiencia',
+    description:
+      'Controlá gastos, cronograma y equipo desde el celular. Presupuestos con IA en segundos.',
+    images: ['/og?title=Control%20total%20de%20tu%20negocio%20de%20techado'],
+  },
+
+  // PWA & icons
   manifest: '/manifest.json',
   icons: {
     icon: [
@@ -27,6 +94,18 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: 'black-translucent',
     title: 'RoofBack',
+  },
+
+  // Indexing
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
   },
 }
 

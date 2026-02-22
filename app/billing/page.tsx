@@ -2,7 +2,11 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { BillingClient } from './billing-client'
 
-export const metadata = { title: 'Billing — RoofBack' }
+export const metadata = {
+  title: 'Billing',
+  robots: { index: false, follow: false },
+  alternates: { canonical: 'https://roofback.app/billing' },
+}
 
 export default async function BillingPage({
   searchParams,

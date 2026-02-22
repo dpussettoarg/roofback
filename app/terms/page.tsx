@@ -1,8 +1,13 @@
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 
-export const metadata = {
-  title: 'Terms of Service — RoofBack',
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Terms of Service',
+  description: 'Read the RoofBack Terms of Service. By using our app you agree to these terms.',
+  alternates: { canonical: 'https://roofback.app/terms' },
+  robots: { index: true, follow: true },
 }
 
 export default function TermsPage() {
