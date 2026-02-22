@@ -426,10 +426,17 @@ export default function EstimatePage() {
   }
 
   async function handleGeneratePdf() {
-    if (!job) return
+    if (!job) {
+      toast.error(lang === 'es' ? 'Cargá el trabajo primero' : 'Load the job first')
+      return
+    }
+    if (!profile && !orgLogo) {
+      toast.error(lang === 'es' ? 'Cargando datos de la empresa...' : 'Loading company data...')
+      return
+    }
 
     // Guard: ensure minimum required data is present before handing to @react-pdf/renderer.
-    // Missing strings cause react-pdf Text nodes to crash with cryptic internal errors.
+    // Missing strings cause react-pdf Text nodes to crash with cryptic internal errors (e.g. t.document.props).
     const clientName = (job.client_name || '').trim() || 'Client'
     const clientAddress = (job.client_address || '').trim()
     const clientEmail = (job.client_email || '').trim()
@@ -444,15 +451,21 @@ export default function EstimatePage() {
     try {
       const isEn = languageOutput === 'en'
 
-      const safeItems = items
-        .filter((i) => i.name?.trim())   // skip blank rows
+      const safeItems = (items || [])
+        .filter((i) => i && i.name?.trim())   // skip blank rows
         .map((i) => ({
-          name:       i.name.trim(),
-          category:   i.category,
+          name:       String(i.name || '').trim(),
+          category:   (i.category || 'material') as 'material' | 'labor' | 'other',
           quantity:   Number(i.quantity)   || 0,
-          unit:       i.unit               || 'ea',
+          unit:       String(i.unit || 'ea'),
           unit_price: Number(i.unit_price) || 0,
         }))
+
+      if (!calc || typeof finalTotal !== 'number') {
+        toast.error(lang === 'es' ? 'Datos del presupuesto incompletos' : 'Estimate data incomplete')
+        setGeneratingPdf(false)
+        return
+      }
 
       const pdfDoc = (
         <EstimatePDF
@@ -546,8 +559,8 @@ export default function EstimatePage() {
   if (job?.client_status === 'approved' || !!job?.approved_at) {
     return (
       <div className="min-h-screen bg-[#0F1117] pb-24 font-[Inter,sans-serif]">
-        <div className="bg-[#0F1117] border-b border-[#2A2D35] px-4 md:px-8 pt-12 pb-4">
-          <div className="w-full max-w-screen-xl mx-auto">
+        <div className="bg-[#0F1117] border-b border-[#2A2D35] px-4 sm:px-6 lg:px-8 pt-12 pb-4">
+          <div className="w-full max-w-7xl mx-auto">
             <Link href={`/jobs/${id}`} className="inline-flex items-center text-sm text-[#6B7280] hover:text-[#A8FF3E] transition-colors mb-3">
               <ArrowLeft className="h-4 w-4 mr-1" />
               {job?.client_name}
@@ -563,7 +576,7 @@ export default function EstimatePage() {
           </div>
         </div>
 
-        <div className="w-full max-w-screen-xl mx-auto px-4 md:px-8 py-5 space-y-4">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-4">
           {/* Approved badge */}
           <div className="bg-[#A8FF3E]/10 border border-[#A8FF3E]/40 rounded-[12px] p-4 flex items-start gap-3">
             <Lock className="h-5 w-5 text-[#A8FF3E] mt-0.5 flex-shrink-0" />
@@ -778,8 +791,8 @@ export default function EstimatePage() {
   return (
     <div className="min-h-screen bg-[#0F1117] pb-28 font-[Inter,sans-serif]">
       {/* ===== HEADER ===== */}
-      <div className="bg-[#0F1117] border-b border-[#2A2D35] px-4 md:px-8 pt-12 pb-4">
-        <div className="w-full max-w-screen-xl mx-auto">
+      <div className="bg-[#0F1117] border-b border-[#2A2D35] px-4 sm:px-6 lg:px-8 pt-12 pb-4">
+        <div className="w-full max-w-7xl mx-auto">
           <Link
             href={`/jobs/${id}`}
             className="inline-flex items-center text-sm text-[#6B7280] hover:text-[#A8FF3E] transition-colors mb-2"
@@ -799,7 +812,7 @@ export default function EstimatePage() {
       </div>
 
       {/* ===== MAIN CONTENT ===== */}
-      <div className="w-full max-w-screen-xl mx-auto px-4 md:px-8 py-5 space-y-4">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-4">
 
         {/* ===== LANGUAGE OUTPUT TOGGLE (moved to top) ===== */}
         <div className="flex items-center justify-between bg-[#1E2228] border border-[#2A2D35] rounded-[12px] p-4">
@@ -1274,7 +1287,7 @@ export default function EstimatePage() {
           <div className="space-y-2 pt-2">
             <button
               onClick={handleGeneratePdf}
-              disabled={generatingPdf}
+              disabled={generatingPdf || !job || loading}
               className="w-full h-11 rounded-[10px] border border-[#2A2D35] text-white hover:border-[#A8FF3E] hover:text-[#A8FF3E] transition-colors flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-40"
             >
               {generatingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
@@ -1305,7 +1318,7 @@ export default function EstimatePage() {
           <div className={`grid ${isLocked ? 'grid-cols-2' : 'grid-cols-3'} gap-2`}>
             <button
               onClick={handleGeneratePdf}
-              disabled={generatingPdf}
+              disabled={generatingPdf || !job || loading}
               className="h-12 rounded-[10px] border border-[#2A2D35] bg-[#1E2228] text-white hover:border-[#A8FF3E] transition-colors flex items-center justify-center gap-1 text-sm font-medium"
             >
               {generatingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}

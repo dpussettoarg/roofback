@@ -417,9 +417,12 @@ export function EstimatePDF(props: EstimatePdfProps) {
     contractorName, contractorCompany, contractorPhone, contractorEmail, contractorWebsite,
     companyLogoUrl, businessAddress, businessPhone, businessEmail,
     jobNumber, estimateVersion = 1, createdAt, startDate, durationDays, paymentTerms,
-    simpleDescription, items, subtotalMaterials, subtotalLabor, subtotalOther,
-    overhead, overheadPct, margin, marginPct, total, photos,
+    simpleDescription, items: rawItems, subtotalMaterials, subtotalLabor, subtotalOther,
+    overhead, overheadPct, margin, marginPct, total, photos: rawPhotos,
   } = props
+
+  const items = Array.isArray(rawItems) ? rawItems : []
+  const photos = Array.isArray(rawPhotos) ? rawPhotos : []
 
   const ptLabel = PAYMENT_TERMS_OPTIONS.find(p => p.value === paymentTerms)
   const ptText = isEn ? ptLabel?.label_en : ptLabel?.label_es

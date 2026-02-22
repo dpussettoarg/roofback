@@ -335,7 +335,7 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0F1117] flex items-center justify-center">
-        <div className="w-full max-w-screen-xl px-4 md:px-8 mx-auto space-y-4">
+        <div className="w-full max-w-7xl px-4 sm:px-6 lg:px-8 mx-auto space-y-4">
           {/* Skeleton header */}
           <div className="pt-12 pb-4 space-y-2">
             <div className="h-7 w-40 bg-[#1E2228] rounded-lg animate-pulse" />
@@ -354,7 +354,7 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-[#0F1117] pb-24">
       {/* Header */}
-      <div className="w-full max-w-screen-xl px-4 md:px-8 mx-auto pt-12 pb-4">
+      <div className="w-full max-w-7xl px-4 sm:px-6 lg:px-8 mx-auto pt-12 pb-4">
         <h1 className="text-2xl font-bold text-white">{t('settings.title')}</h1>
         <p className="text-sm text-[#6B7280] mt-1">
           {lang === 'es'
@@ -363,7 +363,7 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <div className="w-full max-w-screen-xl px-4 md:px-8 mx-auto space-y-4">
+      <div className="w-full max-w-7xl px-4 sm:px-6 lg:px-8 mx-auto space-y-4">
 
         {/* ── Company Profile (Owners only) ─────────────────────────── */}
         {isOwner && (

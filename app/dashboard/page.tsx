@@ -91,6 +91,7 @@ export default function DashboardPage() {
   const [profileName, setProfileName]     = useState('')
   const [companyName, setCompanyName]     = useState('')
   const [customerCount, setCustomerCount] = useState(0)
+  const [milestonesToday, setMilestonesToday] = useState(0)
   const [loading, setLoading]             = useState(true)
   const [orgId, setOrgId]                 = useState<string | null>(null)
 
@@ -131,6 +132,14 @@ export default function DashboardPage() {
           .select('*', { count: 'exact', head: true })
           .eq('organization_id', oid)
         setCustomerCount(count || 0)
+
+        const today = format(now, 'yyyy-MM-dd')
+        const { count: mCount } = await supabase
+          .from('job_milestones')
+          .select('*', { count: 'exact', head: true })
+          .eq('organization_id', oid)
+          .eq('scheduled_date', today)
+        setMilestonesToday(mCount || 0)
       }
 
       setLoading(false)
@@ -165,7 +174,9 @@ export default function DashboardPage() {
   const monthStart = startOfMonth(now)
   const monthEnd   = endOfMonth(now)
 
-  const activeJobs = jobs.filter((j) => j.status !== 'completed')
+  const quotesSentCount = jobs.filter((j) => j.workflow_stage === 'sent').length
+  const jobsInProgress = jobs.filter((j) => j.client_status === 'approved' || j.status === 'in_progress')
+  const activeJobs = jobsInProgress
 
   const completedThisMonth = jobs.filter(
     (j) => j.status === 'completed' && j.completed_at &&
@@ -238,12 +249,12 @@ export default function DashboardPage() {
   // ── Loading skeleton ──────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0F1117] pb-24 max-w-2xl mx-auto">
-        <div className="px-5 pt-14 pb-5">
+      <div className="min-h-screen bg-[#0F1117] pb-24 w-full max-w-7xl px-4 sm:px-6 lg:px-8 mx-auto">
+        <div className="pt-14 pb-5">
           <div className="skeleton h-4 w-20 mb-2" />
           <div className="skeleton h-8 w-48" />
         </div>
-        <div className="px-5 space-y-4">
+        <div className="space-y-4">
           <div className="skeleton h-32 w-full" />
           <div className="grid grid-cols-3 gap-3">
             <div className="skeleton h-24" />
@@ -261,10 +272,10 @@ export default function DashboardPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#0F1117] pb-24 max-w-2xl mx-auto">
+    <div className="min-h-screen bg-[#0F1117] pb-24 w-full max-w-7xl px-4 sm:px-6 lg:px-8 mx-auto">
 
       {/* Page Header */}
-      <div className="px-5 pt-14 pb-5">
+      <div className="pt-14 pb-5">
         <p className="text-[#6B7280] text-sm">{t('dashboard.welcome')}</p>
         <div className="flex items-end justify-between">
           <h1 className="text-[32px] font-bold text-white leading-tight mt-0.5">
@@ -278,7 +289,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="px-5 space-y-5">
+      <div className="space-y-5">
 
         {/* Financial hero — owners only */}
         {canSeeProfit && (
@@ -299,18 +310,28 @@ export default function DashboardPage() {
         )}
 
         {/* Top stat cards */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <Link href="/dashboard/quotes">
+            <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4 hover:border-[#3A3D45] transition-colors cursor-pointer">
+              <Briefcase className="h-4 w-4 text-[#F59E0B] mb-2" />
+              <p className="text-2xl font-bold tabular-nums text-white">{quotesSentCount}</p>
+              <p className="text-[10px] text-[#6B7280] mt-1 leading-tight">
+                {lang === 'es' ? 'Cotizaciones Enviadas' : 'Quotes Sent'}
+              </p>
+            </div>
+          </Link>
+
           <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4">
             <Briefcase className="h-4 w-4 text-[#A8FF3E] mb-2" />
             <p className="text-2xl font-bold tabular-nums text-white">{activeJobs.length}</p>
             <p className="text-[10px] text-[#6B7280] mt-1 leading-tight">
-              {lang === 'es' ? 'Proyectos Activos' : 'Active Projects'}
+              {lang === 'es' ? 'En Proceso' : 'Jobs In Progress'}
             </p>
           </div>
 
           <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4">
             <CalendarCheck className="h-4 w-4 text-[#FBBF24] mb-2" />
-            <p className="text-2xl font-bold tabular-nums text-white">—</p>
+            <p className="text-2xl font-bold tabular-nums text-white">{milestonesToday}</p>
             <p className="text-[10px] text-[#6B7280] mt-1 leading-tight">
               {lang === 'es' ? 'Hitos Hoy' : 'Milestones Today'}
             </p>
@@ -341,7 +362,7 @@ export default function DashboardPage() {
 
         {/* Secondary stats — owners only */}
         {canSeeProfit && (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             <Link href="/customers">
               <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4 hover:border-[#3A3D45] transition-colors cursor-pointer">
                 <Users className="h-4 w-4 text-[#A8FF3E] mb-2" />

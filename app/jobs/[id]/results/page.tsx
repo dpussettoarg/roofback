@@ -144,7 +144,7 @@ export default function ResultsPage() {
 
   return (
     <div className="min-h-screen bg-[#0F1117] pb-24">
-      <div className="w-full max-w-screen-xl px-4 md:px-8 mx-auto">
+      <div className="w-full max-w-7xl px-4 sm:px-6 lg:px-8 mx-auto">
         <div className="border-b border-[#2A2D35] pt-12 pb-4">
           <Link href={`/jobs/${id}`} className="inline-flex items-center text-sm text-[#6B7280] mb-2">
             <ArrowLeft className="h-4 w-4 mr-1" />
