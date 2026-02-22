@@ -28,10 +28,21 @@ const DailyReportPDF = dynamic(
   () => import('@/components/pdf/daily-report-pdf').then((m) => m.DailyReportPDF),
   { ssr: false, loading: () => null }
 )
-// Recharts must be client-only to avoid "ie is not a function" SSR crash
+// Recharts must be client-only — never import recharts at module level.
+// ssr:false prevents the "ie is not a function" crash during server rendering.
 const ProfitChart = dynamic(() => import('@/components/app/profit-chart'), {
   ssr: false,
-  loading: () => <div className="h-[180px] bg-[#16191F] rounded-xl animate-pulse" />,
+  loading: () => (
+    <div className="h-[200px] w-full flex items-end gap-1 px-2 pb-2">
+      {[40, 65, 30, 80, 55, 90].map((h, i) => (
+        <div
+          key={i}
+          className="flex-1 rounded-t bg-[#2A2D35] animate-pulse"
+          style={{ height: `${h}%` }}
+        />
+      ))}
+    </div>
+  ),
 })
 
 function formatMoney(n: number) {
@@ -596,7 +607,7 @@ export default function DashboardPage() {
         )}
 
         {/* ── Profit chart — owners only (client-only via dynamic import) ── */}
-        {canSeeProfit && chartData.some((d) => d.ganancia !== 0) && (
+        {canSeeProfit && Array.isArray(chartData) && chartData.length > 0 && (
           <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-5">
             <h3 className="text-sm font-semibold text-white mb-4">{t('dashboard.profitChart')}</h3>
             <ProfitChart data={chartData} />
