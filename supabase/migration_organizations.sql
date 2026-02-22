@@ -2,12 +2,17 @@
 -- RoofBack — Organizations, Customers & RBAC
 -- Run in: Supabase Dashboard → SQL Editor
 -- Idempotent — safe to run multiple times.
+--
+-- Fix: profiles columns are added BEFORE any RLS policy that
+--      references them, avoiding the 42703 "column does not exist"
+--      error that occurs when Postgres plans the policy body.
 -- ============================================================
 
 BEGIN;
 
 -- ============================================================
--- 1. ORGANIZATIONS TABLE
+-- 1. ORGANIZATIONS TABLE (no RLS yet — policies come after
+--    profiles gets its organization_id column)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS public.organizations (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -19,6 +24,21 @@ CREATE TABLE IF NOT EXISTS public.organizations (
 
 ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
 
+-- ============================================================
+-- 2. UPDATE PROFILES — add org + role columns FIRST
+--    so that every subsequent RLS policy that reads
+--    profiles.organization_id can resolve the column.
+-- ============================================================
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS organization_id UUID REFERENCES public.organizations(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS role            TEXT NOT NULL DEFAULT 'owner';
+
+CREATE INDEX IF NOT EXISTS idx_profiles_organization_id ON public.profiles(organization_id);
+
+-- ============================================================
+-- 3. RLS POLICIES FOR organizations
+--    (now safe: profiles.organization_id already exists)
+-- ============================================================
 DROP POLICY IF EXISTS "Org members can view their org" ON public.organizations;
 CREATE POLICY "Org members can view their org"
   ON public.organizations FOR SELECT
@@ -35,16 +55,7 @@ CREATE POLICY "Org owner can update"
   WITH CHECK (owner_id = auth.uid());
 
 -- ============================================================
--- 2. UPDATE PROFILES — add org + role columns
--- ============================================================
-ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS organization_id UUID REFERENCES public.organizations(id) ON DELETE SET NULL,
-  ADD COLUMN IF NOT EXISTS role            TEXT NOT NULL DEFAULT 'owner';
-
-CREATE INDEX IF NOT EXISTS idx_profiles_organization_id ON public.profiles(organization_id);
-
--- ============================================================
--- 3. CUSTOMERS TABLE
+-- 4. CUSTOMERS TABLE
 -- ============================================================
 CREATE TABLE IF NOT EXISTS public.customers (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -77,23 +88,19 @@ CREATE POLICY "Org members can manage customers"
 CREATE INDEX IF NOT EXISTS idx_customers_organization_id ON public.customers(organization_id);
 
 -- ============================================================
--- 4. JOBS — add customer_id and organization_id
---    (existing client_* columns are kept for backward compatibility)
+-- 5. JOBS — add customer_id and organization_id
+--    (existing client_* columns are kept for backward compat)
 -- ============================================================
 ALTER TABLE public.jobs
   ADD COLUMN IF NOT EXISTS customer_id      UUID REFERENCES public.customers(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS organization_id  UUID REFERENCES public.organizations(id) ON DELETE CASCADE;
 
-CREATE INDEX IF NOT EXISTS idx_jobs_customer_id      ON public.jobs(customer_id);
-CREATE INDEX IF NOT EXISTS idx_jobs_organization_id  ON public.jobs(organization_id);
+CREATE INDEX IF NOT EXISTS idx_jobs_customer_id     ON public.jobs(customer_id);
+CREATE INDEX IF NOT EXISTS idx_jobs_organization_id ON public.jobs(organization_id);
 
 -- ============================================================
--- 5. AUTO-PROVISION ORGANIZATION FOR EXISTING USERS
---    Every user who does not yet have an org gets one created.
---    The user's profile is linked and role set to 'owner'.
+-- 6. AUTO-PROVISION ORG FOR EXISTING USERS
 -- ============================================================
-
--- Helper function: provision an org for a user if they don't have one
 CREATE OR REPLACE FUNCTION public.provision_org_for_user(p_user_id UUID)
 RETURNS UUID
 LANGUAGE plpgsql
@@ -101,7 +108,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_org_id UUID;
+  v_org_id  UUID;
   v_company TEXT;
 BEGIN
   -- Already has org → return it
@@ -110,21 +117,21 @@ BEGIN
     RETURN v_org_id;
   END IF;
 
-  -- Get company name for the org
+  -- Use company_name or full_name as the org display name
   SELECT COALESCE(company_name, full_name, '') INTO v_company
     FROM public.profiles WHERE id = p_user_id;
 
-  -- Create org
+  -- Create the org
   INSERT INTO public.organizations (name, owner_id)
     VALUES (v_company, p_user_id)
     RETURNING id INTO v_org_id;
 
-  -- Link profile
+  -- Link the profile
   UPDATE public.profiles
      SET organization_id = v_org_id, role = 'owner'
    WHERE id = p_user_id;
 
-  -- Backfill all jobs for this user
+  -- Backfill all jobs that belong to this user
   UPDATE public.jobs
      SET organization_id = v_org_id
    WHERE user_id = p_user_id AND organization_id IS NULL;
@@ -133,7 +140,7 @@ BEGIN
 END;
 $$;
 
--- Backfill all existing users
+-- Run for every existing user that has no org yet
 DO $$
 DECLARE r RECORD;
 BEGIN
@@ -144,7 +151,7 @@ END;
 $$;
 
 -- ============================================================
--- 6. TRIGGER — auto-provision org when a new user signs up
+-- 7. TRIGGER — auto-provision org on new profile INSERT
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.handle_new_user_org()
 RETURNS trigger
@@ -165,12 +172,10 @@ CREATE TRIGGER on_profile_created_provision_org
   EXECUTE FUNCTION public.handle_new_user_org();
 
 -- ============================================================
--- 7. ENABLE REALTIME for jobs and customers
---    (run once; idempotent via IF NOT EXISTS logic in pg)
+-- 8. REALTIME — REPLICA IDENTITY + publication
 -- ============================================================
 DO $$
 BEGIN
-  -- Enable replica identity so realtime sends full row on UPDATE/DELETE
   IF NOT EXISTS (
     SELECT 1 FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -191,7 +196,6 @@ BEGIN
 END;
 $$;
 
--- Add tables to the realtime publication (idempotent)
 DO $$
 BEGIN
   IF NOT EXISTS (
