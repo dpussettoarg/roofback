@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { translations, type Lang } from './translations'
 
 interface I18nContextType {
@@ -10,26 +11,67 @@ interface I18nContextType {
 }
 
 const I18nContext = createContext<I18nContextType>({
-  lang: 'es',
+  lang: 'en',
   setLang: () => {},
   t: (key) => key,
 })
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  // Default is English for new / unrecognised users
+  // Default: English. Priority order (highest → lowest):
+  //   1. DB profile.language_preference  (source of truth)
+  //   2. localStorage roofback_lang      (offline / pre-login cache)
+  //   3. 'en'                            (safe default)
   const [lang, setLangState] = useState<Lang>('en')
 
   useEffect(() => {
-    const saved = localStorage.getItem('roofback_lang') as Lang | null
-    if (saved === 'es' || saved === 'en') {
-      setLangState(saved)
+    async function syncLang() {
+      // Step 1: apply localStorage immediately so there's no flash
+      const cached = localStorage.getItem('roofback_lang') as Lang | null
+      if (cached === 'es' || cached === 'en') {
+        setLangState(cached)
+      }
+
+      // Step 2: fetch DB preference and override if different
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('language_preference')
+          .eq('id', user.id)
+          .single()
+
+        const dbLang = prof?.language_preference as Lang | null
+        if (dbLang === 'es' || dbLang === 'en') {
+          setLangState(dbLang)
+          localStorage.setItem('roofback_lang', dbLang)
+        }
+      } catch {
+        // Silently fall back to cached / default
+      }
     }
-    // If nothing saved yet the default ('en') already set above is correct
+    syncLang()
   }, [])
 
-  const setLang = useCallback((l: Lang) => {
+  const setLang = useCallback(async (l: Lang) => {
     setLangState(l)
     localStorage.setItem('roofback_lang', l)
+
+    // Persist to DB so the preference survives across devices/sessions
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await supabase
+          .from('profiles')
+          .update({ language_preference: l, updated_at: new Date().toISOString() })
+          .eq('id', user.id)
+      }
+    } catch {
+      // Non-fatal — localStorage is still updated
+    }
   }, [])
 
   const t = useCallback(

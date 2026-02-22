@@ -596,20 +596,22 @@ export default function JobDetailPage() {
                                           {lang === 'es' ? 'Fecha programada' : 'Scheduled date'}
                                         </p>
                                         <div className="flex gap-1.5">
+                                          {/* filter:invert(1) makes the calendar picker icon visible on dark bg */}
                                           <input
                                             type="date"
                                             defaultValue={md.scheduled || ''}
                                             onChange={(e) => setMilestoneDates(prev => ({
                                               ...prev, [s.key]: { ...prev[s.key], scheduled: e.target.value }
                                             }))}
-                                            className="flex-1 h-9 rounded-lg bg-[#0F1117] border border-[#2A2D35] px-2 text-white text-xs focus:outline-none focus:border-[#A8FF3E] transition-colors"
+                                            className="flex-1 h-9 rounded-lg bg-[#0F1117] border border-[#2A2D35] px-2 text-white text-xs focus:outline-none focus:border-[#A8FF3E] transition-colors [color-scheme:dark]"
+                                            style={{ colorScheme: 'dark' }}
                                           />
                                           <button
                                             onClick={() => saveMilestone(s.key, 'scheduled_date', md.scheduled || '', job.organization_id)}
                                             disabled={savingMilestone === s.key}
                                             className="h-9 px-2.5 rounded-lg bg-[#A8FF3E] text-[#0F1117] text-xs font-bold disabled:opacity-50"
                                           >
-                                            {savingMilestone === s.key ? '…' : lang === 'es' ? 'Ok' : 'Ok'}
+                                            {savingMilestone === s.key ? '…' : '✓'}
                                           </button>
                                         </div>
                                       </div>
@@ -624,7 +626,8 @@ export default function JobDetailPage() {
                                             onChange={(e) => setMilestoneDates(prev => ({
                                               ...prev, [s.key]: { ...prev[s.key], completed: e.target.value }
                                             }))}
-                                            className="flex-1 h-9 rounded-lg bg-[#0F1117] border border-[#2A2D35] px-2 text-white text-xs focus:outline-none focus:border-[#A8FF3E] transition-colors"
+                                            className="flex-1 h-9 rounded-lg bg-[#0F1117] border border-[#2A2D35] px-2 text-white text-xs focus:outline-none focus:border-[#A8FF3E] transition-colors [color-scheme:dark]"
+                                            style={{ colorScheme: 'dark' }}
                                           />
                                           <button
                                             onClick={() => saveMilestone(s.key, 'completed_date', md.completed || '', job.organization_id)}
@@ -648,8 +651,6 @@ export default function JobDetailPage() {
                                           ? `Hola ${job.client_name}, te informamos que la etapa "${stageLabel}" está programada para el ${dateStr}. ¡Gracias!`
                                           : `Hi ${job.client_name}, we're letting you know the "${stageLabel}" milestone is scheduled for ${dateStr}. Thank you!`
                                         const phone = job.client_phone?.replace(/\D/g, '') || ''
-                                        setStartDate(md.scheduled || '')
-                                        // Build SMS or WhatsApp — open contact modal
                                         if (phone) {
                                           window.open(`sms:${phone}?body=${encodeURIComponent(msg)}`, '_blank')
                                         } else {
@@ -663,32 +664,54 @@ export default function JobDetailPage() {
                                       {lang === 'es' ? 'Notificar cliente' : 'Notify client'}
                                     </button>
 
-                                    {/* Advance workflow stage button */}
-                                    {!isFinished && i >= stepIndex && (
-                                      <button
-                                        onClick={async () => {
-                                          const newStage = s.wfKey as import('@/lib/types').WorkflowStage
-                                          const { error } = await supabase
-                                            .from('jobs')
-                                            .update({ workflow_stage: newStage, updated_at: new Date().toISOString() })
-                                            .eq('id', id)
-                                          if (!error) {
-                                            setJob(j => j ? { ...j, workflow_stage: newStage } : j)
-                                            toast.success(lang === 'es' ? '¡Etapa avanzada!' : 'Stage advanced!')
-                                            setExpandedStage(null)
-                                          } else {
-                                            toast.error(error.message)
+                                    {/* Move project to this stage — disabled if already current or past */}
+                                    {(() => {
+                                      const alreadyCurrent = isActive
+                                      const alreadyPast    = isFinished
+                                      const canAdvance     = !alreadyCurrent && !alreadyPast
+                                      return (
+                                        <button
+                                          onClick={async () => {
+                                            if (!canAdvance) return
+                                            const newStage = s.wfKey as import('@/lib/types').WorkflowStage
+                                            const { error } = await supabase
+                                              .from('jobs')
+                                              .update({ workflow_stage: newStage, updated_at: new Date().toISOString() })
+                                              .eq('id', id)
+                                            if (!error) {
+                                              setJob(j => j ? { ...j, workflow_stage: newStage } : j)
+                                              toast.success(lang === 'es' ? '¡Etapa avanzada!' : 'Stage advanced!')
+                                              setExpandedStage(null)
+                                            } else {
+                                              toast.error(error.message)
+                                            }
+                                          }}
+                                          disabled={alreadyCurrent || alreadyPast}
+                                          title={
+                                            alreadyCurrent
+                                              ? (lang === 'es' ? 'Esta es la etapa actual' : 'This is already the current stage')
+                                              : alreadyPast
+                                              ? (lang === 'es' ? 'Esta etapa ya fue completada' : 'This stage is already completed')
+                                              : undefined
                                           }
-                                        }}
-                                        className={`w-full h-10 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors ${
-                                          isActive
-                                            ? 'bg-[#0F1117] border border-[#A8FF3E]/40 text-[#A8FF3E] hover:bg-[#A8FF3E]/5'
-                                            : 'border border-[#2A2D35] text-[#6B7280] hover:bg-[#252830]'
-                                        }`}
-                                      >
-                                        {lang === 'es' ? `Marcar "${s.label_es}" como actual` : `Set "${s.label_en}" as current stage`}
-                                      </button>
-                                    )}
+                                          className={`w-full h-10 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors
+                                            ${alreadyCurrent
+                                              ? 'bg-[#A8FF3E]/10 border border-[#A8FF3E]/30 text-[#A8FF3E] cursor-default opacity-60'
+                                              : alreadyPast
+                                              ? 'border border-[#2A2D35] text-[#4B5563] cursor-not-allowed opacity-40'
+                                              : 'border border-[#A8FF3E]/40 text-[#A8FF3E] hover:bg-[#A8FF3E]/5'
+                                            }`}
+                                        >
+                                          {alreadyCurrent
+                                            ? (lang === 'es' ? '✓ Etapa actual' : '✓ Current stage')
+                                            : alreadyPast
+                                            ? (lang === 'es' ? 'Etapa completada' : 'Stage completed')
+                                            : (lang === 'es'
+                                                ? `Mover proyecto a "${s.label_es}"`
+                                                : `Move project to "${s.label_en}"`)}
+                                        </button>
+                                      )
+                                    })()}
                                   </>
                                 )}
                               </div>

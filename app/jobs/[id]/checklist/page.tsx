@@ -58,6 +58,7 @@ export default function ChecklistPage() {
   const [scratchName, setScratchName] = useState('')
   const [scratchQty, setScratchQty] = useState('1')
   const [scratchUnit, setScratchUnit] = useState('')
+  const [scratchUnitPrice, setScratchUnitPrice] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -171,20 +172,24 @@ export default function ChecklistPage() {
       toast.error(lang === 'es' ? 'Ingresá un nombre' : 'Enter a name')
       return
     }
+    const qty   = parseFloat(scratchQty)   || 1
+    const price = parseFloat(scratchUnitPrice) || 0
     setItems((prev) => [
       ...prev,
       {
         estimate_item_id: null,
-        name: scratchName.trim(),
-        quantity_needed: parseFloat(scratchQty) || 1,
-        unit: scratchUnit.trim(),
-        is_checked: false,
-        actual_cost: null,
+        name:             scratchName.trim(),
+        quantity_needed:  qty,
+        unit:             scratchUnit.trim(),
+        is_checked:       false,
+        // Pre-fill actual_cost = qty × unit_price if a price was provided
+        actual_cost:      price > 0 ? qty * price : null,
       },
     ])
     setScratchName('')
     setScratchQty('1')
     setScratchUnit('')
+    setScratchUnitPrice('')
   }
 
   function toggleCheck(index: number) {
@@ -454,7 +459,7 @@ export default function ChecklistPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs text-[#6B7280]">{lang === 'es' ? 'Cantidad' : 'Quantity'}</label>
                   <input
@@ -471,11 +476,36 @@ export default function ChecklistPage() {
                   <input
                     value={scratchUnit}
                     onChange={(e) => setScratchUnit(e.target.value)}
-                    placeholder={lang === 'es' ? 'sq, und, m²...' : 'sq, unit, m²...'}
+                    placeholder={lang === 'es' ? 'sq, und...' : 'sq, unit...'}
                     className="w-full h-12 rounded-lg bg-[#0F1117] border border-[#2A2D35] px-3 text-white text-sm placeholder:text-[#4B5563] focus:outline-none focus:border-[#A8FF3E] transition-colors"
                   />
                 </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-[#6B7280]">{lang === 'es' ? 'Precio unitario' : 'Unit price'}</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280] text-sm">$</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={scratchUnitPrice}
+                      onChange={(e) => setScratchUnitPrice(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full h-12 rounded-lg bg-[#0F1117] border border-[#2A2D35] pl-6 pr-3 text-white text-sm placeholder:text-[#4B5563] focus:outline-none focus:border-[#A8FF3E] transition-colors"
+                    />
+                  </div>
+                </div>
               </div>
+
+              {/* Live total preview */}
+              {parseFloat(scratchQty) > 0 && parseFloat(scratchUnitPrice) > 0 && (
+                <p className="text-xs text-[#A8FF3E] text-right">
+                  {lang === 'es' ? 'Total estimado: ' : 'Estimated total: '}
+                  {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(
+                    (parseFloat(scratchQty) || 0) * (parseFloat(scratchUnitPrice) || 0)
+                  )}
+                </p>
+              )}
             </div>
 
             <div className="flex gap-2 pt-1">

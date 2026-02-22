@@ -405,37 +405,55 @@ export default function EstimatePage() {
 
   async function handleGeneratePdf() {
     if (!job) return
+
+    // Guard: ensure minimum required data is present before handing to @react-pdf/renderer.
+    // Missing strings cause react-pdf Text nodes to crash with cryptic internal errors.
+    const clientName = (job.client_name || '').trim() || 'Client'
+    const clientAddress = (job.client_address || '').trim()
+    const clientEmail = (job.client_email || '').trim()
+    const clientPhone = (job.client_phone || '').trim()
+    const contractorName = (profile?.full_name || '').trim()
+    const contractorCompany = (profile?.company_name || '').trim()
+    const contractorPhone = (profile?.phone || '').trim()
+    const contractorEmail = (profile?.contact_email || '').trim()
+    const contractorWebsite = (profile?.website || '').trim()
+
     setGeneratingPdf(true)
     try {
       const isEn = languageOutput === 'en'
+
+      const safeItems = items
+        .filter((i) => i.name?.trim())   // skip blank rows
+        .map((i) => ({
+          name:       i.name.trim(),
+          category:   i.category,
+          quantity:   Number(i.quantity)   || 0,
+          unit:       i.unit               || 'ea',
+          unit_price: Number(i.unit_price) || 0,
+        }))
+
       const pdfDoc = (
         <EstimatePDF
           mode={mode}
           isEn={isEn}
-          clientName={job.client_name}
-          clientAddress={job.client_address || ''}
-          clientEmail={job.client_email || ''}
-          clientPhone={job.client_phone || ''}
-          contractorName={profile?.full_name || ''}
-          contractorCompany={profile?.company_name || ''}
-          contractorPhone={profile?.phone || ''}
-          contractorEmail={profile?.contact_email || ''}
-          contractorWebsite={profile?.website || ''}
+          clientName={clientName}
+          clientAddress={clientAddress}
+          clientEmail={clientEmail}
+          clientPhone={clientPhone}
+          contractorName={contractorName}
+          contractorCompany={contractorCompany}
+          contractorPhone={contractorPhone}
+          contractorEmail={contractorEmail}
+          contractorWebsite={contractorWebsite}
           jobId={job.id}
           jobNumber={job.job_number}
           estimateVersion={job.estimate_version || 1}
           createdAt={job.created_at}
-          startDate={startDate}
-          durationDays={durationDays}
-          paymentTerms={paymentTerms}
-          simpleDescription={simpleDescription}
-          items={items.map(i => ({
-            name: i.name,
-            category: i.category,
-            quantity: i.quantity,
-            unit: i.unit,
-            unit_price: i.unit_price,
-          }))}
+          startDate={startDate || ''}
+          durationDays={durationDays || 1}
+          paymentTerms={paymentTerms || ''}
+          simpleDescription={simpleDescription || ''}
+          items={safeItems}
           subtotalMaterials={calc.materials}
           subtotalLabor={calc.labor}
           subtotalOther={calc.other}
@@ -443,23 +461,29 @@ export default function EstimatePage() {
           overheadPct={overheadPct}
           margin={calc.margin}
           marginPct={marginPct}
-          total={finalTotal}
-          photos={photos}
+          total={finalTotal || 0}
+          photos={photos.filter(Boolean)}
         />
       )
+
       const blob = await pdf(pdfDoc).toBlob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${isEn ? 'Estimate' : 'Presupuesto'}_${job.client_name.replace(/\s+/g, '_')}.pdf`
+      a.download = `${isEn ? 'Estimate' : 'Presupuesto'}_${clientName.replace(/\s+/g, '_')}.pdf`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
       toast.success(lang === 'es' ? 'PDF descargado' : 'PDF downloaded')
-    } catch (err) {
-      console.error('PDF generation error:', err)
-      toast.error(lang === 'es' ? 'Error generando PDF' : 'Error generating PDF')
+    } catch (err: unknown) {
+      const detail = err instanceof Error ? err.message : String(err)
+      console.error('[PDF generation] error:', detail, err)
+      toast.error(
+        lang === 'es'
+          ? `Error generando PDF: ${detail}`
+          : `PDF generation failed: ${detail}`
+      )
     } finally {
       setGeneratingPdf(false)
     }
@@ -479,7 +503,7 @@ export default function EstimatePage() {
     return (
       <div className="min-h-screen bg-[#0F1117] pb-24 font-[Inter,sans-serif]">
         <div className="bg-[#0F1117] border-b border-[#2A2D35] px-5 pt-12 pb-4">
-          <div className="max-w-[430px] mx-auto">
+          <div className="w-full max-w-5xl mx-auto">
             <Link href={`/jobs/${id}`} className="inline-flex items-center text-sm text-[#6B7280] hover:text-[#A8FF3E] transition-colors mb-3">
               <ArrowLeft className="h-4 w-4 mr-1" />
               {job?.client_name}
@@ -495,7 +519,7 @@ export default function EstimatePage() {
           </div>
         </div>
 
-        <div className="max-w-[430px] mx-auto px-5 py-5 space-y-4">
+        <div className="w-full max-w-5xl mx-auto px-5 py-5 space-y-4">
           {/* Approved badge */}
           <div className="bg-[#A8FF3E]/10 border border-[#A8FF3E]/40 rounded-[12px] p-4 flex items-start gap-3">
             <Lock className="h-5 w-5 text-[#A8FF3E] mt-0.5 flex-shrink-0" />
@@ -711,7 +735,7 @@ export default function EstimatePage() {
     <div className="min-h-screen bg-[#0F1117] pb-28 font-[Inter,sans-serif]">
       {/* ===== HEADER ===== */}
       <div className="bg-[#0F1117] border-b border-[#2A2D35] px-5 pt-12 pb-4">
-        <div className="max-w-[430px] mx-auto">
+        <div className="w-full max-w-5xl mx-auto">
           <Link
             href={`/jobs/${id}`}
             className="inline-flex items-center text-sm text-[#6B7280] hover:text-[#A8FF3E] transition-colors mb-2"
@@ -731,7 +755,7 @@ export default function EstimatePage() {
       </div>
 
       {/* ===== MAIN CONTENT ===== */}
-      <div className="max-w-[430px] mx-auto px-5 py-5 space-y-4">
+      <div className="w-full max-w-5xl mx-auto px-5 py-5 space-y-4">
 
         {/* ===== LANGUAGE OUTPUT TOGGLE (moved to top) ===== */}
         <div className="flex items-center justify-between bg-[#1E2228] border border-[#2A2D35] rounded-[12px] p-4">
