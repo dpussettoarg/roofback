@@ -16,7 +16,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   ArrowLeft, Plus, Trash2, Download, CheckCircle, Loader2,
   Send, Zap, List, Sparkles, CalendarDays, Clock, CreditCard,
-  Globe, Wand2, Lock
+  Globe, Wand2, Lock, Layers
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { JOB_TEMPLATES, scaleTemplateItems } from '@/lib/templates'
@@ -25,6 +25,7 @@ import type { Job, EstimateItem, JobType, Profile } from '@/lib/types'
 import { pdf } from '@react-pdf/renderer'
 import { EstimatePDF } from '@/components/pdf/estimate-pdf'
 import { ImageUploader } from '@/components/app/image-uploader'
+import { TemplateSelector, type JobTemplate, type JobTemplateMaterial } from '@/components/app/template-selector'
 
 function formatMoney(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(n)
@@ -90,6 +91,9 @@ export default function EstimatePage() {
   const [aiNotes, setAiNotes] = useState('')
   const [aiProposal, setAiProposal] = useState('')
   const [generatingAi, setGeneratingAi] = useState(false)
+
+  // System template picker
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false)
 
   const deadlineDate = startDate ? addDays(startDate, durationDays) : ''
 
@@ -161,6 +165,28 @@ export default function EstimatePage() {
       category: ti.category, name: ti.name, quantity: ti.quantity,
       unit: ti.unit, unit_price: ti.unit_price, sort_order: idx,
     })))
+  }
+
+  function handleLoadSystemTemplate(template: JobTemplate, scaledItems: JobTemplateMaterial[]) {
+    // Switch to itemized mode and populate with template items
+    setMode('itemized')
+    setItems(scaledItems.map((m, idx) => ({
+      category: m.category,
+      name: lang === 'es' ? m.name_es : m.name,
+      quantity: m.quantity,
+      unit: m.unit,
+      unit_price: m.unit_price,
+      sort_order: idx,
+    })))
+    // Auto-fill description with template description
+    if (!simpleDescription.trim()) {
+      setSimpleDescription(lang === 'es' ? template.description_es : template.description)
+    }
+    toast.success(
+      lang === 'es'
+        ? `Plantilla "${template.name_es}" cargada. ¡Editá los valores!`
+        : `Template "${template.name}" loaded. Edit the values!`
+    )
   }
 
   const updateItem = useCallback((index: number, field: string, value: string | number) => {
@@ -823,6 +849,17 @@ export default function EstimatePage() {
           </div>
         )}
 
+        {/* ===== LOAD SYSTEM TEMPLATE BUTTON ===== */}
+        {!isLocked && (
+          <button
+            onClick={() => setShowTemplateSelector(true)}
+            className="w-full h-11 rounded-[10px] border border-dashed border-[#A8FF3E]/50 bg-[#A8FF3E]/5 text-[#A8FF3E] text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#A8FF3E]/10 transition-colors"
+          >
+            <Layers className="h-4 w-4" />
+            {lang === 'es' ? 'Cargar plantilla de materiales' : 'Load materials template'}
+          </button>
+        )}
+
         {/* ===== MODE TOGGLE ===== */}
         <div className={`bg-[#1E2228] border border-[#2A2D35] rounded-lg p-1 flex ${isLocked ? 'opacity-70 pointer-events-none' : ''}`}>
           <button
@@ -1279,6 +1316,15 @@ export default function EstimatePage() {
           </div>
         </div>
       )}
+
+      {/* ===== SYSTEM TEMPLATE SELECTOR MODAL ===== */}
+      <TemplateSelector
+        open={showTemplateSelector}
+        lang={lang as 'es' | 'en'}
+        squareFootage={Number(job?.square_footage) || 1000}
+        onSelect={handleLoadSystemTemplate}
+        onClose={() => setShowTemplateSelector(false)}
+      />
 
       <MobileNav />
 

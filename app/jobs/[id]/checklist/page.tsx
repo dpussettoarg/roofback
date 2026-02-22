@@ -9,8 +9,9 @@ import { MobileNav } from '@/components/app/mobile-nav'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   ArrowLeft, RefreshCw, CheckCircle, AlertCircle, Loader2,
-  Plus, Trash2, BookOpen, X, Package,
+  Plus, Trash2, BookOpen, X, Package, Layers,
 } from 'lucide-react'
+import { TemplateSelector, type JobTemplate, type JobTemplateMaterial } from '@/components/app/template-selector'
 import { toast } from 'sonner'
 import type { Job, MaterialChecklist, EstimateItem } from '@/lib/types'
 
@@ -53,6 +54,7 @@ export default function ChecklistPage() {
   const [templates, setTemplates] = useState<Template[]>([])
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [showScratchModal, setShowScratchModal] = useState(false)
+  const [showSystemTemplates, setShowSystemTemplates] = useState(false)
   const [scratchName, setScratchName] = useState('')
   const [scratchQty, setScratchQty] = useState('1')
   const [scratchUnit, setScratchUnit] = useState('')
@@ -141,6 +143,27 @@ export default function ChecklistPage() {
     ])
     setShowTemplateModal(false)
     toast.success(lang === 'es' ? `Plantilla "${tmpl.name}" cargada` : `Template "${tmpl.name}" loaded`)
+  }
+
+  function loadSystemTemplate(_tmpl: JobTemplate, scaledItems: JobTemplateMaterial[]) {
+    // Only append material-category items to the purchase checklist
+    const materialItems = scaledItems.filter((m) => m.category === 'material')
+    setItems((prev) => [
+      ...prev,
+      ...materialItems.map((m) => ({
+        estimate_item_id: null,
+        name: lang === 'es' ? m.name_es : m.name,
+        quantity_needed: m.checklist_qty ?? m.quantity,
+        unit: m.checklist_unit ?? m.unit,
+        is_checked: false,
+        actual_cost: null,
+      })),
+    ])
+    toast.success(
+      lang === 'es'
+        ? `${materialItems.length} materiales cargados. ¡Editá las cantidades!`
+        : `${materialItems.length} materials loaded. Edit quantities as needed!`
+    )
   }
 
   function addScratchItem() {
@@ -257,31 +280,42 @@ export default function ChecklistPage() {
         )}
 
         {/* Action buttons — always visible */}
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2">
           <button
             onClick={generateFromEstimate}
-            className="h-12 rounded-lg border border-[#2A2D35] bg-[#1E2228] text-[#A8FF3E] font-medium text-sm flex items-center justify-center gap-2 hover:bg-[#252930] transition-colors"
+            className="h-11 rounded-lg border border-[#2A2D35] bg-[#1E2228] text-[#A8FF3E] font-medium text-sm flex items-center justify-center gap-2 hover:bg-[#252930] transition-colors"
           >
             <RefreshCw className="h-4 w-4" />
-            {lang === 'es' ? 'Desde presupuesto' : 'From estimate'}
+            {lang === 'es' ? 'Del presupuesto' : 'From estimate'}
           </button>
 
           <button
             onClick={() => setShowScratchModal(true)}
-            className="h-12 rounded-lg border border-[#2A2D35] bg-[#1E2228] text-white font-medium text-sm flex items-center justify-center gap-2 hover:bg-[#252930] transition-colors"
+            className="h-11 rounded-lg border border-[#2A2D35] bg-[#1E2228] text-white font-medium text-sm flex items-center justify-center gap-2 hover:bg-[#252930] transition-colors"
           >
             <Plus className="h-4 w-4 text-[#A8FF3E]" />
             {lang === 'es' ? 'Agregar ítem' : 'Add item'}
           </button>
 
+          {/* System roof templates */}
           <button
-            onClick={() => setShowTemplateModal(true)}
-            disabled={templates.length === 0}
-            className="h-12 rounded-lg border border-[#2A2D35] bg-[#1E2228] text-white font-medium text-sm flex items-center justify-center gap-2 hover:bg-[#252930] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            onClick={() => setShowSystemTemplates(true)}
+            className="h-11 rounded-lg border border-dashed border-[#A8FF3E]/50 bg-[#A8FF3E]/5 text-[#A8FF3E] font-medium text-sm flex items-center justify-center gap-2 hover:bg-[#A8FF3E]/10 transition-colors col-span-2"
           >
-            <BookOpen className="h-4 w-4 text-[#A8FF3E]" />
-            {lang === 'es' ? 'Cargar plantilla' : 'Load template'}
+            <Layers className="h-4 w-4" />
+            {lang === 'es' ? 'Cargar plantilla de techo' : 'Load roof template'}
           </button>
+
+          {/* User saved templates */}
+          {templates.length > 0 && (
+            <button
+              onClick={() => setShowTemplateModal(true)}
+              className="h-11 rounded-lg border border-[#2A2D35] bg-[#1E2228] text-white font-medium text-sm flex items-center justify-center gap-2 hover:bg-[#252930] transition-colors col-span-2"
+            >
+              <BookOpen className="h-4 w-4 text-[#A8FF3E]" />
+              {lang === 'es' ? 'Mis plantillas guardadas' : 'My saved templates'}
+            </button>
+          )}
         </div>
 
         {/* Checklist items */}
@@ -463,6 +497,15 @@ export default function ChecklistPage() {
           </div>
         </div>
       )}
+
+      {/* System Template Selector */}
+      <TemplateSelector
+        open={showSystemTemplates}
+        lang={lang as 'es' | 'en'}
+        squareFootage={Number(job?.square_footage) || 1000}
+        onSelect={loadSystemTemplate}
+        onClose={() => setShowSystemTemplates(false)}
+      />
 
       <MobileNav />
     </div>
