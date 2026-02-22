@@ -16,9 +16,12 @@ export const metadata: Metadata = {
   description: 'Job management and quoting for roofing contractors.',
   manifest: '/manifest.json',
   icons: {
-    icon: '/logo.png',
+    icon: [
+      { url: '/logo.png', type: 'image/png' },
+      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
     shortcut: '/logo.png',
-    apple: '/logo.png',
+    apple: '/icons/icon-192.png',
   },
   appleWebApp: {
     capable: true,
@@ -37,9 +40,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" className={inter.variable}>
-      <head>
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-      </head>
+      <head />
       <body className="bg-[#0F1117] text-white antialiased font-sans">
         <Providers>{children}</Providers>
         <footer className="w-full border-t border-[#1E2228] py-3 px-4">

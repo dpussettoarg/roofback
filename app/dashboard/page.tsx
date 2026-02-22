@@ -17,10 +17,9 @@ import {
 import { STATUS_CONFIG } from '@/lib/templates'
 import type { Job } from '@/lib/types'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import type { BusinessInsightsResponse, BusinessInsight } from '@/app/api/ai/business-insights/route'
 
-// PDF renderer is SSR-incompatible — load dynamically
+// All SSR-incompatible libs — load dynamically, client-only
 const PDFDownloadLink = dynamic(
   () => import('@react-pdf/renderer').then((m) => m.PDFDownloadLink),
   { ssr: false, loading: () => null }
@@ -29,6 +28,11 @@ const DailyReportPDF = dynamic(
   () => import('@/components/pdf/daily-report-pdf').then((m) => m.DailyReportPDF),
   { ssr: false, loading: () => null }
 )
+// Recharts must be client-only to avoid "ie is not a function" SSR crash
+const ProfitChart = dynamic(() => import('@/components/app/profit-chart'), {
+  ssr: false,
+  loading: () => <div className="h-[180px] bg-[#16191F] rounded-xl animate-pulse" />,
+})
 
 function formatMoney(n: number) {
   return new Intl.NumberFormat('en-US', {
@@ -428,7 +432,7 @@ export default function DashboardPage() {
                     <p className="text-[10px] text-[#6B7280]">
                       {lang === 'es' ? 'Actualizado' : 'Updated'}{' '}
                       {format(new Date(aiData.generatedAt), 'h:mm a')}
-                      {aiData.source === 'ai' ? ' · GPT-4o' : ' · Smart Rules'}
+                      {aiData.source === 'ai' ? ' · Claude' : ' · Smart Rules'}
                     </p>
                   )}
                 </div>
@@ -591,32 +595,11 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ── Profit chart — owners only ────────────────────────── */}
-        {canSeeProfit && jobs.some((j) => j.status === 'completed') && (
+        {/* ── Profit chart — owners only (client-only via dynamic import) ── */}
+        {canSeeProfit && chartData.some((d) => d.ganancia !== 0) && (
           <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-5">
             <h3 className="text-sm font-semibold text-white mb-4">{t('dashboard.profitChart')}</h3>
-            <div className="h-40">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#2A2D35" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#6B7280' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: '#6B7280' }} tickFormatter={(v) => `$${v}`} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    formatter={(v) => formatMoney(Number(v))}
-                    labelFormatter={(l) => String(l)}
-                    contentStyle={{ borderRadius: '8px', border: '1px solid #2A2D35', background: '#1E2228', color: '#fff' }}
-                  />
-                  <Bar dataKey="ganancia" radius={[4, 4, 0, 0]}>
-                    {chartData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={entry.ganancia < 0 ? '#F87171' : '#A8FF3E'}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <ProfitChart data={chartData} />
           </div>
         )}
 

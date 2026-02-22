@@ -4,8 +4,8 @@
   "description": "Presupuestá, chequeá materiales, registrá horas y sabé cuánto ganás en cada trabajo.",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#008B99",
+  "background_color": "#0F1117",
+  "theme_color": "#0F1117",
   "orientation": "portrait",
   "icons": [
     {
