@@ -1,166 +1,219 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowRight } from 'lucide-react'
-import t, { lt } from '@/lib/landing-translations'
+import { motion } from 'framer-motion'
+import { ArrowRight, TrendingUp, DollarSign, CheckCircle } from 'lucide-react'
 import type { LandingLang } from '@/lib/landing-translations'
 
 interface HeroProps {
   lang: LandingLang
 }
 
-export function Hero({ lang }: HeroProps) {
-  const [sloganIdx, setSloganIdx] = useState(0)
-  const slogans = t.slogans
+const JOBS = [
+  { client: 'Rivera Roofing', value: '$14,200', burn: 62, stage: 'En Obra', stageEn: 'On-Site', color: '#A8FF3E' },
+  { client: 'Sunset Metal Co.', value: '$8,950', burn: 88, stage: 'Materiales', stageEn: 'Materials', color: '#FBBF24' },
+  { client: 'A&M Contractors', value: '$22,000', burn: 31, stage: 'Contrato', stageEn: 'Contract', color: '#A8FF3E' },
+]
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSloganIdx((prev) => (prev + 1) % slogans.length)
-    }, 3000)
-    return () => clearInterval(interval)
-  }, [slogans.length])
+function MiniBar({ pct, color }: { pct: number; color: string }) {
+  return (
+    <div className="h-1.5 rounded-full bg-white/10 overflow-hidden flex-1">
+      <motion.div
+        className="h-full rounded-full"
+        style={{ backgroundColor: color }}
+        initial={{ width: 0 }}
+        animate={{ width: `${pct}%` }}
+        transition={{ duration: 1.2, delay: 0.8, ease: 'easeOut' }}
+      />
+    </div>
+  )
+}
+
+export function Hero({ lang }: HeroProps) {
+  const isEs = lang === 'es'
 
   return (
-    <section className="relative min-h-[92vh] flex items-center overflow-hidden bg-gradient-to-b from-white via-slate-50/50 to-white">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 -right-40 w-[600px] h-[600px] rounded-full bg-gradient-to-br from-[#00B4D8]/5 to-[#38B000]/5 blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] rounded-full bg-gradient-to-tr from-[#38B000]/5 to-[#00B4D8]/5 blur-3xl" />
-      </div>
+    <section className="relative min-h-screen flex items-center overflow-hidden bg-[#0F1117]">
+      {/* Grid texture */}
+      <div className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage: 'linear-gradient(rgba(168,255,62,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(168,255,62,0.04) 1px, transparent 1px)',
+          backgroundSize: '60px 60px',
+        }}
+      />
+      {/* Glow */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] rounded-full opacity-20 pointer-events-none"
+        style={{ background: 'radial-gradient(ellipse, #A8FF3E 0%, transparent 70%)' }}
+      />
 
-      <div className="max-w-6xl mx-auto px-6 pt-24 pb-16 w-full">
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+      <div className="max-w-6xl mx-auto px-6 pt-28 pb-20 w-full">
+        <div className="grid lg:grid-cols-2 gap-16 items-center">
+
+          {/* ── Left: Copy ── */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7 }}
             className="space-y-8"
           >
-            <div className="space-y-6">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.2 }}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-[#38B000]" />
-                {lang === 'es' ? 'Para techistas profesionales' : 'For professional roofers'}
-              </motion.div>
+            {/* Badge */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2 }}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#A8FF3E]/30 bg-[#A8FF3E]/10 text-[#A8FF3E] text-xs font-semibold uppercase tracking-widest"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-[#A8FF3E] animate-pulse" />
+              {isEs ? 'Hecho por techistas, para techistas' : 'Built by roofers, for roofers'}
+            </motion.div>
 
-              <h1 className="text-4xl sm:text-5xl lg:text-[56px] font-extrabold text-slate-900 leading-[1.08] tracking-tight">
-                {lt(t.hero.headline, lang)}
-              </h1>
+            <h1 className="text-4xl sm:text-5xl lg:text-[54px] font-black text-white leading-[1.06] tracking-tight">
+              {isEs ? (
+                <>
+                  No te dejamos ahogar<br />
+                  en la organización.<br />
+                  <span className="text-[#A8FF3E]">Controlá tu negocio</span>{' '}
+                  con la experiencia de{' '}
+                  <span className="text-[#A8FF3E]">20 años</span> en el techo.
+                </>
+              ) : (
+                <>
+                  We won&apos;t let you drown<br />
+                  in the paperwork.<br />
+                  <span className="text-[#A8FF3E]">Take control</span>{' '}
+                  with{' '}
+                  <span className="text-[#A8FF3E]">20 years</span> of roofing experience.
+                </>
+              )}
+            </h1>
 
-              <div className="h-10 flex items-center">
-                <span className="text-xl font-bold bg-gradient-to-r from-[#00B4D8] to-[#38B000] bg-clip-text text-transparent tracking-tight mr-2">
-                  ROOFBACK
-                </span>
-                <span className="text-xl text-slate-400 mr-1">&mdash;</span>
-                <AnimatePresence mode="wait">
-                  <motion.span
-                    key={`${sloganIdx}-${lang}`}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -12 }}
-                    transition={{ duration: 0.4 }}
-                    className="text-xl font-medium text-slate-500 italic"
-                  >
-                    {slogans[sloganIdx][lang]}
-                  </motion.span>
-                </AnimatePresence>
-              </div>
-
-              <p className="text-lg text-slate-500 leading-relaxed max-w-lg">
-                {lt(t.hero.sub, lang)}
-              </p>
-            </div>
+            <p className="text-lg text-[#9CA3AF] leading-relaxed max-w-lg">
+              {isEs
+                ? 'Desarrollamos la herramienta que nosotros mismos necesitábamos. Sin vueltas, sin datos innecesarios. Solo lo que necesitás para que el trabajo rinda y el equipo funcione.'
+                : 'We built the tool we always needed ourselves. No fluff, no bloat. Just what you need to run the job right and keep your crew moving.'}
+            </p>
 
             <div className="flex flex-col sm:flex-row items-start gap-4">
               <Link
                 href="/login"
-                className="group inline-flex items-center gap-2 h-14 px-8 rounded-full bg-slate-900 text-white text-base font-semibold shadow-lg shadow-slate-900/10 hover:bg-slate-800 hover:shadow-xl hover:shadow-slate-900/15 transition-all"
+                className="group inline-flex items-center gap-2.5 h-14 px-8 rounded-full bg-[#A8FF3E] text-[#0F1117] text-base font-black shadow-lg shadow-[#A8FF3E]/20 hover:bg-[#bfff6b] hover:shadow-[#A8FF3E]/30 transition-all"
               >
-                {lt(t.hero.cta, lang)}
+                {isEs ? 'Probá la Bestia — 14 días gratis' : 'Try The Beast — 14 days free'}
                 <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
               </Link>
-              <p className="text-sm text-slate-400 sm:self-center">{lt(t.hero.ctaSub, lang)}</p>
+              <p className="text-sm text-[#6B7280] sm:self-center">
+                {isEs ? 'Sin tarjeta de crédito' : 'No credit card required'}
+              </p>
+            </div>
+
+            {/* Social proof */}
+            <div className="flex items-center gap-6 pt-2">
+              {[
+                { icon: CheckCircle, text: isEs ? 'Lista en 5 minutos' : 'Up in 5 minutes' },
+                { icon: DollarSign, text: isEs ? 'Control total de costos' : 'Full cost control' },
+                { icon: TrendingUp, text: isEs ? 'AI Advisor incluido' : 'AI Advisor included' },
+              ].map(({ icon: Icon, text }, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <Icon className="h-3.5 w-3.5 text-[#A8FF3E]" />
+                  <span className="text-xs text-[#6B7280] font-medium">{text}</span>
+                </div>
+              ))}
             </div>
           </motion.div>
 
+          {/* ── Right: Dashboard Preview ── */}
           <motion.div
             initial={{ opacity: 0, x: 40 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8, delay: 0.3 }}
             className="relative flex justify-center lg:justify-end"
           >
-            <div className="relative w-[280px] sm:w-[320px]">
-              <div className="absolute -inset-4 bg-gradient-to-br from-[#00B4D8]/10 to-[#38B000]/10 rounded-[40px] blur-2xl" />
-              <div className="relative bg-white rounded-[32px] shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
-                <div className="h-8 bg-slate-50 flex items-center justify-center">
-                  <div className="w-20 h-1 rounded-full bg-slate-200" />
+            <div className="relative w-full max-w-[360px]">
+              {/* Glow behind card */}
+              <div className="absolute -inset-6 rounded-[40px] opacity-30 blur-3xl"
+                style={{ background: 'radial-gradient(ellipse, #A8FF3E 0%, transparent 70%)' }} />
+
+              {/* Phone shell */}
+              <div className="relative bg-[#1E2228] border border-[#2A2D35] rounded-[28px] overflow-hidden shadow-2xl">
+                {/* Status bar */}
+                <div className="h-8 bg-[#16191F] flex items-center justify-center">
+                  <div className="w-20 h-1 rounded-full bg-[#2A2D35]" />
                 </div>
 
-                <div className="px-5 pt-4 pb-2">
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="text-sm font-extrabold bg-gradient-to-r from-[#00B4D8] to-[#38B000] bg-clip-text text-transparent">ROOF</span>
-                    <span className="text-sm font-extrabold text-slate-900">BACK</span>
+                <div className="px-5 pt-4 pb-6 space-y-4">
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] text-[#6B7280] uppercase tracking-widest font-semibold">
+                        {isEs ? 'Asesor IA' : 'AI Advisor'}
+                      </p>
+                      <p className="text-base font-black text-white mt-0.5">
+                        {isEs ? 'Rivera Techos' : 'Rivera Roofing'}
+                      </p>
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-[#A8FF3E]/20 flex items-center justify-center border border-[#A8FF3E]/30">
+                      <span className="text-base">🧠</span>
+                    </div>
                   </div>
+
+                  {/* AI Insight Card */}
+                  <div className="bg-[#0d1f0a] border border-[#A8FF3E]/20 rounded-xl p-3.5">
+                    <p className="text-[9px] text-[#A8FF3E] uppercase tracking-widest font-bold mb-1.5">
+                      {isEs ? '✅ Acción de hoy' : '✅ Today\'s Action'}
+                    </p>
+                    <p className="text-xs text-[#D1D5DB] leading-relaxed">
+                      {isEs
+                        ? 'Sunset Metal Co. ya consumió el 88% del presupuesto. Revisá los costos de mano de obra antes del turno de mañana.'
+                        : 'Sunset Metal Co. is at 88% budget burn. Review labor costs before tomorrow\'s shift.'}
+                    </p>
+                  </div>
+
+                  {/* Job rows with dual bars */}
                   <div className="space-y-3">
-                    <div className="p-3 bg-slate-50 rounded-xl">
-                      <div className="text-[10px] text-slate-400 uppercase tracking-wider font-medium mb-1.5">
-                        {lang === 'es' ? 'PRESUPUESTO' : 'ESTIMATE'}
-                      </div>
-                      <div className="text-lg font-bold text-slate-900">$8,450.00</div>
-                      <div className="text-xs text-slate-400 mt-0.5">J003-01</div>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <div className="flex-1 p-2.5 bg-slate-50 rounded-lg text-center">
-                        <div className="text-[9px] text-slate-400 uppercase tracking-wider">
-                          {lang === 'es' ? 'MATERIALES' : 'MATERIALS'}
+                    {JOBS.map((job, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.6 + i * 0.15 }}
+                        className="bg-[#16191F] rounded-xl p-3"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <p className="text-xs font-bold text-white">{job.client}</p>
+                            <p className="text-[10px] text-[#6B7280]">{isEs ? job.stage : job.stageEn}</p>
+                          </div>
+                          <span className="text-xs font-bold text-white tabular-nums">{job.value}</span>
                         </div>
-                        <div className="text-sm font-semibold text-slate-800 mt-0.5">$3,200</div>
-                      </div>
-                      <div className="flex-1 p-2.5 bg-slate-50 rounded-lg text-center">
-                        <div className="text-[9px] text-slate-400 uppercase tracking-wider">
-                          {lang === 'es' ? 'MANO DE OBRA' : 'LABOR'}
-                        </div>
-                        <div className="text-sm font-semibold text-slate-800 mt-0.5">$2,850</div>
-                      </div>
-                    </div>
-
-                    <div className="p-3 bg-slate-50 rounded-xl">
-                      <div className="flex items-center justify-between">
-                        <div className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">
-                          {lang === 'es' ? 'ESTADO' : 'STATUS'}
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-[#38B000]" />
-                          <span className="text-xs font-medium text-[#38B000]">
-                            {lang === 'es' ? 'Aprobado' : 'Approved'}
+                        <div className="flex items-center gap-2">
+                          <MiniBar pct={job.burn} color={job.color} />
+                          <span className="text-[10px] font-bold tabular-nums" style={{ color: job.color }}>
+                            {job.burn}%
                           </span>
                         </div>
-                      </div>
-                    </div>
-
-                    <div className="relative h-12 bg-slate-900 rounded-xl flex items-center justify-center text-white text-sm font-semibold shadow-lg">
-                      {lang === 'es' ? 'Descargar PDF' : 'Download PDF'}
-                      <motion.div
-                        className="absolute inset-0 rounded-xl bg-gradient-to-r from-transparent via-white/10 to-transparent"
-                        animate={{ x: ['-100%', '100%'] }}
-                        transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-                      />
-                    </div>
+                      </motion.div>
+                    ))}
                   </div>
+
+                  {/* Bottom CTA */}
+                  <motion.div
+                    className="relative h-11 rounded-xl flex items-center justify-center text-[#0F1117] text-sm font-black overflow-hidden"
+                    style={{ backgroundColor: '#A8FF3E' }}
+                    animate={{ opacity: [1, 0.85, 1] }}
+                    transition={{ duration: 2.5, repeat: Infinity }}
+                  >
+                    {isEs ? 'Descargar Reporte del Día' : 'Download Daily Report'}
+                  </motion.div>
                 </div>
 
-                <div className="h-6 bg-slate-50 flex items-center justify-center">
-                  <div className="w-28 h-1 rounded-full bg-slate-200" />
+                {/* Bottom bar */}
+                <div className="h-6 bg-[#16191F] flex items-center justify-center">
+                  <div className="w-28 h-1 rounded-full bg-[#2A2D35]" />
                 </div>
               </div>
             </div>
           </motion.div>
+
         </div>
       </div>
     </section>

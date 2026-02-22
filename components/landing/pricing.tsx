@@ -18,8 +18,14 @@ export function Pricing({ lang }: PricingProps) {
   const period = yearly ? lt(t.pricing.yearly, lang) : lt(t.pricing.monthly, lang)
 
   return (
-    <section id="pricing" className="py-24 lg:py-32 bg-white">
-      <div className="max-w-6xl mx-auto px-6">
+    <section id="pricing" className="py-24 lg:py-32 bg-[#0F1117] relative overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage: 'linear-gradient(rgba(168,255,62,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(168,255,62,0.04) 1px, transparent 1px)',
+          backgroundSize: '60px 60px',
+        }}
+      />
+      <div className="max-w-6xl mx-auto px-6 relative">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -27,36 +33,39 @@ export function Pricing({ lang }: PricingProps) {
           transition={{ duration: 0.5 }}
           className="text-center mb-12"
         >
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#A8FF3E]/30 bg-[#A8FF3E]/10 text-[#A8FF3E] text-xs font-semibold uppercase tracking-widest mb-5">
+            {lang === 'es' ? 'Simple y transparente' : 'Simple & transparent'}
+          </div>
+          <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
             {lt(t.pricing.title, lang)}
           </h2>
-          <p className="text-lg text-slate-500 mt-3 max-w-md mx-auto">
+          <p className="text-lg text-[#9CA3AF] mt-3 max-w-md mx-auto">
             {lt(t.pricing.sub, lang)}
           </p>
         </motion.div>
 
         <div className="flex items-center justify-center gap-3 mb-12">
-          <span className={`text-sm font-medium transition-colors ${!yearly ? 'text-slate-900' : 'text-slate-400'}`}>
+          <span className={`text-sm font-medium transition-colors ${!yearly ? 'text-white' : 'text-[#6B7280]'}`}>
             {lt(t.pricing.toggle.monthly, lang)}
           </span>
           <button
             onClick={() => setYearly(!yearly)}
-            className="relative w-14 h-8 bg-slate-200 rounded-full p-0.5 hover:bg-slate-300 transition-colors"
+            className="relative w-14 h-8 bg-[#1E2228] border border-[#2A2D35] rounded-full p-0.5 hover:border-[#3A3D45] transition-colors"
           >
             <motion.div
-              className="w-7 h-7 bg-white rounded-full shadow-sm"
+              className="w-7 h-7 bg-[#A8FF3E] rounded-full"
               animate={{ x: yearly ? 24 : 0 }}
               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
             />
           </button>
-          <span className={`text-sm font-medium transition-colors ${yearly ? 'text-slate-900' : 'text-slate-400'}`}>
+          <span className={`text-sm font-medium transition-colors ${yearly ? 'text-white' : 'text-[#6B7280]'}`}>
             {lt(t.pricing.toggle.yearly, lang)}
           </span>
           {yearly && (
             <motion.span
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="text-xs font-bold text-[#38B000] bg-[#38B000]/10 px-2.5 py-1 rounded-full"
+              className="text-xs font-bold text-[#A8FF3E] bg-[#A8FF3E]/10 px-2.5 py-1 rounded-full border border-[#A8FF3E]/30"
             >
               {lt(t.pricing.toggle.save, lang)}
             </motion.span>
@@ -70,23 +79,23 @@ export function Pricing({ lang }: PricingProps) {
           transition={{ duration: 0.5 }}
           className="max-w-md mx-auto"
         >
-          <div className="relative bg-white rounded-3xl border-2 border-slate-900 shadow-xl shadow-slate-200/50 overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#00B4D8] to-[#38B000]" />
+          <div className="relative bg-[#1E2228] rounded-3xl border-2 border-[#A8FF3E] shadow-xl shadow-[#A8FF3E]/10 overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-[#A8FF3E]" />
 
-            <div className="p-8 text-center border-b border-slate-100">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 text-white text-xs font-semibold mb-4">
+            <div className="p-8 text-center border-b border-[#2A2D35]">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#A8FF3E]/10 border border-[#A8FF3E]/30 text-[#A8FF3E] text-xs font-black mb-4">
                 <Zap className="h-3 w-3" />
-                {t.pricing.plan}
+                🦁 {t.pricing.plan}
               </div>
 
               <div className="flex items-baseline justify-center gap-1 mb-1">
-                <span className="text-5xl font-extrabold text-slate-900 tabular-nums">
+                <span className="text-5xl font-black text-white tabular-nums">
                   ${price}
                 </span>
-                <span className="text-lg text-slate-400 font-medium">{period}</span>
+                <span className="text-lg text-[#6B7280] font-medium">{period}</span>
               </div>
 
-              <p className="text-sm text-[#38B000] font-medium mt-3">
+              <p className="text-sm text-[#A8FF3E] font-semibold mt-3">
                 {lt(t.pricing.trial, lang)}
               </p>
             </div>
@@ -94,10 +103,10 @@ export function Pricing({ lang }: PricingProps) {
             <div className="p-8 space-y-4">
               {t.pricing.features.map((f, i) => (
                 <div key={i} className="flex items-center gap-3">
-                  <div className="w-5 h-5 rounded-full bg-[#38B000]/10 flex items-center justify-center flex-shrink-0">
-                    <Check className="h-3 w-3 text-[#38B000]" strokeWidth={3} />
+                  <div className="w-5 h-5 rounded-full bg-[#A8FF3E]/10 flex items-center justify-center flex-shrink-0">
+                    <Check className="h-3 w-3 text-[#A8FF3E]" strokeWidth={3} />
                   </div>
-                  <span className="text-[15px] text-slate-700">{f[lang]}</span>
+                  <span className="text-[15px] text-[#D1D5DB]">{f[lang]}</span>
                 </div>
               ))}
             </div>
@@ -105,11 +114,14 @@ export function Pricing({ lang }: PricingProps) {
             <div className="px-8 pb-8">
               <Link
                 href="/login"
-                className="group w-full h-14 rounded-2xl bg-slate-900 text-white text-base font-semibold flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/10"
+                className="group w-full h-14 rounded-2xl bg-[#A8FF3E] text-[#0F1117] text-base font-black flex items-center justify-center gap-2 hover:bg-[#bfff6b] transition-colors shadow-lg shadow-[#A8FF3E]/20"
               >
-                {lt(t.pricing.cta, lang)}
+                {lang === 'es' ? 'Probá la Bestia — 14 días gratis' : 'Try The Beast — 14 days free'}
                 <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
               </Link>
+              <p className="text-center text-xs text-[#6B7280] mt-3">
+                {lang === 'es' ? 'Sin tarjeta de crédito' : 'No credit card required'}
+              </p>
             </div>
           </div>
         </motion.div>
