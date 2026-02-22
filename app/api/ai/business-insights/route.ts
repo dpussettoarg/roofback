@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ''
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
 
 export interface BusinessInsight {
   type: 'risk' | 'opportunity' | 'action'
@@ -247,8 +247,8 @@ export async function POST(req: NextRequest) {
       }
     })
 
-    // ── 6. Call OpenAI ────────────────────────────────────────────────────
-    if (OPENAI_API_KEY && jobs.length > 0) {
+    // ── 6. Call Anthropic Claude ──────────────────────────────────────────
+    if (ANTHROPIC_API_KEY && jobs.length > 0) {
       const isEs = lang === 'es'
 
       const systemPrompt = isEs
@@ -302,29 +302,29 @@ Identify bottlenecks, cost overrun risks, or schedule delays. Return exactly thi
 }`
 
       try {
-        const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+        const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${OPENAI_API_KEY}`,
+            'x-api-key': ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01',
           },
           body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userPrompt },
-            ],
-            max_tokens: 700,
-            temperature: 0.4,
-            response_format: { type: 'json_object' },
+            model: 'claude-3-5-haiku-20241022',
+            max_tokens: 1024,
+            system: systemPrompt,
+            messages: [{ role: 'user', content: userPrompt }],
           }),
         })
 
         if (aiRes.ok) {
           const aiData = await aiRes.json()
-          const raw = aiData.choices?.[0]?.message?.content?.trim()
+          const raw = aiData.content?.[0]?.text?.trim()
           if (raw) {
-            const parsed = JSON.parse(raw) as { summary: string; insights: BusinessInsight[] }
+            // Extract JSON from Claude's response (it may wrap it in markdown)
+            const jsonMatch = raw.match(/\{[\s\S]*\}/)
+            const jsonStr = jsonMatch ? jsonMatch[0] : raw
+            const parsed = JSON.parse(jsonStr) as { summary: string; insights: BusinessInsight[] }
             return NextResponse.json({
               insights: parsed.insights?.slice(0, 3) || fallbackInsights(context, lang),
               summary: parsed.summary || '',
@@ -333,6 +333,9 @@ Identify bottlenecks, cost overrun risks, or schedule delays. Return exactly thi
               context,
             } satisfies BusinessInsightsResponse)
           }
+        } else {
+          const errText = await aiRes.text()
+          console.error('[business-insights] Anthropic error:', errText)
         }
       } catch {
         // fall through to fallback

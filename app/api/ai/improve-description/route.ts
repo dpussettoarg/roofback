@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ''
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
 
 interface RequestBody {
   description: string
@@ -22,11 +22,11 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // If OpenAI key is available, use it
-    if (OPENAI_API_KEY) {
+    // Use Anthropic Claude if key is available
+    if (ANTHROPIC_API_KEY) {
       const langInstruction = language === 'es'
-        ? 'IMPORTANT: You MUST write the entire proposal in Spanish. Do NOT include any English text.'
-        : 'IMPORTANT: You MUST write the entire proposal in English. Do NOT include any Spanish text.'
+        ? 'IMPORTANTE: Escribí toda la propuesta en español. NO incluyas texto en inglés.'
+        : 'IMPORTANT: Write the entire proposal in English. Do NOT include any Spanish text.'
 
       const systemPrompt = language === 'es'
         ? `Sos un presupuestista profesional de techos en Estados Unidos. Mejorá y completá la siguiente descripción de trabajo para que suene profesional, clara y detallada para el cliente. Mantené el español pero usá terminología técnica de roofing. Incluí detalles como materiales, proceso de trabajo y garantía si corresponde. No inventes precios. Mantené un tono profesional pero accesible. Máximo 200 palabras.\n\n${langInstruction}`
@@ -36,26 +36,24 @@ export async function POST(req: NextRequest) {
         ? `Tipo de trabajo: ${jobType}\nTipo de techo: ${roofType}\nSuperficie: ${squareFootage} sqft\n\nDescripción original del techista:\n"${description}"\n\nMejorá esta descripción (respondé SOLO en español):`
         : `Job type: ${jobType}\nRoof type: ${roofType}\nArea: ${squareFootage} sqft\n\nOriginal roofer description:\n"${description}"\n\nImprove this description (respond ONLY in English):`
 
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
-          ],
-          max_tokens: 500,
-          temperature: 0.7,
+          model: 'claude-3-5-haiku-20241022',
+          max_tokens: 700,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
         }),
       })
 
       if (!res.ok) {
         const err = await res.text()
-        console.error('OpenAI error:', err)
+        console.error('Anthropic error:', err)
         return NextResponse.json(
           { improved: enhanceWithTemplate(description, jobType, roofType, squareFootage, language) },
           { status: 200 }
@@ -63,7 +61,7 @@ export async function POST(req: NextRequest) {
       }
 
       const data = await res.json()
-      const improved = data.choices?.[0]?.message?.content?.trim()
+      const improved = data.content?.[0]?.text?.trim()
 
       if (improved) {
         return NextResponse.json({ improved, source: 'ai' })
