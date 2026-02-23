@@ -658,9 +658,9 @@ export function EstimatePDF(props: EstimatePdfProps) {
           </Text>
           <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
             <Text style={s.footerBrand}>
-              {[contractorCompany || 'RoofBack', companySlogan].filter(Boolean).join(' - ')}
+              {[contractorCompany || 'RoofBack', companySlogan].filter(Boolean).join(' · ')}
             </Text>
-            <Text style={s.footerText}>|</Text>
+            <Text style={s.footerText}>·</Text>
             <Text style={s.footerPowered}>Powered by roofback.app</Text>
           </View>
         </View>

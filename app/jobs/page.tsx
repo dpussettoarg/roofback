@@ -130,14 +130,16 @@ export default function JobsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0F1117] pb-24 max-w-[430px] mx-auto">
-        <div className="px-5 pt-14 pb-4">
-          <div className="skeleton h-8 w-32 mb-4" />
-          <div className="skeleton h-11 w-full mb-3" />
-          <div className="flex gap-2"><div className="skeleton h-9 flex-1" /><div className="skeleton h-9 flex-1" /><div className="skeleton h-9 flex-1" /></div>
-        </div>
-        <div className="px-5 space-y-2">
-          {[1,2,3].map((i) => <div key={i} className="skeleton h-20 w-full" />)}
+      <div className="min-h-screen bg-[#0F1117] pb-24">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="pt-14 pb-4">
+            <div className="skeleton h-8 w-32 mb-4" />
+            <div className="skeleton h-11 w-full mb-3" />
+            <div className="flex gap-2"><div className="skeleton h-9 flex-1" /><div className="skeleton h-9 flex-1" /><div className="skeleton h-9 flex-1" /></div>
+          </div>
+          <div className="space-y-2">
+            {[1,2,3].map((i) => <div key={i} className="skeleton h-20 w-full" />)}
+          </div>
         </div>
         <AppHeader />
         <MobileNav />
@@ -152,9 +154,10 @@ export default function JobsPage() {
   }[activeTab]
 
   return (
-    <div className="min-h-screen bg-[#0F1117] pb-24 max-w-[430px] mx-auto">
+    <div className="min-h-screen bg-[#0F1117] pb-24">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       {/* Header */}
-      <div className="px-5 pt-14 pb-3">
+      <div className="pt-14 pb-3">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-[28px] font-bold text-white">
             {lang === 'es' ? 'Trabajos' : 'Jobs'}
@@ -203,7 +206,7 @@ export default function JobsPage() {
       </div>
 
       {/* Job list */}
-      <div className="px-5 space-y-2">
+      <div className="space-y-2">
         {filtered.length === 0 ? (
           <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-10 text-center mt-2">
             <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-[#A8FF3E]/10 flex items-center justify-center">
@@ -255,6 +258,7 @@ export default function JobsPage() {
             )
           })
         )}
+      </div>
       </div>
 
       <AppHeader />

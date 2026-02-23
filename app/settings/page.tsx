@@ -397,6 +397,9 @@ export default function SettingsPage() {
                 <p className="text-[11px] text-[#4B5563] mb-2">
                   {lang === 'es' ? 'Recomendado: PNG con fondo transparente, 400x400px' : 'Recommended: PNG with transparent background, 400x400px'}
                 </p>
+                <p className="text-[10px] text-[#A8FF3E]/80 italic mb-2">
+                  {lang === 'es' ? 'Pro Tip: Usá un logo PNG con transparencia para mejores resultados en la App oscura y el PDF blanco.' : 'Pro Tip: Use a PNG logo with transparency for best results on both Dark App and White PDF.'}
+                </p>
                 <label className="cursor-pointer">
                   <span className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg border border-[#A8FF3E]/40 text-[#A8FF3E] text-xs font-semibold hover:bg-[#A8FF3E]/5 transition-all">
                     {uploadingLogo
