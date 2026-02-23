@@ -65,6 +65,7 @@ export default function EstimatePage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   // Org branding for PDF header
   const [orgLogo, setOrgLogo] = useState<string | null>(null)
+  const [orgSlogan, setOrgSlogan] = useState<string | null>(null)
   const [orgAddress, setOrgAddress] = useState<string | null>(null)
   const [orgPhone, setOrgPhone] = useState<string | null>(null)
   const [orgEmail, setOrgEmail] = useState<string | null>(null)
@@ -113,11 +114,12 @@ export default function EstimatePage() {
           if (profileData.organization_id) {
             const { data: orgData } = await supabase
               .from('organizations')
-              .select('logo_url,business_address,business_phone,business_email,website')
+              .select('logo_url,company_slogan,business_address,business_phone,business_email,website')
               .eq('id', profileData.organization_id)
               .single()
             if (orgData) {
               setOrgLogo(orgData.logo_url || null)
+              setOrgSlogan(orgData.company_slogan || null)
               setOrgAddress(orgData.business_address || null)
               setOrgPhone(orgData.business_phone || null)
               setOrgEmail(orgData.business_email || null)
@@ -481,6 +483,7 @@ export default function EstimatePage() {
           contractorEmail={contractorEmail}
           contractorWebsite={orgWebsite || contractorWebsite}
           companyLogoUrl={orgLogo}
+          companySlogan={orgSlogan}
           businessAddress={orgAddress}
           businessPhone={orgPhone}
           businessEmail={orgEmail}

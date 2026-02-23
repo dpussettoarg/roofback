@@ -262,6 +262,7 @@ export default function SettingsPage() {
     try {
       const payload = {
         name: (profile.company_name || orgBranding.name || '').trim() || null,
+        company_slogan: (orgBranding.company_slogan || '').trim().slice(0, 100) || null,
         business_address: orgBranding.business_address?.trim() || null,
         business_phone:   orgBranding.business_phone?.trim()   || null,
         business_email:   orgBranding.business_email?.trim()   || null,
@@ -378,11 +379,12 @@ export default function SettingsPage() {
             {/* Logo uploader */}
             <div className="flex items-center gap-4">
               {orgBranding.logo_url ? (
-                <img
-                  src={orgBranding.logo_url}
-                  alt="Logo"
-                  className="w-20 h-20 object-contain rounded-xl bg-white p-1 border border-[#2A2D35]"
-                />
+                <div
+                  className="w-20 h-20 rounded-xl bg-white p-1 border border-[#2A2D35] flex items-center justify-center overflow-hidden [&>img]:object-contain [&>img]:max-w-full [&>img]:max-h-full [&>img]:object-center"
+                  style={{ filter: 'drop-shadow(0 0 2px rgba(255,255,255,0.5))' }}
+                >
+                  <img src={orgBranding.logo_url} alt="Logo" className="w-full h-full" />
+                </div>
               ) : (
                 <div className="w-20 h-20 rounded-xl bg-[#16191F] border border-dashed border-[#2A2D35] flex items-center justify-center">
                   <ImagePlus className="h-7 w-7 text-[#4B5563]" />
@@ -391,6 +393,9 @@ export default function SettingsPage() {
               <div className="flex-1">
                 <p className="text-xs text-[#6B7280] mb-2">
                   {lang === 'es' ? 'Logo de la empresa (PNG/JPG)' : 'Company logo (PNG/JPG)'}
+                </p>
+                <p className="text-[11px] text-[#4B5563] mb-2">
+                  {lang === 'es' ? 'Recomendado: PNG con fondo transparente, 400x400px' : 'Recommended: PNG with transparent background, 400x400px'}
                 </p>
                 <label className="cursor-pointer">
                   <span className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg border border-[#A8FF3E]/40 text-[#A8FF3E] text-xs font-semibold hover:bg-[#A8FF3E]/5 transition-all">
@@ -429,6 +434,23 @@ export default function SettingsPage() {
                 placeholder={lang === 'es' ? 'Ej: Techos Perez LLC' : 'E.g.: Perez Roofing LLC'}
                 className="input-dark h-12 rounded-lg bg-[#16191F] border-[#2A2D35] text-white placeholder:text-[#3A3F4B] focus:border-[#A8FF3E] focus:ring-[#A8FF3E]/20"
               />
+            </div>
+
+            {/* Company slogan */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-[#6B7280] flex items-center gap-1.5">
+                {lang === 'es' ? 'Slogan o descripción' : 'Company slogan or description'}
+              </Label>
+              <Input
+                value={orgBranding.company_slogan || ''}
+                onChange={(e) => setOrgBranding((b) => ({ ...b, company_slogan: e.target.value.slice(0, 100) }))}
+                placeholder={lang === 'es' ? 'Ej: Calidad y confianza desde 2010' : 'E.g.: Quality & trust since 2010'}
+                maxLength={100}
+                className="input-dark h-12 rounded-lg bg-[#16191F] border-[#2A2D35] text-white placeholder:text-[#3A3F4B] focus:border-[#A8FF3E] focus:ring-[#A8FF3E]/20"
+              />
+              <p className="text-[11px] text-[#4B5563]">
+                {(orgBranding.company_slogan || '').length}/100
+              </p>
             </div>
 
             {/* Business address */}

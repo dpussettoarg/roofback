@@ -27,6 +27,7 @@ export interface EstimatePdfProps {
   contractorWebsite: string
   // Org branding (optional — falls back to profile data)
   companyLogoUrl?: string | null
+  companySlogan?: string | null
   businessAddress?: string | null
   businessPhone?: string | null
   businessEmail?: string | null
@@ -96,8 +97,16 @@ const s = StyleSheet.create({
   logoImage: {
     width: 160,
     height: 52,
-    objectFit: 'contain',
+    objectFit: 'contain' as const,
+    objectPosition: 'left',
     marginBottom: 6,
+  },
+  companySlogan: {
+    fontSize: 9,
+    fontStyle: 'italic' as const,
+    color: GRAY,
+    marginBottom: 4,
+    lineHeight: 1.3,
   },
   companyName: {
     fontSize: 15,
@@ -415,7 +424,7 @@ export function EstimatePDF(props: EstimatePdfProps) {
   const {
     mode, isEn, clientName, clientAddress, clientEmail, clientPhone,
     contractorName, contractorCompany, contractorPhone, contractorEmail, contractorWebsite,
-    companyLogoUrl, businessAddress, businessPhone, businessEmail,
+    companyLogoUrl, companySlogan, businessAddress, businessPhone, businessEmail,
     jobNumber, estimateVersion = 1, createdAt, startDate, durationDays, paymentTerms,
     simpleDescription, items: rawItems, subtotalMaterials, subtotalLabor, subtotalOther,
     overhead, overheadPct, margin, marginPct, total, photos: rawPhotos,
@@ -472,6 +481,9 @@ export function EstimatePDF(props: EstimatePdfProps) {
             )}
             {contractorCompany ? (
               <Text style={s.companyName}>{contractorCompany}</Text>
+            ) : null}
+            {companySlogan ? (
+              <Text style={s.companySlogan}>{companySlogan}</Text>
             ) : null}
             {displayAddress ? <Text style={s.contactLine}>{displayAddress}</Text> : null}
             {displayPhone   ? <Text style={s.contactLine}>{displayPhone}</Text>   : null}
@@ -644,9 +656,11 @@ export function EstimatePDF(props: EstimatePdfProps) {
               ? 'This estimate is valid for 30 days from issue date.'
               : 'Este presupuesto es válido por 30 días desde la fecha de emisión.'}
           </Text>
-          <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
-            <Text style={s.footerBrand}>{contractorCompany || 'RoofBack'}</Text>
-            <Text style={s.footerText}>·</Text>
+          <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Text style={s.footerBrand}>
+              {[contractorCompany || 'RoofBack', companySlogan].filter(Boolean).join(' - ')}
+            </Text>
+            <Text style={s.footerText}>|</Text>
             <Text style={s.footerPowered}>Powered by roofback.app</Text>
           </View>
         </View>

@@ -316,7 +316,7 @@ export default function JobDetailPage() {
 
   return (
     <div className="min-h-screen bg-[#0F1117] pb-24">
-      <div className="w-full max-w-[430px] mx-auto px-5 pt-12 pb-4">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-4">
         <Link href="/jobs" className="inline-flex items-center gap-1.5 text-sm text-[#6B7280] mb-4 hover:text-white transition-colors">
           <ArrowLeft className="h-4 w-4" />
           {lang === 'es' ? 'Trabajos' : 'Jobs'}
@@ -353,7 +353,7 @@ export default function JobDetailPage() {
         </div>
       </div>
 
-      <div className="w-full max-w-[430px] mx-auto px-5 space-y-4">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
         {/* Info strip */}
         <p className="text-[13px] text-[#6B7280]">
           {lang === 'es' ? jt?.label_es : jt?.label_en}

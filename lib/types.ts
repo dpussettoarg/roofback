@@ -8,6 +8,7 @@ export interface Organization {
   updated_at: string
   // Branding & contact (added via migration_org_branding.sql)
   logo_url?: string | null
+  company_slogan?: string | null
   business_address?: string | null
   business_phone?: string | null
   business_email?: string | null

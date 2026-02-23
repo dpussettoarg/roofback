@@ -90,7 +90,7 @@ export default function QuotesPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0F1117] pb-24">
-        <div className="max-w-[430px] mx-auto px-5 pt-14 space-y-3">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 space-y-3">
           <div className="skeleton h-8 w-40 mb-4" />
           {[1, 2, 3].map((i) => <div key={i} className="skeleton h-20 w-full" />)}
         </div>
@@ -102,9 +102,9 @@ export default function QuotesPage() {
 
   return (
     <div className="min-h-screen bg-[#0F1117] pb-24">
-      <div className="max-w-[430px] mx-auto">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="px-5 pt-12 pb-4">
+        <div className="pt-12 pb-4">
           <Link href="/dashboard" className="inline-flex items-center text-sm text-[#6B7280] mb-3 hover:text-white transition-colors">
             <ArrowLeft className="h-4 w-4 mr-1" />
             {lang === 'es' ? 'Dashboard' : 'Dashboard'}
@@ -128,7 +128,7 @@ export default function QuotesPage() {
         </div>
 
         {/* List */}
-        <div className="px-5 space-y-2">
+        <div className="space-y-2">
           {quotes.length === 0 ? (
             <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-10 text-center mt-2">
               <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-[#A8FF3E]/10 flex items-center justify-center">
