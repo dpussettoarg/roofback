@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { Profile, Organization, Customer } from '@/lib/types'
+import type { Profile, Organization } from '@/lib/types'
 
 // Module-level cache — avoids N+1 fetches when multiple components mount
 let _profile: Profile | null = null
@@ -63,15 +63,17 @@ export function useOrganization() {
   }, [supabase])
 
   useEffect(() => {
-    if (!_loadPromise) {
-      _loadPromise = load().finally(() => { _loadPromise = null })
-    } else {
+    const run = () => {
+      if (!_loadPromise) {
+        _loadPromise = load().finally(() => { _loadPromise = null })
+      }
       _loadPromise.then(() => {
         setProfile(_profile)
         setOrg(_org)
         setLoading(false)
       })
     }
+    queueMicrotask(run)
   }, [load])
 
   const loadMembers = useCallback(async () => {

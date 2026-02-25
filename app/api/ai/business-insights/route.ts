@@ -218,7 +218,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── 3. Fetch actual costs ─────────────────────────────────────────────
-    let actualCostByJob: Record<string, number> = {}
+    const actualCostByJob: Record<string, number> = {}
     if (jobIds.length > 0) {
       const [{ data: chk }, { data: te }, { data: exp }] = await Promise.all([
         supabase.from('material_checklist').select('job_id,actual_cost,is_checked').in('job_id', jobIds),

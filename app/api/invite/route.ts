@@ -183,7 +183,7 @@ export async function POST(request: Request) {
     // TODO: wire to an email provider (Resend/Mailgun) when ready.
     console.log('[INVITE] Invitation created for org:', orgId, '| role:', role)
 
-    return NextResponse.json({ token, acceptUrl })
+    return NextResponse.json({ token, acceptUrl, html })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
     return NextResponse.json({ error: msg }, { status: 500 })

@@ -48,7 +48,7 @@ export default function QuotesPage() {
   const [quotes, setQuotes] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
   const { lang } = useI18n()
-  const { profile, canSeeFinancials } = useProfile()
+  const { canSeeFinancials } = useProfile()
   const supabase = createClient()
 
   useEffect(() => {

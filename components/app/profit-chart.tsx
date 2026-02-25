@@ -65,7 +65,7 @@ export default function ProfitChart({ data }: Props) {
 
   // Layer 1: runs after first render, so we know we are on the client
   useEffect(() => {
-    setIsMounted(true)
+    queueMicrotask(() => setIsMounted(true))
   }, [])
 
   // Layer 2: once mounted, wait for the next animation frame

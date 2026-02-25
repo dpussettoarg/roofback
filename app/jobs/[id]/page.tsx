@@ -32,8 +32,8 @@ function pct(actual: number, budget: number) {
 }
 
 function BudgetBar({
-  label, budgeted, actual, lang,
-}: { label: string; budgeted: number; actual: number; lang: string }) {
+  label, budgeted, actual,
+}: { label: string; budgeted: number; actual: number }) {
   const over = actual > budgeted && budgeted > 0
   return (
     <div className="space-y-1">
@@ -63,7 +63,6 @@ export default function JobDetailPage() {
   const [expandedStage, setExpandedStage] = useState<number | null>(null)
   const [clientEmail, setClientEmail] = useState('')
   const [startDate, setStartDate] = useState('')
-  const [savingDate, setSavingDate] = useState(false)
 
   // Milestone dates per stage
   const [milestoneDates, setMilestoneDates] = useState<Record<string, { scheduled?: string; completed?: string }>>({})
@@ -81,7 +80,7 @@ export default function JobDetailPage() {
 
   const router = useRouter()
   const { lang } = useI18n()
-  const { canSeeFinancials } = useProfile()
+  useProfile() // ensures profile/org context for RLS
   const { canSeeProfit, canSeeContractTotal } = usePermissions()
   const supabase = createClient()
 
@@ -157,15 +156,6 @@ export default function JobDetailPage() {
     router.push('/jobs')
   }
 
-  async function handleSaveStartDate() {
-    if (!startDate) return
-    setSavingDate(true)
-    await supabase.from('jobs').update({ start_date: startDate, updated_at: new Date().toISOString() }).eq('id', id)
-    setJob((j) => j ? { ...j, start_date: startDate } : j)
-    setSavingDate(false)
-    toast.success(lang === 'es' ? 'Fecha guardada' : 'Date saved')
-  }
-
   async function saveMilestone(stage: string, field: 'scheduled_date' | 'completed_date', value: string, orgId: string | null) {
     setSavingMilestone(stage)
     try {
@@ -225,11 +215,6 @@ export default function JobDetailPage() {
       toast.error(lang === 'es' ? 'No hay número de teléfono registrado' : 'No phone number on file')
     }
     setShowContactModal(false)
-  }
-
-  function handleNotifyClient() {
-    if (!startDate) { toast.error(lang === 'es' ? 'Elegí una fecha primero' : 'Pick a date first'); return }
-    setShowContactModal(true)
   }
 
   async function logActivity(note: string) {
@@ -835,10 +820,10 @@ export default function JobDetailPage() {
 
                 {totalBudget > 0 ? (
                   <>
-                    <BudgetBar label={lang === 'es' ? 'Materiales' : 'Materials'} budgeted={budgetMat} actual={actualMat} lang={lang} />
-                    <BudgetBar label={lang === 'es' ? 'Mano de obra' : 'Labor'} budgeted={budgetLabor} actual={actualLabor} lang={lang} />
+                    <BudgetBar label={lang === 'es' ? 'Materiales' : 'Materials'} budgeted={budgetMat} actual={actualMat} />
+                    <BudgetBar label={lang === 'es' ? 'Mano de obra' : 'Labor'} budgeted={budgetLabor} actual={actualLabor} />
                     {(budgetOther > 0 || actualOther > 0) && (
-                      <BudgetBar label={lang === 'es' ? 'Otros gastos' : 'Other expenses'} budgeted={budgetOther} actual={actualOther} lang={lang} />
+                      <BudgetBar label={lang === 'es' ? 'Otros gastos' : 'Other expenses'} budgeted={budgetOther} actual={actualOther} />
                     )}
 
                     {canSeeProfit && (

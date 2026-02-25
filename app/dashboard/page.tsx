@@ -170,7 +170,7 @@ export default function DashboardPage() {
   }, [profile?.organization_id])
 
   // ── KPIs ─────────────────────────────────────────────────────────────────
-  const now = new Date()
+  const now = useMemo(() => new Date(), [])
   const monthStart = startOfMonth(now)
   const monthEnd   = endOfMonth(now)
 

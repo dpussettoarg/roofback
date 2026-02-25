@@ -100,7 +100,7 @@ export function AddressInput({
 
   useEffect(() => {
     if (value && value.length > 10 && !mapUrl) {
-      updateMapUrl(value)
+      queueMicrotask(() => updateMapUrl(value))
     }
   }, [value, mapUrl, updateMapUrl])
 

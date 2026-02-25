@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { ArrowLeft, TrendingUp, TrendingDown, Minus, CheckCircle, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
-import type { Job } from '@/lib/types'
+import type { Job, EstimateItem, MaterialChecklist, TimeEntry, Expense } from '@/lib/types'
 
 function formatMoney(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
@@ -45,33 +45,29 @@ export default function ResultsPage() {
       // Estimated items
       const { data: items } = await supabase.from('estimate_items').select('*').eq('job_id', id)
       if (items) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const typedItems = items as any[]
-        setEstMaterials(typedItems.filter((i: any) => i.category === 'material').reduce((s: number, i: any) => s + Number(i.quantity) * Number(i.unit_price), 0))
-        setEstLabor(typedItems.filter((i: any) => i.category === 'labor').reduce((s: number, i: any) => s + Number(i.quantity) * Number(i.unit_price), 0))
-        setEstOther(typedItems.filter((i: any) => i.category === 'other').reduce((s: number, i: any) => s + Number(i.quantity) * Number(i.unit_price), 0))
+        const typedItems = items as EstimateItem[]
+        setEstMaterials(typedItems.filter((i) => i.category === 'material').reduce((s, i) => s + Number(i.quantity) * Number(i.unit_price), 0))
+        setEstLabor(typedItems.filter((i) => i.category === 'labor').reduce((s, i) => s + Number(i.quantity) * Number(i.unit_price), 0))
+        setEstOther(typedItems.filter((i) => i.category === 'other').reduce((s, i) => s + Number(i.quantity) * Number(i.unit_price), 0))
       }
 
       // Actual materials (from checklist)
       const { data: checklist } = await supabase.from('material_checklist').select('*').eq('job_id', id)
       if (checklist) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const totalActualMat = (checklist as any[]).reduce((s: number, c: any) => s + (Number(c.actual_cost) || 0), 0)
+        const totalActualMat = (checklist as MaterialChecklist[]).reduce((s, c) => s + (Number(c.actual_cost) || 0), 0)
         setActMaterials(totalActualMat)
       }
 
       // Actual labor (from time entries)
       const { data: timeEntries } = await supabase.from('time_entries').select('*').eq('job_id', id)
       if (timeEntries) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setActLabor((timeEntries as any[]).reduce((s: number, te: any) => s + Number(te.hours) * Number(te.hourly_rate), 0))
+        setActLabor((timeEntries as TimeEntry[]).reduce((s, te) => s + Number(te.hours) * Number(te.hourly_rate), 0))
       }
 
       // Actual expenses
       const { data: expenses } = await supabase.from('expenses').select('*').eq('job_id', id)
       if (expenses) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setActExpenses((expenses as any[]).reduce((s: number, e: any) => s + Number(e.amount), 0))
+        setActExpenses((expenses as Expense[]).reduce((s, e) => s + Number(e.amount), 0))
       }
 
       setLoading(false)

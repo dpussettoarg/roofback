@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useI18n } from '@/lib/i18n/context'
@@ -19,7 +20,7 @@ import { PricingCard } from '@/components/app/pricing-card'
 export default function SettingsPage() {
   const { t, lang, setLang } = useI18n()
   const { isOwner } = useProfile()
-  const { org, members, loadMembers, invalidate } = useOrganization()
+  const { members, loadMembers, invalidate } = useOrganization()
   const supabase = createClient()
   const router = useRouter()
 
@@ -380,10 +381,10 @@ export default function SettingsPage() {
             <div className="flex items-center gap-4">
               {orgBranding.logo_url ? (
                 <div
-                  className="w-20 h-20 rounded-xl bg-white p-1 border border-[#2A2D35] flex items-center justify-center overflow-hidden [&>img]:object-contain [&>img]:max-w-full [&>img]:max-h-full [&>img]:object-center"
+                  className="w-20 h-20 rounded-xl bg-white p-1 border border-[#2A2D35] flex items-center justify-center overflow-hidden relative"
                   style={{ filter: 'drop-shadow(0 0 2px rgba(255,255,255,0.5))' }}
                 >
-                  <img src={orgBranding.logo_url} alt="Logo" className="w-full h-full" />
+                  <Image src={orgBranding.logo_url} alt="Company logo" fill className="object-contain object-center" />
                 </div>
               ) : (
                 <div className="w-20 h-20 rounded-xl bg-[#16191F] border border-dashed border-[#2A2D35] flex items-center justify-center">

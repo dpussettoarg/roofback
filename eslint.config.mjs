@@ -5,7 +5,11 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-  // Override default ignores of eslint-config-next.
+  // PDF components use @react-pdf Image (no alt prop) — not DOM img
+  {
+    files: ["components/pdf/**/*.tsx"],
+    rules: { "jsx-a11y/alt-text": "off" },
+  },
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
