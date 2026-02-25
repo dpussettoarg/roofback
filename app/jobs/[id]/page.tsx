@@ -617,7 +617,7 @@ export default function JobDetailPage() {
                                   </p>
                                   {md.scheduled && (
                                     <p className="text-[11px] text-[#6B7280]">
-                                      {lang === 'es' ? 'Prog: ' : 'Sched: '}
+                                      {lang === 'es' ? 'Planificado: ' : 'Planned: '}
                                       {new Date(md.scheduled + 'T12:00').toLocaleDateString(lang === 'es' ? 'es' : 'en-US', { month: 'short', day: 'numeric' })}
                                     </p>
                                   )}
@@ -646,49 +646,62 @@ export default function JobDetailPage() {
                                 ) : (
                                   /* Not finished — show date pickers + notify button */
                                   <>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                      <div className="space-y-1">
-                                        <p className="text-[11px] text-[#6B7280] font-medium uppercase">
-                                          {lang === 'es' ? 'Fecha programada' : 'Scheduled date'}
+                                    <div className="space-y-4">
+                                      {/* Planned date (when you expect to do this stage) */}
+                                      <div className="space-y-2">
+                                        <p className="text-xs font-medium text-white">
+                                          {lang === 'es' ? 'Fecha planificada' : 'Planned date'}
                                         </p>
-                                        <div className="flex gap-1.5">
-                                          {/* filter:invert(1) makes the calendar picker icon visible on dark bg */}
+                                        <p className="text-[11px] text-[#6B7280] -mt-1">
+                                          {lang === 'es' ? 'Cuándo tenés previsto hacer esta etapa' : 'When you plan to do this stage'}
+                                        </p>
+                                        <div className="flex gap-2 items-center">
                                           <input
                                             type="date"
                                             defaultValue={md.scheduled || ''}
                                             onChange={(e) => setMilestoneDates(prev => ({
                                               ...prev, [s.key]: { ...prev[s.key], scheduled: e.target.value }
                                             }))}
-                                            className="flex-1 h-9 rounded-lg bg-[#0F1117] border border-[#2A2D35] px-2 text-white text-xs focus:outline-none focus:border-[#A8FF3E] transition-colors [color-scheme:dark]"
+                                            aria-label={lang === 'es' ? 'Fecha planificada' : 'Planned date'}
+                                            className="flex-1 min-h-[44px] rounded-lg bg-[#0F1117] border border-[#2A2D35] px-3 text-white text-sm focus:outline-none focus:border-[#A8FF3E] transition-colors [color-scheme:dark]"
                                             style={{ colorScheme: 'dark' }}
                                           />
                                           <button
+                                            type="button"
                                             onClick={() => saveMilestone(s.key, 'scheduled_date', md.scheduled || '', job.organization_id)}
                                             disabled={savingMilestone === s.key}
-                                            className="h-9 px-2.5 rounded-lg bg-[#A8FF3E] text-[#0F1117] text-xs font-bold disabled:opacity-50"
+                                            aria-label={lang === 'es' ? 'Guardar fecha planificada' : 'Save planned date'}
+                                            className="h-11 min-w-[44px] px-3 rounded-lg bg-[#A8FF3E] text-[#0F1117] text-sm font-bold disabled:opacity-50 shrink-0"
                                           >
                                             {savingMilestone === s.key ? '…' : '✓'}
                                           </button>
                                         </div>
                                       </div>
-                                      <div className="space-y-1">
-                                        <p className="text-[11px] text-[#6B7280] font-medium uppercase">
-                                          {lang === 'es' ? 'Fecha real' : 'Completion date'}
+                                      {/* Actual completion date (when you really finished) */}
+                                      <div className="space-y-2">
+                                        <p className="text-xs font-medium text-white">
+                                          {lang === 'es' ? 'Fecha real de finalización' : 'Actual completion date'}
                                         </p>
-                                        <div className="flex gap-1.5">
+                                        <p className="text-[11px] text-[#6B7280] -mt-1">
+                                          {lang === 'es' ? 'Cuándo se completó realmente esta etapa' : 'When this stage was actually completed'}
+                                        </p>
+                                        <div className="flex gap-2 items-center">
                                           <input
                                             type="date"
                                             defaultValue={md.completed || ''}
                                             onChange={(e) => setMilestoneDates(prev => ({
                                               ...prev, [s.key]: { ...prev[s.key], completed: e.target.value }
                                             }))}
-                                            className="flex-1 h-9 rounded-lg bg-[#0F1117] border border-[#2A2D35] px-2 text-white text-xs focus:outline-none focus:border-[#A8FF3E] transition-colors [color-scheme:dark]"
+                                            aria-label={lang === 'es' ? 'Fecha real de finalización' : 'Actual completion date'}
+                                            className="flex-1 min-h-[44px] rounded-lg bg-[#0F1117] border border-[#2A2D35] px-3 text-white text-sm focus:outline-none focus:border-[#A8FF3E] transition-colors [color-scheme:dark]"
                                             style={{ colorScheme: 'dark' }}
                                           />
                                           <button
+                                            type="button"
                                             onClick={() => saveMilestone(s.key, 'completed_date', md.completed || '', job.organization_id)}
                                             disabled={savingMilestone === s.key}
-                                            className="h-9 px-2.5 rounded-lg border border-[#2A2D35] text-[#6B7280] text-xs font-bold disabled:opacity-50 hover:bg-[#252830]"
+                                            aria-label={lang === 'es' ? 'Guardar fecha de finalización' : 'Save completion date'}
+                                            className="h-11 min-w-[44px] px-3 rounded-lg border border-[#2A2D35] text-[#6B7280] text-sm font-bold disabled:opacity-50 hover:bg-[#252830] shrink-0"
                                           >
                                             {savingMilestone === s.key ? '…' : '✓'}
                                           </button>
