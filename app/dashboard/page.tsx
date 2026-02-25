@@ -94,6 +94,7 @@ export default function DashboardPage() {
   const [milestonesToday, setMilestonesToday] = useState(0)
   const [loading, setLoading]             = useState(true)
   const [orgId, setOrgId]                 = useState<string | null>(null)
+  const [changeOrdersByJob, setChangeOrdersByJob] = useState<Record<string, { sent: number; verbal: number }>>({})
 
   const { t, lang } = useI18n()
   const { profile, canSeeFinancials } = useProfile()
@@ -124,7 +125,19 @@ export default function DashboardPage() {
         jobQuery = jobQuery.eq('user_id', user.id)
       }
       const { data } = await jobQuery
-      setJobs((data as Job[]) || [])
+      const jobList = (data as Job[]) || []
+      setJobs(jobList)
+      const jobIds = jobList.map((j) => j.id)
+      if (jobIds.length > 0) {
+        const { data: cos } = await supabase.from('change_orders').select('job_id,status').in('job_id', jobIds)
+        const map: Record<string, { sent: number; verbal: number }> = {}
+        ;(cos || []).forEach((c: { job_id: string; status: string }) => {
+          if (!map[c.job_id]) map[c.job_id] = { sent: 0, verbal: 0 }
+          if (c.status === 'sent') map[c.job_id].sent++
+          if (c.status === 'verbal') map[c.job_id].verbal++
+        })
+        setChangeOrdersByJob(map)
+      }
 
       if (oid) {
         const { count } = await supabase
@@ -182,13 +195,12 @@ export default function DashboardPage() {
   const totalActual = activeJobs.reduce((s, j) => s + Number(j.actual_total || 0), 0)
   const burnRatePct = totalBudget > 0 ? (totalActual / totalBudget) * 100 : 0
 
-  const marginValues = activeJobs
-    .filter((j) => Number(j.estimated_total) > 0)
-    .map((j) => {
-      const est = Number(j.estimated_total)
-      const act = Number(j.actual_total || 0)
-      return ((est - act) / est) * 100
-    })
+  const jobsWithRealCosts = activeJobs.filter((j) => Number(j.actual_total || 0) >= 1 && Number(j.estimated_total) > 0)
+  const marginValues = jobsWithRealCosts.map((j) => {
+    const est = Number(j.estimated_total)
+    const act = Number(j.actual_total || 0)
+    return ((est - act) / est) * 100
+  })
   const avgMargin = marginValues.length > 0
     ? marginValues.reduce((a, b) => a + b, 0) / marginValues.length
     : 0
@@ -314,10 +326,16 @@ export default function DashboardPage() {
           <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4">
             <Percent className="h-4 w-4 text-[#6B7280] mb-2" />
             <p className="text-xl font-bold tabular-nums text-white">
-              {canSeeFinancials ? `${avgMargin.toFixed(1)}%` : '—'}
+              {canSeeFinancials
+                ? (jobsWithRealCosts.length > 0 ? `${avgMargin.toFixed(1)}%` : '—')
+                : '—'}
             </p>
             <p className="text-[10px] text-[#6B7280] mt-1 leading-tight">
               {t('dashboard.avgMargin')}
+              {canSeeFinancials && jobsWithRealCosts.length > 0 && ` (${lang === 'es' ? 'basado en' : 'based on'} ${jobsWithRealCosts.length} ${lang === 'es' ? 'trabajos' : 'jobs'})`}
+              {canSeeFinancials && jobsWithRealCosts.length === 0 && (
+                <span className="block mt-0.5 text-[#6B7280]/80">{lang === 'es' ? 'Registrá gastos para ver' : 'Log expenses to track'}</span>
+              )}
             </p>
           </div>
         </div>
@@ -363,9 +381,17 @@ export default function DashboardPage() {
                 const stageIdx   = stageOrder.indexOf(job.workflow_stage)
                 const milestonePct = stageIdx >= 0 ? ((stageIdx + 1) / stageOrder.length) * 100 : 25
 
+                const pts = (job.payment_checkpoints as { id: string; checked: boolean }[] | null) || []
+                const finalChecked = pts.find((p: { id: string }) => p.id === 'final')?.checked ?? false
+                const showPaymentWarning = (job.workflow_stage === 'completed' || job.status === 'completed') && !finalChecked
+                const coInfo = changeOrdersByJob[job.id] || { sent: 0, verbal: 0 }
+
                 return (
                   <Link key={job.id} href={`/jobs/${job.id}`}>
-                    <div className={`bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4 hover:border-[#3A3D45] transition-colors ${borderClass(job.status)}`}>
+                    <div className={`relative bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4 hover:border-[#3A3D45] transition-colors ${borderClass(job.status)}`}>
+                      {showPaymentWarning && (
+                        <div className="absolute top-3 right-3 w-2.5 h-2.5 rounded-full bg-red-500" title={lang === 'es' ? 'Pago final no confirmado' : 'Final payment not confirmed'} />
+                      )}
                       <div className="flex items-start justify-between gap-2 mb-3">
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-white truncate text-sm">{job.client_name}</p>
@@ -400,10 +426,20 @@ export default function DashboardPage() {
                         )}
                       </div>
 
-                      <div className="mt-2">
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
                         <span className={statusDotClass(job.status)}>
                           {lang === 'es' ? STATUS_CONFIG[job.status]?.label_es : STATUS_CONFIG[job.status]?.label_en}
                         </span>
+                        {coInfo.sent > 0 && (
+                          <span className="text-[10px] text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded">
+                            {coInfo.sent} {lang === 'es' ? 'CO pend.' : 'CO awaiting'}
+                          </span>
+                        )}
+                        {coInfo.verbal > 0 && (
+                          <span className="text-[10px] text-orange-400 bg-orange-400/10 px-1.5 py-0.5 rounded">
+                            {coInfo.verbal} {lang === 'es' ? 'sin notif.' : 'not notified'}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </Link>
@@ -445,9 +481,15 @@ export default function DashboardPage() {
               <div className="space-y-2">
                 {recentJobs.map((job) => {
                   const sc = STATUS_CONFIG[job.status]
+                  const pts = (job.payment_checkpoints as { id: string; checked: boolean }[] | null) || []
+                  const finalChecked = pts.find((p: { id: string }) => p.id === 'final')?.checked ?? false
+                  const showPaymentWarning = (job.workflow_stage === 'completed' || job.status === 'completed') && !finalChecked
                   return (
                     <Link key={job.id} href={`/jobs/${job.id}`}>
-                      <div className={`bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4 flex items-center justify-between hover:border-[#3A3D45] transition-colors ${borderClass(job.status)}`}>
+                      <div className={`relative bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4 flex items-center justify-between hover:border-[#3A3D45] transition-colors ${borderClass(job.status)}`}>
+                        {showPaymentWarning && (
+                          <div className="absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-red-500" title={lang === 'es' ? 'Pago final no confirmado' : 'Final payment not confirmed'} />
+                        )}
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-white truncate">{job.client_name}</p>
                           <p className="text-xs text-[#6B7280] truncate mt-0.5">{job.client_address}</p>

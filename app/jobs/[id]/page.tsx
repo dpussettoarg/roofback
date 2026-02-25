@@ -13,14 +13,15 @@ import {
   ShieldCheck, CalendarCheck, Lock, HardHat, CalendarDays,
   MessageSquare, Package, TrendingUp, TrendingDown, AlertCircle,
   Smartphone, MessageCircle, ChevronDown, ChevronUp,
-  ClipboardList, Wrench, HardDriveDownload, Flag, BookOpen,
+  ClipboardList, Wrench, HardDriveDownload, Flag, BookOpen, DollarSign, FileEdit, Plus,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { JOB_TYPE_OPTIONS, ROOF_TYPE_OPTIONS } from '@/lib/templates'
 import { formatJobNumber } from '@/lib/types'
 import { useProfile } from '@/lib/hooks/useProfile'
 import { usePermissions } from '@/lib/hooks/usePermissions'
-import type { Job } from '@/lib/types'
+import type { Job, PaymentCheckpoint, ChangeOrder } from '@/lib/types'
+import { ChangeOrderModal } from '@/components/app/change-order-modal'
 
 function formatMoney(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
@@ -77,10 +78,18 @@ export default function JobDetailPage() {
   const [actualOther, setActualOther] = useState(0)
   const [checklistTotal, setChecklistTotal] = useState(0)
   const [checklistDone, setChecklistDone] = useState(0)
+  const [paymentCheckpoints, setPaymentCheckpoints] = useState<PaymentCheckpoint[]>([
+    { id: 'deposit', checked: false, date: null },
+    { id: 'progress', checked: false, date: null },
+    { id: 'final', checked: false, date: null },
+  ])
+  const [savingPaymentCheckpoint, setSavingPaymentCheckpoint] = useState<string | null>(null)
+  const [changeOrders, setChangeOrders] = useState<ChangeOrder[]>([])
+  const [showChangeOrderModal, setShowChangeOrderModal] = useState(false)
 
   const router = useRouter()
+  const { profile } = useProfile()
   const { lang } = useI18n()
-  useProfile() // ensures profile/org context for RLS
   const { canSeeProfit, canSeeContractTotal } = usePermissions()
   const supabase = createClient()
 
@@ -124,7 +133,17 @@ export default function JobDetailPage() {
       setJob(j)
       setClientEmail(j?.client_email || '')
       setStartDate(j?.start_date || '')
+      const defaults: PaymentCheckpoint[] = [
+        { id: 'deposit', checked: false, date: null },
+        { id: 'progress', checked: false, date: null },
+        { id: 'final', checked: false, date: null },
+      ]
+      const pts = (j?.payment_checkpoints as PaymentCheckpoint[] | null) || defaults
+      setPaymentCheckpoints(Array.isArray(pts) && pts.length === 3 ? pts : defaults)
       loadFinancials(j)
+
+      const { data: cos } = await supabase.from('change_orders').select('*').eq('job_id', id).order('created_at', { ascending: false })
+      setChangeOrders((cos as ChangeOrder[]) || [])
 
       const { data: milestones } = await supabase
         .from('job_milestones')
@@ -177,6 +196,28 @@ export default function JobDetailPage() {
       toast.error(err instanceof Error ? err.message : 'Error')
     } finally {
       setSavingMilestone(null)
+    }
+  }
+
+  async function togglePaymentCheckpoint(cpId: PaymentCheckpoint['id']) {
+    setSavingPaymentCheckpoint(cpId)
+    try {
+      const next = paymentCheckpoints.map((cp) =>
+        cp.id === cpId
+          ? { ...cp, checked: !cp.checked, date: !cp.checked ? new Date().toISOString() : null }
+          : cp
+      )
+      const { error } = await supabase.from('jobs').update({
+        payment_checkpoints: next,
+        updated_at: new Date().toISOString(),
+      }).eq('id', id)
+      if (error) throw error
+      setPaymentCheckpoints(next)
+      toast.success(lang === 'es' ? 'Guardado' : 'Saved')
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Error')
+    } finally {
+      setSavingPaymentCheckpoint(null)
     }
   }
 
@@ -303,8 +344,17 @@ export default function JobDetailPage() {
 
   const totalBudget = budgetMat + budgetLabor + budgetOther
   const totalActual = actualMat + actualLabor + actualOther
-  const liveProfit = Number(job.estimated_total) - totalActual
-  const liveProfitPct = Number(job.estimated_total) > 0 ? (liveProfit / Number(job.estimated_total)) * 100 : 0
+  const originalTotal = Number(job.estimated_total) || 0
+  const effectiveContractTotal = originalTotal + changeOrders
+    .filter((co) => co.status === 'approved' || co.status === 'verbal')
+    .reduce((s, co) => s + Number(co.amount), 0)
+  const liveProfit = effectiveContractTotal - totalActual
+  const liveProfitPct = effectiveContractTotal > 0 ? (liveProfit / effectiveContractTotal) * 100 : 0
+
+  const sentCount = changeOrders.filter((co) => co.status === 'sent').length
+  const verbalCount = changeOrders.filter((co) => co.status === 'verbal').length
+  const approvedCount = changeOrders.filter((co) => co.status === 'approved').length
+  const allApproved = changeOrders.length > 0 && changeOrders.every((co) => co.status === 'approved')
 
   return (
     <div className="min-h-screen bg-[#0F1117] pb-24">
@@ -324,7 +374,7 @@ export default function JobDetailPage() {
               )}
               <h1 className="text-[26px] font-bold text-white leading-tight truncate">{job.client_name}</h1>
             </div>
-            <div className="flex items-center gap-2 mt-1.5">
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
               {isApproved ? (
                 <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#A8FF3E] bg-[#A8FF3E]/10 px-2 py-0.5 rounded-full">
                   <HardHat className="h-3 w-3" />
@@ -335,12 +385,31 @@ export default function JobDetailPage() {
                   {lang === 'es' ? 'Lead / Pendiente' : 'Lead / Pending'}
                 </span>
               )}
+              {sentCount > 0 && (
+                <span className="text-xs font-medium text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full">
+                  {sentCount} {lang === 'es' ? 'orden(es) pendiente(s)' : 'change order(s) awaiting approval'}
+                </span>
+              )}
+              {verbalCount > 0 && (
+                <span className="text-xs font-medium text-orange-400 bg-orange-400/10 px-2 py-0.5 rounded-full">
+                  {verbalCount} {lang === 'es' ? 'sin notificar' : '— client not notified'}
+                </span>
+              )}
+              {allApproved && (
+                <span className="text-xs font-medium text-[#A8FF3E]/80 bg-[#A8FF3E]/5 px-2 py-0.5 rounded-full">
+                  {lang === 'es' ? 'Todas aprobadas' : 'All change orders approved'}
+                </span>
+              )}
             </div>
           </div>
-          {canSeeContractTotal && Number(job.estimated_total) > 0 && (
-            <p className="text-xl font-bold text-white tabular-nums ml-3">
-              {formatMoney(Number(job.estimated_total))}
-            </p>
+          {canSeeContractTotal && effectiveContractTotal > 0 && (
+            <div className="text-right ml-3">
+              <p className="text-xl font-bold text-white tabular-nums">
+                {changeOrders.filter((c) => c.status === 'approved' || c.status === 'verbal').length > 0
+                  ? `${formatMoney(originalTotal)} + ${formatMoney(effectiveContractTotal - originalTotal)} = ${formatMoney(effectiveContractTotal)}`
+                  : formatMoney(originalTotal)}
+              </p>
+            </div>
           )}
         </div>
       </div>
@@ -787,6 +856,81 @@ export default function JobDetailPage() {
               )
             })()}
 
+            {/* Payment Checklist — 3 fixed checkpoints */}
+            <div className="flex flex-wrap items-center gap-2 py-3 px-4 rounded-xl bg-[#1E2228] border border-[#2A2D35]">
+              <DollarSign className="h-4 w-4 text-[#A8FF3E] flex-shrink-0" />
+              {[
+                { id: 'deposit' as const, label_es: 'Depósito', label_en: 'Deposit' },
+                { id: 'progress' as const, label_es: 'Progreso', label_en: 'Progress Payment' },
+                { id: 'final' as const, label_es: 'Final', label_en: 'Final Payment' },
+              ].map(({ id: cpId, label_es, label_en }) => {
+                const cp = paymentCheckpoints.find((p) => p.id === cpId)
+                const checked = cp?.checked ?? false
+                const date = cp?.date ? new Date(cp.date) : null
+                return (
+                  <button
+                    key={cpId}
+                    onClick={() => togglePaymentCheckpoint(cpId)}
+                    disabled={savingPaymentCheckpoint === cpId}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                      checked
+                        ? 'bg-[#A8FF3E]/20 text-[#A8FF3E] border border-[#A8FF3E]/40'
+                        : 'bg-[#0F1117] text-[#6B7280] border border-[#2A2D35] hover:border-[#3A3D45]'
+                    }`}
+                  >
+                    {checked ? <CheckCircle className="h-3.5 w-3.5" /> : <span className="w-3.5 h-3.5 rounded-full border-2 border-current opacity-60" />}
+                    <span>{lang === 'es' ? label_es : label_en}</span>
+                    {checked && date && (
+                      <span className="text-[10px] opacity-80">· {date.toLocaleDateString(lang === 'es' ? 'es' : 'en-US', { month: 'short', day: 'numeric' })}</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Red banner when job finished + final payment not confirmed */}
+            {job.workflow_stage === 'completed' && !paymentCheckpoints.find((p) => p.id === 'final')?.checked && (
+              <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400">
+                <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                <span className="text-sm font-semibold">
+                  {lang === 'es' ? 'Pago final no confirmado' : 'Final payment not confirmed'}
+                </span>
+              </div>
+            )}
+
+            {/* Change Orders */}
+            <div className="bg-[#1E2228] rounded-[12px] border border-[#2A2D35] overflow-hidden">
+              <div className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileEdit className="h-5 w-5 text-[#A8FF3E]" />
+                  <h3 className="text-sm font-bold text-white">{lang === 'es' ? 'Órdenes de Cambio' : 'Change Orders'}</h3>
+                </div>
+                <button onClick={() => setShowChangeOrderModal(true)} className="flex items-center gap-1.5 text-xs font-semibold text-[#A8FF3E] hover:underline">
+                  <Plus className="h-3.5 w-3.5" /> {lang === 'es' ? 'Nueva' : 'New'}
+                </button>
+              </div>
+              {changeOrders.length > 0 ? (
+                <div className="border-t border-[#2A2D35] divide-y divide-[#2A2D35]">
+                  {changeOrders.map((co) => (
+                    <div key={co.id} className="px-4 py-3 flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-white truncate">{co.description}</p>
+                        <p className={`text-xs ${co.status === 'rejected' ? 'text-red-400 line-through' : 'text-[#6B7280]'}`}>
+                          {formatMoney(Number(co.amount))}
+                          {co.status === 'sent' && ` · ${lang === 'es' ? 'Pendiente' : 'Awaiting approval'}`}
+                          {co.status === 'verbal' && ` · ${lang === 'es' ? 'Sin notificar' : 'Client not notified'}`}
+                          {co.status === 'approved' && ` · ${lang === 'es' ? 'Aprobado' : 'Approved'}`}
+                          {co.status === 'rejected' && ` · ${lang === 'es' ? 'Rechazado' : 'Rejected'}`}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="px-4 pb-4 text-xs text-[#6B7280]">{lang === 'es' ? 'Sin órdenes de cambio' : 'No change orders'}</p>
+              )}
+            </div>
+
             {/* Material checklist summary */}
             <Link href={`/jobs/${id}/checklist`}>
               <div className="bg-[#1E2228] rounded-[12px] border border-[#2A2D35] p-4 flex items-center gap-4 hover:bg-[#252830] transition-all cursor-pointer">
@@ -812,7 +956,7 @@ export default function JobDetailPage() {
               </div>
             </Link>
 
-            {/* Budget vs Actual Tracker — all roles see costs, only owners see profit row */}
+            {/* Budget vs Actual — use effective contract (incl change orders) for margin */}
             <div className="bg-[#1E2228] rounded-[12px] overflow-hidden border border-[#2A2D35]">
               <div className="h-1 bg-[#A8FF3E]" />
               <div className="p-4 space-y-4">
@@ -826,33 +970,63 @@ export default function JobDetailPage() {
                   </Link>
                 </div>
 
-                {totalBudget > 0 ? (
+                {totalBudget > 0 || totalActual > 0 ? (
                   <>
-                    <BudgetBar label={lang === 'es' ? 'Materiales' : 'Materials'} budgeted={budgetMat} actual={actualMat} />
-                    <BudgetBar label={lang === 'es' ? 'Mano de obra' : 'Labor'} budgeted={budgetLabor} actual={actualLabor} />
-                    {(budgetOther > 0 || actualOther > 0) && (
-                      <BudgetBar label={lang === 'es' ? 'Otros gastos' : 'Other expenses'} budgeted={budgetOther} actual={actualOther} />
-                    )}
-
                     {canSeeProfit && (
-                      <div className="pt-2 border-t border-[#2A2D35] space-y-1.5">
-                        {liveProfit < 0 && totalActual > 0 && (
-                          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/20">
-                            <TrendingDown className="h-3.5 w-3.5 text-red-400 flex-shrink-0" />
-                            <span className="text-[11px] font-bold text-red-400">
-                              {lang === 'es' ? 'PÉRDIDA — gastos superan el precio del contrato' : 'LOSS — expenses exceed contract price'}
-                            </span>
-                          </div>
-                        )}
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-[#6B7280]">{lang === 'es' ? 'Ganancia proyectada' : 'Projected profit'}</span>
-                          <div className={`flex items-center gap-1 text-sm font-bold tabular-nums ${liveProfit >= 0 ? 'text-[#A8FF3E]' : 'text-red-400'}`}>
-                            {liveProfit >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-                            {formatMoney(Math.abs(liveProfit))}
-                            <span className="text-xs font-normal">({liveProfitPct.toFixed(0)}%)</span>
-                          </div>
+                      <>
+                        <div className="flex justify-between items-center py-2 border-b border-[#2A2D35]">
+                          <span className="text-xs text-[#6B7280]">{lang === 'es' ? 'Valor del contrato' : 'Contract value'}</span>
+                          <span className="text-sm font-bold text-white tabular-nums">{formatMoney(effectiveContractTotal)}</span>
                         </div>
-                      </div>
+                        <BudgetBar label={lang === 'es' ? 'Materiales registrados' : 'Materials logged'} budgeted={budgetMat} actual={actualMat} />
+                        <BudgetBar label={lang === 'es' ? 'Mano de obra registrada' : 'Labor logged'} budgeted={budgetLabor} actual={actualLabor} />
+                        {(budgetOther > 0 || actualOther > 0) && (
+                          <BudgetBar label={lang === 'es' ? 'Otros gastos' : 'Other expenses'} budgeted={budgetOther} actual={actualOther} />
+                        )}
+                        <div className="flex justify-between items-center py-2 border-t border-[#2A2D35]">
+                          <span className="text-xs text-[#6B7280]">{lang === 'es' ? 'Costos totales' : 'Total costs'}</span>
+                          <span className="text-sm font-bold text-white tabular-nums">{formatMoney(totalActual)}</span>
+                        </div>
+                        {(() => {
+                          const thHigh = Number(profile?.margin_threshold_high) || 40
+                          const thLow = Number(profile?.margin_threshold_low) || 25
+                          const marginColor = liveProfitPct >= thHigh ? 'text-[#A8FF3E]' : liveProfitPct >= thLow ? 'text-amber-400' : 'text-red-400'
+                          return (
+                            <div className="pt-3 space-y-1">
+                              {liveProfit < 0 && totalActual > 0 && (
+                                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/20">
+                                  <TrendingDown className="h-3.5 w-3.5 text-red-400 flex-shrink-0" />
+                                  <span className="text-[11px] font-bold text-red-400">
+                                    {lang === 'es' ? 'PÉRDIDA — gastos superan el precio del contrato' : 'LOSS — expenses exceed contract price'}
+                                  </span>
+                                </div>
+                              )}
+                              <div className="flex justify-between items-baseline">
+                                <span className="text-xs text-[#6B7280]">{lang === 'es' ? 'Margen real' : 'Real margin'}</span>
+                                <div className={`flex items-center gap-1 text-lg font-bold tabular-nums ${marginColor}`}>
+                                  <TrendingUp className="h-4 w-4" />
+                                  {liveProfitPct.toFixed(1)}%
+                                </div>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-[10px] text-[#6B7280]">{lang === 'es' ? 'Proyectado (estimado)' : 'Projected (estimate)'}</span>
+                                <span className="text-xs text-[#6B7280] tabular-nums">
+                                  {((totalBudget > 0 ? (effectiveContractTotal - totalBudget) / effectiveContractTotal : 0) * 100).toFixed(1)}%
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        })()}
+                      </>
+                    )}
+                    {!canSeeProfit && (
+                      <>
+                        <BudgetBar label={lang === 'es' ? 'Materiales' : 'Materials'} budgeted={budgetMat} actual={actualMat} />
+                        <BudgetBar label={lang === 'es' ? 'Mano de obra' : 'Labor'} budgeted={budgetLabor} actual={actualLabor} />
+                        {(budgetOther > 0 || actualOther > 0) && (
+                          <BudgetBar label={lang === 'es' ? 'Otros gastos' : 'Other expenses'} budgeted={budgetOther} actual={actualOther} />
+                        )}
+                      </>
                     )}
                   </>
                 ) : (
@@ -992,6 +1166,18 @@ export default function JobDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Change Order modal */}
+      {showChangeOrderModal && job && (
+        <ChangeOrderModal
+          job={{ id: job.id, client_name: job.client_name, client_phone: job.client_phone || '', client_email: job.client_email || '', client_address: job.client_address || '' }}
+          originalTotal={originalTotal}
+          companyName={profile?.company_name || ''}
+          lang={lang}
+          onClose={() => setShowChangeOrderModal(false)}
+          onSaved={(co) => { setChangeOrders((prev) => [co, ...prev]); setShowChangeOrderModal(false) }}
+        />
       )}
 
       <AppHeader />

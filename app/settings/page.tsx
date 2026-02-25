@@ -300,6 +300,8 @@ export default function SettingsPage() {
           default_hourly_rate: profile.default_hourly_rate,
           default_overhead_pct: profile.default_overhead_pct,
           default_margin_pct: profile.default_margin_pct,
+          margin_threshold_high: profile.margin_threshold_high ?? 40,
+          margin_threshold_low: profile.margin_threshold_low ?? 25,
           language: lang,
           language_preference: lang,
           updated_at: new Date().toISOString(),
@@ -618,6 +620,33 @@ export default function SettingsPage() {
                 value={profile.default_margin_pct || 20}
                 onChange={(e) => update('default_margin_pct', parseFloat(e.target.value) || 0)}
                 className="input-dark h-12 rounded-lg bg-[#16191F] border-[#2A2D35] text-white placeholder:text-[#3A3F4B] focus:border-[#A8FF3E] focus:ring-[#A8FF3E]/20"
+              />
+            </div>
+          </div>
+          <p className="text-[11px] text-[#6B7280] mt-3">
+            {lang === 'es' ? 'Umbrales de margen para colores (verde/ámbar/rojo):' : 'Margin health thresholds (green/amber/red):'}
+          </p>
+          <div className="grid grid-cols-2 gap-3 mt-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-[#6B7280]">{lang === 'es' ? 'Verde (>)' : 'Green (>)'} %</Label>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                value={profile.margin_threshold_high ?? 40}
+                onChange={(e) => update('margin_threshold_high', parseFloat(e.target.value) || 40)}
+                className="input-dark h-10 rounded-lg bg-[#16191F] border-[#2A2D35] text-white"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-[#6B7280]">{lang === 'es' ? 'Ámbar (≥)' : 'Amber (≥)'} %</Label>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                value={profile.margin_threshold_low ?? 25}
+                onChange={(e) => update('margin_threshold_low', parseFloat(e.target.value) || 25)}
+                className="input-dark h-10 rounded-lg bg-[#16191F] border-[#2A2D35] text-white"
               />
             </div>
           </div>

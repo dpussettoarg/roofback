@@ -52,6 +52,8 @@ export interface Profile {
   stripe_subscription_id?: string | null
   price_id?: string | null
   subscription_price_id?: string | null
+  margin_threshold_high?: number | null
+  margin_threshold_low?: number | null
 }
 
 export interface Job {
@@ -100,6 +102,26 @@ export interface Job {
   simple_materials_budget: number
   simple_labor_budget: number
   simple_other_budget: number
+  // Payment checklist (3 fixed checkpoints)
+  payment_checkpoints?: PaymentCheckpoint[]
+}
+
+export interface PaymentCheckpoint {
+  id: 'deposit' | 'progress' | 'final'
+  checked: boolean
+  date: string | null
+}
+
+export interface ChangeOrder {
+  id: string
+  job_id: string
+  description: string
+  amount: number
+  reason: string
+  internal_note: string
+  status: 'sent' | 'approved' | 'verbal' | 'rejected'
+  created_at: string
+  updated_at: string
 }
 
 export type JobType = 'repair' | 'reroof' | 'new_roof' | 'gutters' | 'waterproofing' | 'other'
