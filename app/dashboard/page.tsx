@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useI18n } from '@/lib/i18n/context'
 import { MobileNav } from '@/components/app/mobile-nav'
@@ -100,6 +101,7 @@ export default function DashboardPage() {
   const { profile, canSeeFinancials } = useProfile()
   const canSeeProfit = canSeeFinancials
   const supabase = createClient()
+  const router = useRouter()
 
   // ── Initial load ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -109,9 +111,14 @@ export default function DashboardPage() {
 
       const { data: prof } = await supabase
         .from('profiles')
-        .select('full_name, company_name, organization_id, role')
+        .select('full_name, company_name, organization_id, role, onboarding_completed')
         .eq('id', user.id)
         .single()
+
+      if (prof && (prof as { onboarding_completed?: boolean }).onboarding_completed === false) {
+        router.replace('/onboarding')
+        return
+      }
 
       setProfileName(prof?.full_name || user.email?.split('@')[0] || '')
       setCompanyName(prof?.company_name || '')

@@ -54,6 +54,8 @@ export interface Profile {
   subscription_price_id?: string | null
   margin_threshold_high?: number | null
   margin_threshold_low?: number | null
+  onboarding_completed?: boolean | null
+  default_proposal_language?: string | null
 }
 
 export interface Job {
