@@ -109,7 +109,7 @@ export function TemplateSelector({ open, lang, squareFootage = 1000, onSelect, o
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl text-[#4B5563] hover:text-white hover:bg-[#2A2D35] transition-colors">
+          <button onClick={onClose} className="p-2 rounded-xl text-[#4B5563] hover:text-white hover:bg-[#2A2D35] transition-colors" aria-label="Close">
             <X className="h-4 w-4" />
           </button>
         </div>

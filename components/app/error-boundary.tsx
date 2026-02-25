@@ -2,6 +2,7 @@
 
 import { Component, ReactNode } from 'react'
 import { AlertTriangle } from 'lucide-react'
+import { logger } from '@/lib/logger'
 
 interface Props {
   children: ReactNode
@@ -34,7 +35,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: { componentStack: string }) {
-    console.error('[ErrorBoundary] Caught error:', error.message, info.componentStack)
+    logger.error('[ErrorBoundary] Caught error:', error.message, info.componentStack)
   }
 
   render() {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { logger } from '@/lib/logger'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
 
@@ -48,11 +49,19 @@ interface RequestBody {
 
 export async function POST(req: NextRequest) {
   try {
-    // ── AUTHENTICATION (was missing — critical vulnerability fixed) ───────────
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return NextResponse.json(
+        { error: 'Server configuration error. Supabase credentials must be set.' },
+        { status: 500 }
+      )
+    }
+
     const cookieStore = await cookies()
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      supabaseUrl,
+      supabaseAnonKey,
       {
         cookies: {
           getAll: () => cookieStore.getAll(),
@@ -122,7 +131,7 @@ export async function POST(req: NextRequest) {
 
       if (!res.ok) {
         const err = await res.text()
-        console.error('[improve-description] Anthropic error:', err)
+        logger.error('[improve-description] Anthropic error:', err)
         return NextResponse.json(
           { improved: enhanceWithTemplate(description, jobType, roofType, sqft, language) },
           { status: 200 }
@@ -141,7 +150,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ improved, source: 'template' })
 
   } catch (error) {
-    console.error('[improve-description] Error:', error)
+    logger.error('[improve-description] Error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

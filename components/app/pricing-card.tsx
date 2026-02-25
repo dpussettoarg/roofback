@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { createCheckoutSession } from '@/app/actions/stripe'
+import { logger } from '@/lib/logger'
 import { Loader2, Check } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -51,7 +52,7 @@ export function PricingCard({
       }
       toast.error(lang === 'es' ? 'No se pudo crear la sesión' : 'Could not create session')
     } catch (err) {
-      console.error('Checkout error:', err)
+      logger.error('Checkout error:', err)
       toast.error(err instanceof Error ? err.message : (lang === 'es' ? 'Error al procesar' : 'Checkout failed'))
     } finally {
       setLoading(false)

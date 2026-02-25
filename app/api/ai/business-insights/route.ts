@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { logger } from '@/lib/logger'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
 
@@ -155,10 +156,19 @@ function fallbackInsights(context: BusinessInsightsResponse['context'], lang: st
 
 export async function POST(req: NextRequest) {
   try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return NextResponse.json(
+        { error: 'Server configuration error. Supabase credentials must be set.' },
+        { status: 500 }
+      )
+    }
+
     const cookieStore = await cookies()
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      supabaseUrl,
+      supabaseAnonKey,
       {
         cookies: {
           getAll: () => cookieStore.getAll(),
@@ -393,7 +403,7 @@ Identify bottlenecks, cost overrun risks, or schedule delays. Return exactly thi
     } satisfies BusinessInsightsResponse)
 
   } catch (err: unknown) {
-    console.error('[business-insights]', err)
+    logger.error('[business-insights]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

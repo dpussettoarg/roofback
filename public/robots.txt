@@ -1,0 +1,18 @@
+# RoofBack - Production robots.txt
+# https://roofback.app (update if using custom domain)
+
+User-agent: *
+Allow: /
+Allow: /proposal/
+Allow: /login
+Allow: /signup
+
+Disallow: /dashboard
+Disallow: /jobs
+Disallow: /settings
+Disallow: /api
+Disallow: /customers
+Disallow: /debug
+
+# Sitemap (update domain if using custom)
+Sitemap: https://roofback.app/sitemap.xml

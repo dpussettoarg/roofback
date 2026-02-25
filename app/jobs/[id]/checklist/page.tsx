@@ -12,6 +12,7 @@ import {
   Plus, Trash2, BookOpen, X, Package, Layers,
 } from 'lucide-react'
 import { TemplateSelector, type JobTemplate, type JobTemplateMaterial } from '@/components/app/template-selector'
+import { ErrorBoundary } from '@/components/app/error-boundary'
 import { toast } from 'sonner'
 import type { Job, MaterialChecklist, EstimateItem } from '@/lib/types'
 
@@ -241,15 +242,20 @@ export default function ChecklistPage() {
     }
   }
 
+  const errFallback = <div className="min-h-screen bg-[#0F1117] flex items-center justify-center p-6"><p className="text-[#6B7280]">Something went wrong. Refresh to retry.</p></div>
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#0F1117]">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#2A2D35] border-t-[#A8FF3E]" />
-      </div>
+      <ErrorBoundary fallback={errFallback}>
+        <div className="flex items-center justify-center min-h-screen bg-[#0F1117]">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#2A2D35] border-t-[#A8FF3E]" />
+        </div>
+      </ErrorBoundary>
     )
   }
 
   return (
+    <ErrorBoundary fallback={errFallback}>
     <div className="min-h-screen bg-[#0F1117] pb-24">
       {/* Header */}
       <div className="border-b border-[#2A2D35] px-4 pt-12 pb-4 max-w-2xl mx-auto">
@@ -539,5 +545,6 @@ export default function ChecklistPage() {
 
       <MobileNav />
     </div>
+    </ErrorBoundary>
   )
 }

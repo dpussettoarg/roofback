@@ -23,6 +23,8 @@ import { pdf } from '@react-pdf/renderer'
 import { EstimatePDF } from '@/components/pdf/estimate-pdf'
 import { ImageUploader } from '@/components/app/image-uploader'
 import { TemplateSelector, type JobTemplate, type JobTemplateMaterial } from '@/components/app/template-selector'
+import { ErrorBoundary } from '@/components/app/error-boundary'
+import { logger } from '@/lib/logger'
 
 function formatMoney(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(n)
@@ -535,7 +537,7 @@ export default function EstimatePage() {
       }
     } catch (err: unknown) {
       const detail = err instanceof Error ? err.message : String(err)
-      console.error('[PDF generation] error:', detail, err)
+      logger.error('[PDF generation] error:', detail, err)
       toast.error(
         lang === 'es'
           ? `Error generando PDF: ${detail}`
@@ -546,18 +548,23 @@ export default function EstimatePage() {
     }
   }
 
+  const errFallback = <div className="min-h-screen bg-[#0F1117] flex items-center justify-center p-6"><p className="text-[#6B7280]">Something went wrong. Refresh to retry.</p></div>
+
   // --- Loading state ---
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#0F1117]">
-        <div className="w-8 h-8 rounded-full border-2 border-[#2A2D35] border-t-[#A8FF3E] animate-spin" />
-      </div>
+      <ErrorBoundary fallback={errFallback}>
+        <div className="flex items-center justify-center min-h-screen bg-[#0F1117]">
+          <div className="w-8 h-8 rounded-full border-2 border-[#2A2D35] border-t-[#A8FF3E] animate-spin" />
+        </div>
+      </ErrorBoundary>
     )
   }
 
   // --- Locked / Read-only view (approved quote) ---
   if (job?.client_status === 'approved' || !!job?.approved_at) {
     return (
+      <ErrorBoundary fallback={errFallback}>
       <div className="min-h-screen bg-[#0F1117] pb-24 font-[Inter,sans-serif]">
         <div className="bg-[#0F1117] border-b border-[#2A2D35] px-4 sm:px-6 lg:px-8 pt-12 pb-4">
           <div className="w-full max-w-7xl mx-auto">
@@ -687,6 +694,7 @@ export default function EstimatePage() {
           input[type="date"]::-webkit-calendar-picker-indicator { filter:invert(1); }
         `}</style>
       </div>
+      </ErrorBoundary>
     )
   }
 
@@ -789,6 +797,7 @@ export default function EstimatePage() {
   }
 
   return (
+    <ErrorBoundary fallback={errFallback}>
     <div className="min-h-screen bg-[#0F1117] pb-28 font-[Inter,sans-serif]">
       {/* ===== HEADER ===== */}
       <div className="bg-[#0F1117] border-b border-[#2A2D35] px-4 sm:px-6 lg:px-8 pt-12 pb-4">
@@ -1473,5 +1482,6 @@ export default function EstimatePage() {
         }
       `}</style>
     </div>
+    </ErrorBoundary>
   )
 }

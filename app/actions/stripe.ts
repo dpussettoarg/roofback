@@ -1,6 +1,7 @@
 'use server'
 
 import { stripe } from '@/lib/stripe'
+import { logger } from '@/lib/logger'
 import { createClient } from '@/lib/supabase/server'
 import { getURL } from '@/lib/utils'
 
@@ -54,7 +55,7 @@ export async function createCheckoutSession(
     }
     return { url: null, error: 'Failed to create checkout session' }
   } catch (err) {
-    console.error('Stripe checkout error:', err)
+    logger.error('Stripe checkout error:', err)
     const msg = err instanceof Error ? err.message : 'Checkout failed'
     return { url: null, error: msg }
   }

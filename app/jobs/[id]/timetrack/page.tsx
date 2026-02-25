@@ -20,6 +20,7 @@ import type { Job, TimeEntry, Expense, ActivityLog } from '@/lib/types'
 import { format } from 'date-fns'
 import Image from 'next/image'
 import { ImageUploader } from '@/components/app/image-uploader'
+import { ErrorBoundary } from '@/components/app/error-boundary'
 
 function formatMoney(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(n)
@@ -254,15 +255,20 @@ export default function TimeTrackPage() {
     }
   }
 
+  const errFallback = <div className="min-h-screen bg-[#0F1117] flex items-center justify-center p-6"><p className="text-[#6B7280]">Something went wrong. Refresh to retry.</p></div>
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#0F1117]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#2A2D35] border-t-[#A8FF3E]" />
-      </div>
+      <ErrorBoundary fallback={errFallback}>
+        <div className="flex items-center justify-center min-h-screen bg-[#0F1117]">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#2A2D35] border-t-[#A8FF3E]" />
+        </div>
+      </ErrorBoundary>
     )
   }
 
   return (
+    <ErrorBoundary fallback={errFallback}>
     <div className="min-h-screen bg-[#0F1117] pb-24">
       <div className="mx-auto max-w-[430px]">
         {/* Header */}
@@ -550,5 +556,6 @@ export default function TimeTrackPage() {
 
       <MobileNav />
     </div>
+    </ErrorBoundary>
   )
 }

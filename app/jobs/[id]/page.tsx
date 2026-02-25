@@ -926,7 +926,7 @@ export default function JobDetailPage() {
               {getProposalUrl() ? (
                 <div className="flex gap-2">
                   <input readOnly value={getProposalUrl()!} className="flex-1 h-10 rounded-[8px] bg-[#0F1117] border border-[#2A2D35] px-3 text-xs text-[#A8FF3E] focus:outline-none" />
-                  <button onClick={handleCopyLink} className="h-10 px-3 rounded-[8px] border border-[#2A2D35] bg-transparent text-[#6B7280] hover:bg-[#252830]"><Copy className="h-3.5 w-3.5" /></button>
+                  <button onClick={handleCopyLink} className="h-10 px-3 rounded-[8px] border border-[#2A2D35] bg-transparent text-[#6B7280] hover:bg-[#252830]" aria-label={lang === 'es' ? 'Copiar enlace' : 'Copy link'}><Copy className="h-3.5 w-3.5" /></button>
                 </div>
               ) : (
                 <p className="text-xs text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-[8px] px-3 py-2">

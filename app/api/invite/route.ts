@@ -1,6 +1,13 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { logger } from '@/lib/logger'
+
+const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
+
+function isValidEmail(email: string): boolean {
+  return EMAIL_REGEX.test((email || '').trim()) && email.length <= 254
+}
 
 function getBase() {
   const host = process.env.NEXT_PUBLIC_SITE_URL || 'https://roofback.app'
@@ -94,10 +101,19 @@ function inviteEmailHtml({
 
 export async function POST(request: Request) {
   try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return NextResponse.json(
+        { error: 'Server configuration error. NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set.' },
+        { status: 500 }
+      )
+    }
+
     const cookieStore = await cookies()
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      supabaseUrl,
+      supabaseAnonKey,
       {
         cookies: {
           getAll: () => cookieStore.getAll(),
@@ -114,6 +130,9 @@ export async function POST(request: Request) {
 
     if (!email || !['owner', 'ops'].includes(role)) {
       return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
+    }
+    if (!isValidEmail(email)) {
+      return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
     }
 
     // Verify caller is owner
@@ -166,7 +185,7 @@ export async function POST(request: Request) {
       })
 
       // Fallback insert path — return URL for owner to share manually
-      console.log('[INVITE] Fallback insert for org:', orgId, '| role:', role)
+      logger.info('[INVITE] Fallback insert for org:', orgId, '| role:', role)
       return NextResponse.json({ token, acceptUrl, html })
     }
 
@@ -181,7 +200,7 @@ export async function POST(request: Request) {
     // Invitation token is a secret — never log it.
     // The acceptUrl is returned to the owner so they can share it manually.
     // TODO: wire to an email provider (Resend/Mailgun) when ready.
-    console.log('[INVITE] Invitation created for org:', orgId, '| role:', role)
+    logger.info('[INVITE] Invitation created for org:', orgId, '| role:', role)
 
     return NextResponse.json({ token, acceptUrl, html })
   } catch (err: unknown) {

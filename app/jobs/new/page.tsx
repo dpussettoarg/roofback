@@ -14,6 +14,7 @@ import { JOB_TYPE_OPTIONS, ROOF_TYPE_OPTIONS } from '@/lib/templates'
 import Link from 'next/link'
 import { AddressInput } from '@/components/app/address-input'
 import type { Customer } from '@/lib/types'
+import { logger } from '@/lib/logger'
 
 const FILTERED_JOB_TYPES = JOB_TYPE_OPTIONS.filter((o) =>
   ['repair', 'reroof', 'new_roof', 'other'].includes(o.value)
@@ -205,7 +206,7 @@ export default function NewJobPage() {
       toast.success(lang === 'es' ? '¡Trabajo creado!' : 'Job created!')
       router.push(`/jobs/${data.id}/estimate`)
     } catch (err: unknown) {
-      console.error('Job creation error:', err)
+      logger.error('Job creation error:', err)
       const message = err instanceof Error ? err.message : t('common.error')
       toast.error(message)
     } finally {
@@ -248,7 +249,7 @@ export default function NewJobPage() {
                   <p className="text-sm font-semibold text-white">{selectedCustomer.full_name}</p>
                   {selectedCustomer.phone && <p className="text-xs text-[#6B7280]">{selectedCustomer.phone}</p>}
                 </div>
-                <button type="button" onClick={clearCustomer} className="text-[#6B7280] hover:text-white p-1">
+                <button type="button" onClick={clearCustomer} className="text-[#6B7280] hover:text-white p-1" aria-label={lang === 'es' ? 'Limpiar cliente' : 'Clear customer'}>
                   <X className="h-4 w-4" />
                 </button>
               </div>

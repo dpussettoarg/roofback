@@ -16,6 +16,7 @@ import { useOrganization, type OrgMember } from '@/lib/hooks/useOrganization'
 import { toast } from 'sonner'
 import type { Profile, Organization } from '@/lib/types'
 import { PricingCard } from '@/components/app/pricing-card'
+import { logger } from '@/lib/logger'
 
 export default function SettingsPage() {
   const { t, lang, setLang } = useI18n()
@@ -231,7 +232,7 @@ export default function SettingsPage() {
         .from('org-logos')
         .upload(path, file, { upsert: true, contentType: file.type })
       if (upErr) {
-        console.error('[Settings] Logo upload error:', upErr)
+        logger.error('[Settings] Logo upload error:', upErr)
         const msg = upErr.message?.includes('Bucket not found') || upErr.message?.includes('not found')
           ? (lang === 'es' ? 'Creá el bucket "org-logos" en Supabase Storage primero.' : 'Create the "org-logos" bucket in Supabase Storage first.')
           : upErr.message
@@ -242,14 +243,14 @@ export default function SettingsPage() {
       setOrgBranding((b) => ({ ...b, logo_url: logoUrl }))
       const { error: dbErr } = await supabase.from('organizations').update({ logo_url: logoUrl, updated_at: new Date().toISOString() }).eq('id', orgId)
       if (dbErr) {
-        console.error('[Settings] DB update logo_url error:', dbErr)
+        logger.error('[Settings] DB update logo_url error:', dbErr)
         throw new Error(dbErr.message)
       }
       invalidate()
       toast.success(lang === 'es' ? 'Logo actualizado' : 'Logo updated')
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Upload failed'
-      console.error('[Settings] handleUploadLogo:', err)
+      logger.error('[Settings] handleUploadLogo:', err)
       toast.error(message)
     } finally {
       setUploadingLogo(false)
@@ -272,14 +273,14 @@ export default function SettingsPage() {
       }
       const { error } = await supabase.from('organizations').update(payload).eq('id', orgId)
       if (error) {
-        console.error('[Settings] handleSaveBranding DB error:', error)
+        logger.error('[Settings] handleSaveBranding DB error:', error)
         throw new Error(error.message)
       }
       invalidate()
       toast.success(lang === 'es' ? '¡Empresa actualizada!' : 'Company profile updated!')
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : (lang === 'es' ? 'Algo falló al guardar.' : 'Something went wrong.')
-      console.error('[Settings] handleSaveBranding:', err)
+      logger.error('[Settings] handleSaveBranding:', err)
       toast.error(message)
     } finally {
       setSavingBranding(false)
@@ -306,7 +307,7 @@ export default function SettingsPage() {
         .eq('id', profile.id)
 
       if (error) {
-        console.error('[Settings] handleSave profiles error:', error)
+        logger.error('[Settings] handleSave profiles error:', error)
         throw new Error(error.message)
       }
       // Sync company name to organization when user is owner
@@ -315,13 +316,13 @@ export default function SettingsPage() {
           .from('organizations')
           .update({ name: profile.company_name.trim(), updated_at: new Date().toISOString() })
           .eq('id', profile.organization_id)
-        if (orgErr) console.error('[Settings] org name sync error:', orgErr)
+        if (orgErr) logger.error('[Settings] org name sync error:', orgErr)
         else invalidate()
       }
       toast.success(t('settings.saved'))
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : t('common.error')
-      console.error('[Settings] handleSave:', err)
+      logger.error('[Settings] handleSave:', err)
       toast.error(message)
     } finally {
       setSaving(false)

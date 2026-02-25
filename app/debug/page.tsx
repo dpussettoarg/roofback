@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { logger } from '@/lib/logger'
 
 /**
  * Diagnostic page — DEVELOPMENT ONLY.
@@ -37,7 +38,7 @@ export default async function DebugPage({
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim()
 
   // Only log SET/MISSING — never log actual values
-  console.log('[RoofBack Debug]', {
+  logger.debug('[RoofBack Debug]', {
     NEXT_PUBLIC_SUPABASE_URL: supabaseUrl ? 'SET' : 'MISSING',
     NEXT_PUBLIC_SUPABASE_ANON_KEY: anonKey ? 'SET' : 'MISSING',
     NEXT_PUBLIC_SITE_URL: siteUrl ? 'SET' : 'MISSING',

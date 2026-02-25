@@ -12,6 +12,8 @@ import { Separator } from '@/components/ui/separator'
 import { ArrowLeft, TrendingUp, TrendingDown, Minus, CheckCircle, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Job, EstimateItem, MaterialChecklist, TimeEntry, Expense } from '@/lib/types'
+import { logger } from '@/lib/logger'
+import { ErrorBoundary } from '@/components/app/error-boundary'
 
 function formatMoney(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
@@ -38,6 +40,7 @@ export default function ResultsPage() {
 
   useEffect(() => {
     async function load() {
+      try {
       const { data: jobData } = await supabase.from('jobs').select('*').eq('id', id).single()
       if (!jobData) return
       setJob(jobData as Job)
@@ -71,6 +74,10 @@ export default function ResultsPage() {
       }
 
       setLoading(false)
+      } catch (err) {
+        logger.error('[Results] load error:', err)
+        setLoading(false)
+      }
     }
     load()
   }, [id, supabase])
@@ -130,15 +137,20 @@ export default function ResultsPage() {
   const profitBg    = calc.actProfit > 0 ? 'bg-[#A8FF3E]/10 border-[#A8FF3E]/30' : calc.actProfit < 0 ? 'bg-[#EF4444]/10 border-[#EF4444]/30' : 'bg-[#F59E0B]/10 border-[#F59E0B]/30'
   const profitMessage = calc.actProfit > 200 ? t('results.great') : calc.actProfit >= 0 ? t('results.ok') : t('results.bad')
 
+  const errFallback = <div className="min-h-screen bg-[#0F1117] flex items-center justify-center p-6"><p className="text-[#6B7280]">Something went wrong. Refresh to retry.</p></div>
+
   if (loading) {
     return (
+      <ErrorBoundary fallback={errFallback}>
       <div className="flex items-center justify-center min-h-screen bg-[#0F1117]">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#2A2D35] border-t-[#A8FF3E]" />
       </div>
+      </ErrorBoundary>
     )
   }
 
   return (
+    <ErrorBoundary fallback={errFallback}>
     <div className="min-h-screen bg-[#0F1117] pb-24">
       <div className="w-full max-w-7xl px-4 sm:px-6 lg:px-8 mx-auto">
         <div className="border-b border-[#2A2D35] pt-12 pb-4">
@@ -277,5 +289,6 @@ export default function ResultsPage() {
 
       <MobileNav />
     </div>
+    </ErrorBoundary>
   )
 }

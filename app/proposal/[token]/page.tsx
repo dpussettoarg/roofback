@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { PAYMENT_TERMS_OPTIONS, translateMaterialName } from '@/lib/types'
 import type { Job, EstimateItem } from '@/lib/types'
+import { ErrorBoundary } from '@/components/app/error-boundary'
 
 function formatMoney(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(n)
@@ -202,6 +203,7 @@ export default function ProposalPage() {
     : null
 
   return (
+    <ErrorBoundary fallback={<div className="min-h-screen bg-white flex items-center justify-center p-6"><p className="text-slate-600">Something went wrong. Refresh to retry.</p></div>}>
     <div className="min-h-screen bg-white">
 
       {/* ── "Just signed" thank-you strip ─────────────────────────────────── */}
@@ -474,5 +476,6 @@ export default function ProposalPage() {
         <p className="text-xs text-slate-400 text-center pb-6">Powered by RoofBack</p>
       </div>
     </div>
+    </ErrorBoundary>
   )
 }
