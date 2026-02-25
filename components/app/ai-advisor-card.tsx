@@ -113,7 +113,11 @@ export default function AiAdvisorCard({
     return () => cancelAnimationFrame(raf)
   }, [])
 
-  const fetchInsights = useCallback(async () => {
+  const [hideWidget, setHideWidget] = useState(false)
+
+  const fetchInsights = useCallback(async (attempt = 0): Promise<void> => {
+    const MAX_ATTEMPTS = 3
+    const baseDelay = 1000
     setAiLoading(true)
     setAiError('')
     try {
@@ -129,26 +133,28 @@ export default function AiAdvisorCard({
       const data = (await res.json()) as BusinessInsightsResponse
       setAiData(data)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error'
-      setAiError(
-        msg === 'Too many requests. Please wait a minute and try again.'
-          ? (lang === 'es' ? 'Demasiadas solicitudes. Esperá un minuto.' : msg)
-          : (lang === 'es' ? 'Error al obtener consejos. Intentá de nuevo.' : 'Failed to get insights. Please try again.')
-      )
+      if (attempt < MAX_ATTEMPTS - 1) {
+        const delay = baseDelay * Math.pow(2, attempt)
+        await new Promise((r) => setTimeout(r, delay))
+        return fetchInsights(attempt + 1)
+      }
+      setHideWidget(true)
     } finally {
       setAiLoading(false)
     }
   }, [lang, orgId])
 
-  // Auto-fetch once on mount
+  // Auto-fetch once on mount with retry
   useEffect(() => {
-    if (hasFetched.current) return
+    if (hasFetched.current || hideWidget) return
     hasFetched.current = true
     fetchInsights()
-  }, [fetchInsights])
+  }, [fetchInsights, hideWidget])
 
   const now = new Date()
   const displayName = companyName || profileName
+
+  if (hideWidget) return null
 
   return (
     <div
@@ -182,7 +188,7 @@ export default function AiAdvisorCard({
             </div>
           </div>
           <button
-            onClick={fetchInsights}
+            onClick={() => fetchInsights(0)}
             disabled={aiLoading}
             className="flex items-center gap-1.5 text-xs text-[#6B7280] hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-white/5 disabled:opacity-40"
           >
@@ -212,11 +218,6 @@ export default function AiAdvisorCard({
               {lang === 'es' ? 'Analizando tu negocio…' : 'Analyzing your business…'}
             </p>
           </div>
-        )}
-
-        {/* Error */}
-        {aiError && !aiLoading && (
-          <p className="text-xs text-red-400 text-center py-4">{aiError}</p>
         )}
 
         {/* Insights */}

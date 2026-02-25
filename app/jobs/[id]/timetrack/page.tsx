@@ -239,13 +239,17 @@ export default function TimeTrackPage() {
         if (error) throw error
       }
 
-      // Update job status if not already in progress
-      if (job?.status === 'approved') {
-        await supabase.from('jobs').update({
-          status: 'in_progress',
-          updated_at: new Date().toISOString(),
-        }).eq('id', id)
-      }
+      // Sync job.actual_total for Budget vs Actual / dashboard
+      const laborTotal = entries.reduce((s, e) => s + e.hours * e.hourly_rate, 0)
+      const expenseTotal = expenses.reduce((s, e) => s + e.amount, 0)
+      const { data: checklist } = await supabase.from('material_checklist').select('actual_cost').eq('job_id', id)
+      const matTotal = (checklist || []).reduce((s: number, c: { actual_cost?: number }) => s + (Number(c.actual_cost) || 0), 0)
+      const newActualTotal = matTotal + laborTotal + expenseTotal
+      await supabase.from('jobs').update({
+        actual_total: newActualTotal,
+        updated_at: new Date().toISOString(),
+        ...(job?.status === 'approved' ? { status: 'in_progress' } : {}),
+      }).eq('id', id)
 
       toast.success(lang === 'es' ? '¡Registro guardado!' : 'Log saved!')
     } catch (err: unknown) {

@@ -5,10 +5,11 @@ import { usePathname } from 'next/navigation'
 import { LayoutDashboard, Hammer, Users, Settings } from 'lucide-react'
 import { useI18n } from '@/lib/i18n/context'
 
+// Order: Home | Customers | Jobs | Settings (workflow: create customer first, then job)
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
-  { href: '/jobs', icon: Hammer, labelKey: 'nav.jobs' },
   { href: '/customers', icon: Users, label_es: 'Clientes', label_en: 'Customers' },
+  { href: '/jobs', icon: Hammer, labelKey: 'nav.jobs' },
   { href: '/settings', icon: Settings, labelKey: 'nav.settings' },
 ]
 

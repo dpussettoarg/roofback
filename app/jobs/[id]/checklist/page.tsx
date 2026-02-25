@@ -234,6 +234,17 @@ export default function ChecklistPage() {
         if (error) throw error
       }
 
+      // Sync job.actual_total for Budget vs Actual / dashboard
+      const matTotal = items.reduce((s, i) => s + (i.actual_cost || 0), 0)
+      const { data: te } = await supabase.from('time_entries').select('hours,hourly_rate').eq('job_id', id)
+      const laborTotal = (te || []).reduce((s: number, e: { hours?: number; hourly_rate?: number }) => s + Number(e.hours) * Number(e.hourly_rate), 0)
+      const { data: exp } = await supabase.from('expenses').select('amount').eq('job_id', id)
+      const expenseTotal = (exp || []).reduce((s: number, e: { amount?: number }) => s + Number(e.amount), 0)
+      await supabase.from('jobs').update({
+        actual_total: matTotal + laborTotal + expenseTotal,
+        updated_at: new Date().toISOString(),
+      }).eq('id', id)
+
       toast.success(lang === 'es' ? '¡Checklist guardada!' : 'Checklist saved!')
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : t('common.error'))

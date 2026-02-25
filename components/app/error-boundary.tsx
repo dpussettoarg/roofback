@@ -40,7 +40,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
-      if (this.props.fallback) return this.props.fallback
+      if (this.props.fallback !== undefined) return this.props.fallback
 
       return (
         <div className="flex items-center gap-3 rounded-xl border border-red-900/40 bg-red-950/20 p-4 text-sm text-red-400">

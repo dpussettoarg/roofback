@@ -11,11 +11,11 @@ import { useProfile } from '@/lib/hooks/useProfile'
 import { ErrorBoundary } from '@/components/app/error-boundary'
 import {
   Briefcase, DollarSign, TrendingUp, Percent, Plus,
-  ChevronRight, Users, Clock, CalendarCheck,
+  ChevronRight, Clock,
 } from 'lucide-react'
 import { STATUS_CONFIG } from '@/lib/templates'
 import type { Job } from '@/lib/types'
-import { format, startOfMonth, endOfMonth } from 'date-fns'
+import { format } from 'date-fns'
 
 // ── Dynamic imports (client-only, never SSR) ─────────────────────────────────
 //
@@ -171,25 +171,27 @@ export default function DashboardPage() {
 
   // ── KPIs ─────────────────────────────────────────────────────────────────
   const now = useMemo(() => new Date(), [])
-  const monthStart = startOfMonth(now)
-  const monthEnd   = endOfMonth(now)
 
-  const quotesSentCount = jobs.filter((j) => j.workflow_stage === 'sent').length
   const jobsInProgress = jobs.filter((j) => j.client_status === 'approved' || j.status === 'in_progress')
   const activeJobs = jobsInProgress
 
-  const completedThisMonth = jobs.filter(
-    (j) => j.status === 'completed' && j.completed_at &&
-      new Date(j.completed_at) >= monthStart &&
-      new Date(j.completed_at) <= monthEnd
-  )
-  const monthRevenue = completedThisMonth.reduce((s, j) => s + Number(j.estimated_total), 0)
-  const monthProfit  = completedThisMonth.reduce((s, j) => s + Number(j.profit), 0)
-  const avgMargin    = monthRevenue > 0 ? (monthProfit / monthRevenue) * 100 : 0
+  const totalBudget = activeJobs.reduce((s, j) => {
+    const b = Number(j.simple_materials_budget) + Number(j.simple_labor_budget) + Number(j.simple_other_budget)
+    return s + (b > 0 ? b : Number(j.estimated_total))
+  }, 0)
+  const totalActual = activeJobs.reduce((s, j) => s + Number(j.actual_total || 0), 0)
+  const burnRatePct = totalBudget > 0 ? (totalActual / totalBudget) * 100 : 0
 
-  const totalEstimated = activeJobs.reduce((s, j) => s + Number(j.estimated_total), 0)
-  const totalActual    = activeJobs.reduce((s, j) => s + Number(j.actual_total || 0), 0)
-  const orgBurnPct     = totalEstimated > 0 ? (totalActual / totalEstimated) * 100 : 0
+  const marginValues = activeJobs
+    .filter((j) => Number(j.estimated_total) > 0)
+    .map((j) => {
+      const est = Number(j.estimated_total)
+      const act = Number(j.actual_total || 0)
+      return ((est - act) / est) * 100
+    })
+  const avgMargin = marginValues.length > 0
+    ? marginValues.reduce((a, b) => a + b, 0) / marginValues.length
+    : 0
 
   const chartData = useMemo(() => {
     const months: Record<string, { month: string; ganancia: number }> = {}
@@ -291,97 +293,34 @@ export default function DashboardPage() {
 
       <div className="space-y-5">
 
-        {/* Financial hero — owners only */}
-        {canSeeProfit && (
-          <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-5">
-            <p className="text-[#A8FF3E] text-xs font-bold uppercase tracking-widest mb-2">
-              {t('dashboard.profitThisMonth')}
-            </p>
-            <p className={`text-[56px] font-black tabular-nums leading-none ${monthProfit >= 0 ? 'text-white' : 'text-red-400'}`}>
-              {formatMoney(monthProfit)}
-            </p>
-            <div className="flex items-center gap-1.5 mt-3">
-              <TrendingUp className="h-4 w-4 text-[#6B7280]" />
-              <span className="text-sm text-[#6B7280]">
-                {avgMargin.toFixed(1)}% {t('dashboard.margin')}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Top stat cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          <Link href="/dashboard/quotes">
-            <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4 hover:border-[#3A3D45] transition-colors cursor-pointer">
-              <Briefcase className="h-4 w-4 text-[#F59E0B] mb-2" />
-              <p className="text-2xl font-bold tabular-nums text-white">{quotesSentCount}</p>
-              <p className="text-[10px] text-[#6B7280] mt-1 leading-tight">
-                {lang === 'es' ? 'Cotizaciones Enviadas' : 'Quotes Sent'}
-              </p>
-            </div>
-          </Link>
-
+        {/* 3 key indicator cards only */}
+        <div className="grid grid-cols-3 gap-3">
           <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4">
             <Briefcase className="h-4 w-4 text-[#A8FF3E] mb-2" />
-            <p className="text-2xl font-bold tabular-nums text-white">{activeJobs.length}</p>
+            <p className="text-2xl font-bold tabular-nums text-white">{jobsInProgress.length}</p>
             <p className="text-[10px] text-[#6B7280] mt-1 leading-tight">
-              {lang === 'es' ? 'En Proceso' : 'Jobs In Progress'}
+              {lang === 'es' ? 'En Proceso' : 'Jobs in Progress'}
             </p>
           </div>
-
           <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4">
-            <CalendarCheck className="h-4 w-4 text-[#FBBF24] mb-2" />
-            <p className="text-2xl font-bold tabular-nums text-white">{milestonesToday}</p>
+            <DollarSign className="h-4 w-4 text-[#3B82F6] mb-2" />
+            <p className={`text-xl font-bold tabular-nums ${canSeeFinancials && burnRatePct > 85 ? 'text-red-400' : 'text-white'}`}>
+              {canSeeFinancials ? `${burnRatePct.toFixed(0)}%` : '—'}
+            </p>
             <p className="text-[10px] text-[#6B7280] mt-1 leading-tight">
-              {lang === 'es' ? 'Hitos Hoy' : 'Milestones Today'}
+              {lang === 'es' ? 'Burn Rate' : 'Burn Rate'}
             </p>
           </div>
-
-          {canSeeFinancials ? (
-            <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4">
-              <DollarSign className="h-4 w-4 text-[#3B82F6] mb-2" />
-              <p className={`text-xl font-bold tabular-nums ${orgBurnPct > 85 ? 'text-red-400' : 'text-white'}`}>
-                {orgBurnPct.toFixed(0)}%
-              </p>
-              <p className="text-[10px] text-[#6B7280] mt-1 leading-tight">
-                {lang === 'es' ? 'Burn Rate Org' : 'Org Burn Rate'}
-              </p>
-            </div>
-          ) : (
-            <Link href="/customers">
-              <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4 hover:border-[#3A3D45] transition-colors cursor-pointer">
-                <Users className="h-4 w-4 text-[#A8FF3E] mb-2" />
-                <p className="text-2xl font-bold tabular-nums text-white">{customerCount}</p>
-                <p className="text-[10px] text-[#6B7280] mt-1 leading-tight">
-                  {lang === 'es' ? 'Clientes' : 'Customers'}
-                </p>
-              </div>
-            </Link>
-          )}
-        </div>
-
-        {/* Secondary stats — owners only */}
-        {canSeeProfit && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            <Link href="/customers">
-              <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4 hover:border-[#3A3D45] transition-colors cursor-pointer">
-                <Users className="h-4 w-4 text-[#A8FF3E] mb-2" />
-                <p className="text-2xl font-bold tabular-nums text-white">{customerCount}</p>
-                <p className="text-[10px] text-[#6B7280] mt-1">{lang === 'es' ? 'Clientes' : 'Customers'}</p>
-              </div>
-            </Link>
-            <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4">
-              <DollarSign className="h-4 w-4 text-[#3B82F6] mb-2" />
-              <p className="text-xl font-bold tabular-nums text-white">{formatMoney(monthRevenue)}</p>
-              <p className="text-[10px] text-[#6B7280] mt-1">{t('dashboard.monthRevenue')}</p>
-            </div>
-            <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4">
-              <Percent className="h-4 w-4 text-[#6B7280] mb-2" />
-              <p className="text-2xl font-bold tabular-nums text-white">{avgMargin.toFixed(1)}%</p>
-              <p className="text-[10px] text-[#6B7280] mt-1">{t('dashboard.avgMargin')}</p>
-            </div>
+          <div className="bg-[#1E2228] border border-[#2A2D35] rounded-xl p-4">
+            <Percent className="h-4 w-4 text-[#6B7280] mb-2" />
+            <p className="text-xl font-bold tabular-nums text-white">
+              {canSeeFinancials ? `${avgMargin.toFixed(1)}%` : '—'}
+            </p>
+            <p className="text-[10px] text-[#6B7280] mt-1 leading-tight">
+              {t('dashboard.avgMargin')}
+            </p>
           </div>
-        )}
+        </div>
 
         {/* New job CTA */}
         <Link href="/jobs/new">
@@ -391,18 +330,8 @@ export default function DashboardPage() {
           </button>
         </Link>
 
-        {/* ══ AI BUSINESS ADVISOR — isolated dynamic import + error boundary ══ */}
-        <ErrorBoundary
-          fallback={
-            <div className="flex items-center gap-3 rounded-xl border border-[#2A2D35] bg-[#1E2228] p-4 text-sm text-[#6B7280]">
-              <span>
-                {lang === 'es'
-                  ? 'Asesor temporalmente no disponible.'
-                  : 'Advisor temporarily unavailable.'}
-              </span>
-            </div>
-          }
-        >
+        {/* ══ AI BUSINESS ADVISOR — isolated dynamic import + error boundary; hide completely when unavailable ══ */}
+        <ErrorBoundary fallback={null}>
           <AiAdvisorCard
             lang={lang}
             orgId={orgId}

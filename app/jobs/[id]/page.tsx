@@ -13,7 +13,7 @@ import {
   ShieldCheck, CalendarCheck, Lock, HardHat, CalendarDays,
   MessageSquare, Package, TrendingUp, TrendingDown, AlertCircle,
   Smartphone, MessageCircle, ChevronDown, ChevronUp,
-  ClipboardList, Wrench, HardDriveDownload, Flag,
+  ClipboardList, Wrench, HardDriveDownload, Flag, BookOpen,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { JOB_TYPE_OPTIONS, ROOF_TYPE_OPTIONS } from '@/lib/templates'
@@ -84,6 +84,39 @@ export default function JobDetailPage() {
   const { canSeeProfit, canSeeContractTotal } = usePermissions()
   const supabase = createClient()
 
+  function loadFinancials(j: Job | null) {
+    if (!j || !(j.client_status === 'approved' || j.status === 'approved' || j.status === 'in_progress')) return
+    const load = async () => {
+      const { data: items } = await supabase.from('estimate_items').select('*').eq('job_id', id)
+      if (items && items.length > 0) {
+        const typed = items as { category: string; quantity: number; unit_price: number }[]
+        setBudgetMat(typed.filter((i) => i.category === 'material').reduce((s, i) => s + Number(i.quantity) * Number(i.unit_price), 0))
+        setBudgetLabor(typed.filter((i) => i.category === 'labor').reduce((s, i) => s + Number(i.quantity) * Number(i.unit_price), 0))
+        setBudgetOther(typed.filter((i) => i.category === 'other').reduce((s, i) => s + Number(i.quantity) * Number(i.unit_price), 0))
+      } else {
+        setBudgetMat(Number(j.simple_materials_budget) || 0)
+        setBudgetLabor(Number(j.simple_labor_budget) || 0)
+        setBudgetOther(Number(j.simple_other_budget) || 0)
+      }
+      const { data: checklist } = await supabase.from('material_checklist').select('*').eq('job_id', id)
+      if (checklist) {
+        const typed = checklist as { actual_cost: number | null; is_checked: boolean }[]
+        setActualMat(typed.reduce((s, c) => s + (Number(c.actual_cost) || 0), 0))
+        setChecklistTotal(typed.length)
+        setChecklistDone(typed.filter((c) => c.is_checked).length)
+      }
+      const { data: te } = await supabase.from('time_entries').select('*').eq('job_id', id)
+      if (te) {
+        setActualLabor((te as { hours: number; hourly_rate: number }[]).reduce((s, e) => s + Number(e.hours) * Number(e.hourly_rate), 0))
+      }
+      const { data: exp } = await supabase.from('expenses').select('*').eq('job_id', id)
+      if (exp) {
+        setActualOther((exp as { amount: number }[]).reduce((s, e) => s + Number(e.amount), 0))
+      }
+    }
+    void load()
+  }
+
   useEffect(() => {
     async function load() {
       const { data } = await supabase.from('jobs').select('*').eq('id', id).single()
@@ -91,46 +124,8 @@ export default function JobDetailPage() {
       setJob(j)
       setClientEmail(j?.client_email || '')
       setStartDate(j?.start_date || '')
+      loadFinancials(j)
 
-      // If approved, load financial data for execution dashboard
-      if (j?.client_status === 'approved' || j?.status === 'approved' || j?.status === 'in_progress') {
-        // Budget from estimate items
-        const { data: items } = await supabase.from('estimate_items').select('*').eq('job_id', id)
-        if (items && items.length > 0) {
-          const typed = items as { category: string; quantity: number; unit_price: number }[]
-          setBudgetMat(typed.filter((i) => i.category === 'material').reduce((s, i) => s + Number(i.quantity) * Number(i.unit_price), 0))
-          setBudgetLabor(typed.filter((i) => i.category === 'labor').reduce((s, i) => s + Number(i.quantity) * Number(i.unit_price), 0))
-          setBudgetOther(typed.filter((i) => i.category === 'other').reduce((s, i) => s + Number(i.quantity) * Number(i.unit_price), 0))
-        } else {
-          // Fallback: simple mode budget buckets
-          setBudgetMat(Number(j.simple_materials_budget) || 0)
-          setBudgetLabor(Number(j.simple_labor_budget) || 0)
-          setBudgetOther(Number(j.simple_other_budget) || 0)
-        }
-
-        // Actual: materials from checklist actual_cost
-        const { data: checklist } = await supabase.from('material_checklist').select('*').eq('job_id', id)
-        if (checklist) {
-          const typed = checklist as { actual_cost: number | null; is_checked: boolean }[]
-          setActualMat(typed.reduce((s, c) => s + (Number(c.actual_cost) || 0), 0))
-          setChecklistTotal(typed.length)
-          setChecklistDone(typed.filter((c) => c.is_checked).length)
-        }
-
-        // Actual: labor from time entries
-        const { data: te } = await supabase.from('time_entries').select('*').eq('job_id', id)
-        if (te) {
-          setActualLabor((te as { hours: number; hourly_rate: number }[]).reduce((s, e) => s + Number(e.hours) * Number(e.hourly_rate), 0))
-        }
-
-        // Actual: other from expenses
-        const { data: exp } = await supabase.from('expenses').select('*').eq('job_id', id)
-        if (exp) {
-          setActualOther((exp as { amount: number }[]).reduce((s, e) => s + Number(e.amount), 0))
-        }
-      }
-
-      // Load milestone dates
       const { data: milestones } = await supabase
         .from('job_milestones')
         .select('stage, scheduled_date, completed_date')
@@ -148,6 +143,18 @@ export default function JobDetailPage() {
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
+
+  // Realtime: refetch financials when time_entries, expenses, material_checklist change
+  useEffect(() => {
+    const channel = supabase
+      .channel(`job-financials-${id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_entries', filter: `job_id=eq.${id}` }, () => loadFinancials(job))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `job_id=eq.${id}` }, () => loadFinancials(job))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'material_checklist', filter: `job_id=eq.${id}` }, () => loadFinancials(job))
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, job?.id])
 
   async function handleDelete() {
     if (!confirm(lang === 'es' ? '¿Borrar este trabajo?' : 'Delete this job?')) return
@@ -718,11 +725,12 @@ export default function JobDetailPage() {
                                       {lang === 'es' ? 'Notificar cliente' : 'Notify client'}
                                     </button>
 
-                                    {/* Move project to this stage — disabled if already current or past */}
+                                    {/* Move project to this stage — only next stage is unlockable (sequential) */}
                                     {(() => {
                                       const alreadyCurrent = isActive
                                       const alreadyPast    = isFinished
-                                      const canAdvance     = !alreadyCurrent && !alreadyPast
+                                      const isNextStage    = i === stepIndex + 1
+                                      const canAdvance     = !alreadyCurrent && !alreadyPast && isNextStage
                                       return (
                                         <button
                                           onClick={async () => {
@@ -860,6 +868,7 @@ export default function JobDetailPage() {
             <div className="space-y-2">
               {[
                 { href: `/jobs/${id}/timetrack`, icon: Clock, title_es: 'Horas y Gastos', title_en: 'Time & Expenses', desc_es: 'Registrar horas del crew y gastos', desc_en: 'Log crew hours and expenses' },
+                { href: `/jobs/${id}/log`, icon: BookOpen, title_es: 'Field Log', title_en: 'Field Log', desc_es: 'Bitácora de obra y notas de campo', desc_en: 'Field notes and project log' },
                 { href: `/jobs/${id}/results`, icon: BarChart3, title_es: 'Resultados', title_en: 'Results', desc_es: 'Ver análisis final del trabajo', desc_en: 'View final job analysis' },
               ].map((s) => (
                 <Link key={s.href} href={s.href}>
@@ -883,6 +892,7 @@ export default function JobDetailPage() {
             {[
               { href: `/jobs/${id}/checklist`, icon: CheckSquare, title_es: 'Checklist', title_en: 'Checklist', desc_es: 'Lista de materiales', desc_en: 'Materials list' },
               { href: `/jobs/${id}/timetrack`, icon: Clock, title_es: 'Horas / Gastos', title_en: 'Time / Expenses', desc_es: 'Registro de horas y gastos', desc_en: 'Time and expense log' },
+              { href: `/jobs/${id}/log`, icon: BookOpen, title_es: 'Field Log', title_en: 'Field Log', desc_es: 'Bitácora de obra', desc_en: 'Field notes' },
               { href: `/jobs/${id}/results`, icon: BarChart3, title_es: 'Resultados', title_en: 'Results', desc_es: 'Análisis del trabajo', desc_en: 'Job analysis' },
             ].map((s) => (
               <Link key={s.href} href={s.href}>
