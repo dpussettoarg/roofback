@@ -26,6 +26,20 @@ export default function LoginPage() {
   const { t, lang, setLang } = useI18n()
   const supabase = createClient()
 
+  // Mostrar toast si hay error de auth (OAuth callback falló)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('error') === 'auth') {
+      toast.error(
+        lang === 'es'
+          ? 'No se pudo completar el acceso con Google. Probá de nuevo o usá email y contraseña.'
+          : "Couldn't complete Google sign-in. Try again or use email and password."
+      )
+      window.history.replaceState(null, '', '/login')
+    }
+  }, [lang])
+
   // Procesar hash de Supabase (#access_token, magic link) - el servidor NUNCA recibe el hash
   useEffect(() => {
     if (typeof window === 'undefined' || processingHash) return
@@ -161,7 +175,7 @@ export default function LoginPage() {
   const isForgot = view === 'forgot'
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-6 relative overflow-hidden" style={{ backgroundColor: '#0F1117' }}>
+    <div className="flex min-h-screen flex-col items-center justify-center px-4 sm:px-6 relative overflow-x-hidden" style={{ backgroundColor: '#0F1117' }}>
       {/* Background blurred lime-green orbs */}
       <div
         className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full blur-3xl pointer-events-none"
@@ -195,7 +209,7 @@ export default function LoginPage() {
       </div>
 
       {/* Card */}
-      <div className="w-full max-w-sm relative z-10">
+      <div className="w-full max-w-[400px] relative z-10">
         <div className="rounded-2xl border border-[#2A2D35] p-8" style={{ backgroundColor: '#1E2228' }}>
 
           {/* ===== FORGOT PASSWORD VIEW ===== */}
@@ -389,15 +403,15 @@ export default function LoginPage() {
               </form>
 
               {/* Legal disclaimer */}
-              <p className="mt-5 text-center text-[11px] text-[#4B5563] leading-relaxed px-2">
+              <p className="mt-5 text-center text-xs text-[#9CA3AF] leading-relaxed px-1">
                 {lang === 'es' ? (
                   <>
                     Al continuar, aceptás los{' '}
-                    <Link href="/terms" target="_blank" className="underline underline-offset-2 hover:text-[#A8FF3E] transition-colors">
+                    <Link href="/terms" target="_blank" className="text-[#A8FF3E] hover:text-[#bdff72] underline underline-offset-2 transition-colors">
                       Términos de Servicio
                     </Link>
                     {' '}y la{' '}
-                    <Link href="/privacy" target="_blank" className="underline underline-offset-2 hover:text-[#A8FF3E] transition-colors">
+                    <Link href="/privacy" target="_blank" className="text-[#A8FF3E] hover:text-[#bdff72] underline underline-offset-2 transition-colors">
                       Política de Privacidad
                     </Link>
                     {' '}de RoofBack.
@@ -405,11 +419,11 @@ export default function LoginPage() {
                 ) : (
                   <>
                     By continuing, you agree to RoofBack&apos;s{' '}
-                    <Link href="/terms" target="_blank" className="underline underline-offset-2 hover:text-[#A8FF3E] transition-colors">
+                    <Link href="/terms" target="_blank" className="text-[#A8FF3E] hover:text-[#bdff72] underline underline-offset-2 transition-colors">
                       Terms of Service
                     </Link>
                     {' '}and{' '}
-                    <Link href="/privacy" target="_blank" className="underline underline-offset-2 hover:text-[#A8FF3E] transition-colors">
+                    <Link href="/privacy" target="_blank" className="text-[#A8FF3E] hover:text-[#bdff72] underline underline-offset-2 transition-colors">
                       Privacy Policy
                     </Link>
                     .

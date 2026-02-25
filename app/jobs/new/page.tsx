@@ -8,6 +8,13 @@ import { MobileNav } from '@/components/app/mobile-nav'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { ArrowLeft, Search, User, Plus, X, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { JOB_TYPE_OPTIONS, ROOF_TYPE_OPTIONS } from '@/lib/templates'
@@ -46,17 +53,11 @@ function PitchIcon({ angle, active }: { angle: number; active: boolean }) {
 
 export default function NewJobPage() {
   const [form, setForm] = useState({
-    client_name: '',
-    client_phone: '',
-    client_email: '',
-    client_address: '',
     job_type: 'repair',
     roof_type: 'shingle',
     square_footage: '',
     pitch: '4/12',
     notes: '',
-    lat: null as number | null,
-    lng: null as number | null,
   })
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -69,12 +70,14 @@ export default function NewJobPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [customerSearch, setCustomerSearch] = useState('')
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
-  const [showNewCustomerForm, setShowNewCustomerForm] = useState(false)
+  const [showNewCustomerModal, setShowNewCustomerModal] = useState(false)
   const [newCustomerName, setNewCustomerName] = useState('')
   const [newCustomerPhone, setNewCustomerPhone] = useState('')
   const [newCustomerEmail, setNewCustomerEmail] = useState('')
+  const [newCustomerAddress, setNewCustomerAddress] = useState('')
   const [creatingCustomer, setCreatingCustomer] = useState(false)
   const customerSearchRef = useRef<HTMLInputElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     async function loadOrg() {
@@ -96,26 +99,28 @@ export default function NewJobPage() {
       }
     }
     loadOrg()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase])
+
+  // Click outside to close dropdown
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowCustomerDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Sync form fields from selected customer
   function selectCustomer(c: Customer) {
     setSelectedCustomer(c)
-    setForm(f => ({
-      ...f,
-      client_name: c.full_name,
-      client_phone: c.phone,
-      client_email: c.email,
-      client_address: c.address,
-    }))
     setShowCustomerDropdown(false)
     setCustomerSearch('')
   }
 
   function clearCustomer() {
     setSelectedCustomer(null)
-    setForm(f => ({ ...f, client_name: '', client_phone: '', client_email: '', client_address: '' }))
+    setCustomerSearch('')
   }
 
   async function handleCreateCustomer() {
@@ -129,7 +134,7 @@ export default function NewJobPage() {
           full_name: newCustomerName.trim(),
           phone: newCustomerPhone.trim(),
           email: newCustomerEmail.trim(),
-          address: '',
+          address: newCustomerAddress.trim(),
           notes: '',
         })
         .select()
@@ -138,10 +143,11 @@ export default function NewJobPage() {
       const c = data as Customer
       setCustomers(prev => [...prev, c].sort((a, b) => a.full_name.localeCompare(b.full_name)))
       selectCustomer(c)
-      setShowNewCustomerForm(false)
+      setShowNewCustomerModal(false)
       setNewCustomerName('')
       setNewCustomerPhone('')
       setNewCustomerEmail('')
+      setNewCustomerAddress('')
       toast.success(lang === 'es' ? 'Cliente creado' : 'Customer created')
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Error')
@@ -152,21 +158,20 @@ export default function NewJobPage() {
 
   const filteredCustomers = customers.filter(c =>
     c.full_name.toLowerCase().includes(customerSearch.toLowerCase()) ||
-    c.phone.includes(customerSearch) ||
-    c.email.toLowerCase().includes(customerSearch.toLowerCase())
+    (c.phone || '').includes(customerSearch) ||
+    (c.email || '').toLowerCase().includes(customerSearch.toLowerCase()) ||
+    (c.address || '').toLowerCase().includes(customerSearch.toLowerCase())
   )
+  const hasNoResults = filteredCustomers.length === 0
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!selectedCustomer) return
     setLoading(true)
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error(lang === 'es' ? 'No estás autenticado' : 'Not authenticated')
-
-      if (!form.client_name.trim()) {
-        throw new Error(lang === 'es' ? 'El nombre del cliente es obligatorio' : 'Client name is required')
-      }
 
       const { data: profile } = await supabase
         .from('profiles')
@@ -177,11 +182,11 @@ export default function NewJobPage() {
       const insertPayload: Record<string, unknown> = {
         user_id: user.id,
         organization_id: profile?.organization_id || null,
-        customer_id: selectedCustomer?.id || null,
-        client_name: form.client_name.trim(),
-        client_phone: form.client_phone,
-        client_email: form.client_email,
-        client_address: form.client_address,
+        customer_id: selectedCustomer.id,
+        client_name: selectedCustomer.full_name,
+        client_phone: selectedCustomer.phone || '',
+        client_email: selectedCustomer.email || '',
+        client_address: selectedCustomer.address || '',
         job_type: form.job_type,
         roof_type: form.roof_type,
         square_footage: parseFloat(form.square_footage) || 0,
@@ -190,9 +195,6 @@ export default function NewJobPage() {
         overhead_pct: profile?.default_overhead_pct || 15,
         margin_pct: profile?.default_margin_pct || 20,
       }
-
-      if (form.lat !== null) insertPayload.lat = form.lat
-      if (form.lng !== null) insertPayload.lng = form.lng
 
       const { data, error } = await supabase
         .from('jobs')
@@ -216,11 +218,13 @@ export default function NewJobPage() {
 
   const update = (field: string, value: string) => setForm((f) => ({ ...f, [field]: value }))
 
+  const canCreateJob = !!selectedCustomer
+
   return (
     <div className="min-h-screen pb-40" style={{ backgroundColor: '#0F1117' }}>
       {/* ── HEADER ── */}
       <div className="sticky top-0 z-30 px-4 pt-12 pb-4" style={{ backgroundColor: '#0F1117', borderBottom: '1px solid #2A2D35' }}>
-        <div className="mx-auto w-full max-w-2xl">
+        <div className="mx-auto w-full max-w-7xl">
           <Link href="/jobs" className="inline-flex items-center text-sm mb-2" style={{ color: '#6B7280' }}>
             <ArrowLeft className="h-4 w-4 mr-1" />
             {t('jobs.back')}
@@ -229,18 +233,17 @@ export default function NewJobPage() {
         </div>
       </div>
 
-      <form id="new-job-form" onSubmit={handleSubmit} className="mx-auto w-full px-4 py-5 space-y-5 max-w-2xl">
+      <form id="new-job-form" onSubmit={handleSubmit} className="mx-auto w-full px-4 py-5 space-y-5 max-w-7xl">
 
         {/* ══════════════════════════════════════════════
-            SECTION 0 — CUSTOMER SELECTOR (CRM)
+            SECTION 0 — CUSTOMER (CRM, Customer First)
            ══════════════════════════════════════════════ */}
-        <div>
+        <div ref={dropdownRef}>
           <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: '#A8FF3E' }}>
-            {lang === 'es' ? 'Cliente' : 'Customer'}
+            {lang === 'es' ? 'Cliente' : 'Customer'} *
           </p>
-          <div className="rounded-xl p-4 space-y-3" style={{ backgroundColor: '#1E2228', border: '1px solid #2A2D35' }}>
+          <div className="rounded-xl p-4" style={{ backgroundColor: '#1E2228', border: '1px solid #2A2D35' }}>
             {selectedCustomer ? (
-              /* Selected customer card */
               <div className="flex items-center gap-3 bg-[#0F1117] border border-[#A8FF3E]/30 rounded-xl px-4 py-3">
                 <div className="w-9 h-9 rounded-full bg-[#A8FF3E]/10 flex items-center justify-center flex-shrink-0">
                   <User className="h-4 w-4 text-[#A8FF3E]" />
@@ -248,178 +251,87 @@ export default function NewJobPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-white">{selectedCustomer.full_name}</p>
                   {selectedCustomer.phone && <p className="text-xs text-[#6B7280]">{selectedCustomer.phone}</p>}
+                  {selectedCustomer.address && <p className="text-xs text-[#6B7280] truncate">{selectedCustomer.address}</p>}
                 </div>
-                <button type="button" onClick={clearCustomer} className="text-[#6B7280] hover:text-white p-1" aria-label={lang === 'es' ? 'Limpiar cliente' : 'Clear customer'}>
+                <button type="button" onClick={clearCustomer} className="text-[#6B7280] hover:text-white p-1" aria-label={lang === 'es' ? 'Cambiar cliente' : 'Change customer'}>
                   <X className="h-4 w-4" />
                 </button>
               </div>
             ) : (
-              /* Picker */
-              <div className="space-y-2">
-                {/* Search input */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B7280]" />
-                  <input
-                    ref={customerSearchRef}
-                    type="text"
-                    value={customerSearch}
-                    onChange={(e) => { setCustomerSearch(e.target.value); setShowCustomerDropdown(true) }}
-                    onFocus={() => setShowCustomerDropdown(true)}
-                    placeholder={lang === 'es' ? 'Buscar cliente existente...' : 'Search existing customer...'}
-                    className="w-full h-11 pl-10 pr-4 rounded-lg bg-[#0F1117] border border-[#2A2D35] text-white text-sm placeholder:text-[#4B5563] focus:outline-none focus:border-[#A8FF3E] transition-colors"
-                  />
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B7280]" />
-                </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B7280] pointer-events-none" />
+                <input
+                  ref={customerSearchRef}
+                  type="text"
+                  value={customerSearch}
+                  onChange={(e) => { setCustomerSearch(e.target.value); setShowCustomerDropdown(true) }}
+                  onFocus={() => setShowCustomerDropdown(true)}
+                  placeholder={lang === 'es' ? 'Buscar cliente por nombre, teléfono, email o dirección...' : 'Search customer by name, phone, email or address...'}
+                  className="w-full h-12 pl-10 pr-10 rounded-lg bg-[#0F1117] border border-[#2A2D35] text-white text-sm placeholder:text-[#4B5563] focus:outline-none focus:border-[#A8FF3E] transition-colors"
+                />
+                <ChevronDown className={`absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B7280] transition-transform ${showCustomerDropdown ? 'rotate-180' : ''}`} />
 
-                {/* Dropdown results */}
                 {showCustomerDropdown && (
-                  <div className="relative z-10">
-                    <div
-                      className="absolute left-0 right-0 top-0 max-h-48 overflow-y-auto rounded-xl border border-[#2A2D35] bg-[#16191F] shadow-xl"
-                      onMouseDown={(e) => e.preventDefault()}
-                    >
-                      {filteredCustomers.length === 0 && (
-                        <p className="px-4 py-3 text-xs text-[#6B7280]">
-                          {lang === 'es' ? 'Sin resultados' : 'No results'}
-                        </p>
+                  <div className="absolute left-0 right-0 top-full mt-2 z-20">
+                    <div className="max-h-64 overflow-y-auto rounded-xl border border-[#2A2D35] bg-[#16191F] shadow-xl">
+                      {hasNoResults ? (
+                        <div className="p-4 text-center space-y-4">
+                          <p className="text-sm text-[#9CA3AF]">
+                            {customers.length === 0
+                              ? (lang === 'es' ? 'Aún no tenés clientes' : "You don't have customers yet")
+                              : (lang === 'es' ? 'No se encontraron clientes' : 'No customers found')}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => { setShowNewCustomerModal(true); setShowCustomerDropdown(false) }}
+                            className="w-full h-12 rounded-lg border-2 border-dashed border-[#A8FF3E]/50 bg-[#A8FF3E]/5 text-[#A8FF3E] font-semibold flex items-center justify-center gap-2 hover:bg-[#A8FF3E]/10 transition-colors"
+                          >
+                            <Plus className="h-5 w-5" />
+                            {lang === 'es' ? '+ Crear Nuevo Cliente' : '+ Create New Customer'}
+                          </button>
+                        </div>
+                      ) : (
+                        filteredCustomers.map(c => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => selectCustomer(c)}
+                            className="w-full text-left px-4 py-3 hover:bg-[#252830] transition-colors border-b border-[#2A2D35] last:border-0"
+                          >
+                            <p className="text-sm font-medium text-white">{c.full_name}</p>
+                            {c.phone && <p className="text-xs text-[#6B7280]">{c.phone}</p>}
+                            {c.address && <p className="text-xs text-[#6B7280] truncate">{c.address}</p>}
+                          </button>
+                        ))
                       )}
-                      {filteredCustomers.map(c => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => selectCustomer(c)}
-                          className="w-full text-left px-4 py-2.5 hover:bg-[#252830] transition-colors border-b border-[#2A2D35] last:border-0"
-                        >
-                          <p className="text-sm font-medium text-white">{c.full_name}</p>
-                          {c.phone && <p className="text-xs text-[#6B7280]">{c.phone}</p>}
-                        </button>
-                      ))}
+                      {!hasNoResults && filteredCustomers.length > 0 && (
+                        <div className="p-2 border-t border-[#2A2D35]">
+                          <button
+                            type="button"
+                            onClick={() => { setShowNewCustomerModal(true); setShowCustomerDropdown(false) }}
+                            className="w-full h-10 rounded-lg border border-dashed border-[#2A2D35] text-[#A8FF3E] text-sm font-medium flex items-center justify-center gap-2 hover:bg-[#A8FF3E]/5 transition-colors"
+                          >
+                            <Plus className="h-4 w-4" />
+                            {lang === 'es' ? 'Crear nuevo cliente' : 'Create new customer'}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
-
-                {/* Or create new */}
-                <button
-                  type="button"
-                  onClick={() => { setShowNewCustomerForm(!showNewCustomerForm); setShowCustomerDropdown(false) }}
-                  className="w-full h-10 rounded-lg border border-dashed border-[#2A2D35] text-[#A8FF3E] text-sm font-medium flex items-center justify-center gap-2 hover:bg-[#A8FF3E]/5 transition-colors"
-                >
-                  <Plus className="h-4 w-4" />
-                  {lang === 'es' ? 'Crear nuevo cliente' : 'Create new customer'}
-                </button>
-
-                {/* Inline new customer mini-form */}
-                {showNewCustomerForm && (
-                  <div className="bg-[#0F1117] border border-[#2A2D35] rounded-xl p-4 space-y-3 mt-1">
-                    <p className="text-xs font-semibold text-[#A8FF3E]">
-                      {lang === 'es' ? 'Nuevo cliente' : 'New customer'}
-                    </p>
-                    <input
-                      autoFocus
-                      value={newCustomerName}
-                      onChange={e => setNewCustomerName(e.target.value)}
-                      placeholder={lang === 'es' ? 'Nombre completo *' : 'Full name *'}
-                      className="w-full h-11 rounded-lg bg-[#1E2228] border border-[#2A2D35] px-3 text-white text-sm placeholder:text-[#4B5563] focus:outline-none focus:border-[#A8FF3E]"
-                    />
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        value={newCustomerPhone}
-                        onChange={e => setNewCustomerPhone(e.target.value)}
-                        placeholder={lang === 'es' ? 'Teléfono' : 'Phone'}
-                        type="tel"
-                        className="h-11 rounded-lg bg-[#1E2228] border border-[#2A2D35] px-3 text-white text-sm placeholder:text-[#4B5563] focus:outline-none focus:border-[#A8FF3E]"
-                      />
-                      <input
-                        value={newCustomerEmail}
-                        onChange={e => setNewCustomerEmail(e.target.value)}
-                        placeholder="Email"
-                        type="email"
-                        className="h-11 rounded-lg bg-[#1E2228] border border-[#2A2D35] px-3 text-white text-sm placeholder:text-[#4B5563] focus:outline-none focus:border-[#A8FF3E]"
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowNewCustomerForm(false)}
-                        className="flex-1 h-10 rounded-lg border border-[#2A2D35] bg-transparent text-[#6B7280] text-sm"
-                      >
-                        {lang === 'es' ? 'Cancelar' : 'Cancel'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleCreateCustomer}
-                        disabled={creatingCustomer || !newCustomerName.trim()}
-                        className="flex-1 h-10 rounded-lg bg-[#A8FF3E] text-[#0F1117] font-bold text-sm disabled:opacity-50"
-                      >
-                        {creatingCustomer ? '...' : (lang === 'es' ? 'Crear' : 'Create')}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <p className="text-xs text-[#4B5563] text-center">
-                  {lang === 'es'
-                    ? 'O completá los datos manualmente abajo'
-                    : 'Or fill in details manually below'}
-                </p>
               </div>
             )}
           </div>
         </div>
 
         {/* ══════════════════════════════════════════════
-            SECTION 1 — CLIENT INFO (manual / override)
-           ══════════════════════════════════════════════ */}
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: '#A8FF3E' }}>
-            {t('jobs.sectionClient')}
-          </p>
-          <div className="rounded-xl p-4 space-y-4" style={{ backgroundColor: '#1E2228', border: '1px solid #2A2D35' }}>
-            <div className="space-y-1.5">
-              <Label className="text-xs" style={{ color: '#6B7280' }}>{t('jobs.client')} *</Label>
-              <Input
-                value={form.client_name}
-                onChange={(e) => update('client_name', e.target.value)}
-                placeholder="John Smith"
-                required
-                className="input-dark h-12 rounded-lg text-base"
-                style={{ backgroundColor: '#16191F', borderColor: '#2A2D35', color: '#FFFFFF' }}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs" style={{ color: '#6B7280' }}>{t('jobs.phone')}</Label>
-              <Input
-                value={form.client_phone}
-                onChange={(e) => update('client_phone', e.target.value)}
-                placeholder="(555) 123-4567"
-                type="tel"
-                className="input-dark h-12 rounded-lg text-base"
-                style={{ backgroundColor: '#16191F', borderColor: '#2A2D35', color: '#FFFFFF' }}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs" style={{ color: '#6B7280' }}>{t('jobs.address')} *</Label>
-              <AddressInput
-                value={form.client_address}
-                onChange={(address, lat, lng) => setForm(f => ({ ...f, client_address: address, lat: lat ?? null, lng: lng ?? null }))}
-                placeholder="123 Main St, City, TX"
-                required
-                lang={lang as 'es' | 'en'}
-                className="input-dark"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* ══════════════════════════════════════════════
-            SECTION 2 — JOB DETAILS
+            SECTION 1 — JOB DETAILS
            ══════════════════════════════════════════════ */}
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: '#A8FF3E' }}>
             {t('jobs.sectionJob')}
           </p>
           <div className="rounded-xl p-4 space-y-5" style={{ backgroundColor: '#1E2228', border: '1px solid #2A2D35' }}>
-            {/* Job Type chips */}
             <div className="space-y-1.5">
               <Label className="text-xs" style={{ color: '#6B7280' }}>{t('jobs.jobType')}</Label>
               <div className="flex flex-wrap gap-2">
@@ -445,7 +357,6 @@ export default function NewJobPage() {
               </div>
             </div>
 
-            {/* Roof Type chips */}
             <div className="space-y-1.5">
               <Label className="text-xs" style={{ color: '#6B7280' }}>{t('jobs.roofType')}</Label>
               <div className="overflow-x-auto flex gap-2 pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'none' }}>
@@ -471,7 +382,6 @@ export default function NewJobPage() {
               </div>
             </div>
 
-            {/* Square footage */}
             <div className="space-y-1.5">
               <Label className="text-xs" style={{ color: '#6B7280' }}>{t('jobs.sqft')}</Label>
               <Input
@@ -485,7 +395,6 @@ export default function NewJobPage() {
               />
             </div>
 
-            {/* Pitch selector */}
             <div className="space-y-1.5">
               <Label className="text-xs" style={{ color: '#6B7280' }}>{t('jobs.pitch')}</Label>
               <div className="grid grid-cols-4 gap-2">
@@ -512,7 +421,6 @@ export default function NewJobPage() {
               </div>
             </div>
 
-            {/* Notes */}
             <div className="space-y-1.5">
               <Label className="text-xs" style={{ color: '#6B7280' }}>{t('jobs.notes')}</Label>
               <Textarea
@@ -528,18 +436,94 @@ export default function NewJobPage() {
         </div>
       </form>
 
+      {/* ── Create New Customer Modal ── */}
+      <Dialog open={showNewCustomerModal} onOpenChange={setShowNewCustomerModal}>
+        <DialogContent
+          className="bg-[#1E2228] border-[#2A2D35] text-white max-w-md"
+          showCloseButton={true}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-white">
+              {lang === 'es' ? 'Nuevo Cliente' : 'New Customer'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-xs text-[#6B7280]">{lang === 'es' ? 'Nombre completo' : 'Full name'} *</Label>
+              <Input
+                value={newCustomerName}
+                onChange={(e) => setNewCustomerName(e.target.value)}
+                placeholder={lang === 'es' ? 'Juan Pérez' : 'John Smith'}
+                className="input-dark h-11"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-2">
+                <Label className="text-xs text-[#6B7280]">{lang === 'es' ? 'Teléfono' : 'Phone'}</Label>
+                <Input
+                  value={newCustomerPhone}
+                  onChange={(e) => setNewCustomerPhone(e.target.value)}
+                  placeholder="(555) 123-4567"
+                  type="tel"
+                  className="input-dark h-11"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-[#6B7280]">Email</Label>
+                <Input
+                  value={newCustomerEmail}
+                  onChange={(e) => setNewCustomerEmail(e.target.value)}
+                  placeholder="email@ejemplo.com"
+                  type="email"
+                  className="input-dark h-11"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-[#6B7280]">{lang === 'es' ? 'Dirección del trabajo' : 'Job address'}</Label>
+              <AddressInput
+                value={newCustomerAddress}
+                onChange={(addr) => setNewCustomerAddress(addr)}
+                placeholder="123 Main St, City, TX"
+                lang={lang as 'es' | 'en'}
+                className="input-dark"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <button
+              type="button"
+              onClick={() => setShowNewCustomerModal(false)}
+              className="h-10 px-4 rounded-lg border border-[#2A2D35] text-[#6B7280] text-sm hover:bg-[#252830]"
+            >
+              {lang === 'es' ? 'Cancelar' : 'Cancel'}
+            </button>
+            <button
+              type="button"
+              onClick={handleCreateCustomer}
+              disabled={creatingCustomer || !newCustomerName.trim()}
+              className="h-10 px-4 rounded-lg btn-lime font-semibold text-sm disabled:opacity-50"
+            >
+              {creatingCustomer ? '...' : (lang === 'es' ? 'Crear Cliente' : 'Create Customer')}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ── STICKY BOTTOM CTA ── */}
       <div className="fixed left-0 right-0 z-50 px-4 pt-3 pb-20" style={{ bottom: 0, background: 'linear-gradient(to top, #0F1117 60%, transparent)' }}>
-        <div className="mx-auto w-full max-w-2xl">
+        <div className="mx-auto w-full max-w-7xl">
           <button
             type="submit"
             form="new-job-form"
-            disabled={loading}
-            className="btn-lime w-full h-14 rounded-xl text-base font-bold transition-all active:scale-[0.98] disabled:opacity-50"
+            disabled={loading || !canCreateJob}
+            className="btn-lime w-full h-14 rounded-xl text-base font-bold transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading
               ? (lang === 'es' ? 'Creando...' : 'Creating...')
-              : (lang === 'es' ? 'Crear Trabajo →' : 'Create Job →')}
+              : !canCreateJob
+                ? (lang === 'es' ? 'Seleccioná un cliente' : 'Select a customer')
+                : (lang === 'es' ? 'Crear Trabajo →' : 'Create Job →')}
           </button>
         </div>
       </div>

@@ -122,19 +122,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head />
       <body className="bg-[#0F1117] text-white antialiased font-sans">
         <Providers>{children}</Providers>
-        <footer className="w-full border-t border-[#1E2228] py-3 px-4">
-          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-[#4B5563]">
+        <footer className="w-full bg-[#0F1117] border-t border-[#1E2228] py-3 px-4">
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-[#9CA3AF]">
             <span>© {new Date().getFullYear()} RoofBack</span>
             <span aria-hidden="true">·</span>
-            <Link href="/terms" className="hover:text-[#A8FF3E] transition-colors">
+            <Link href="/terms" className="text-[#A8FF3E] hover:text-[#bdff72] transition-colors">
               Terms of Service
             </Link>
             <span aria-hidden="true">·</span>
-            <Link href="/privacy" className="hover:text-[#A8FF3E] transition-colors">
+            <Link href="/privacy" className="text-[#A8FF3E] hover:text-[#bdff72] transition-colors">
               Privacy Policy
             </Link>
             <span aria-hidden="true">·</span>
-            <a href="mailto:hello@roofback.app" className="hover:text-[#A8FF3E] transition-colors">
+            <a href="mailto:hello@roofback.app" className="text-[#A8FF3E] hover:text-[#bdff72] transition-colors">
               hello@roofback.app
             </a>
           </div>
