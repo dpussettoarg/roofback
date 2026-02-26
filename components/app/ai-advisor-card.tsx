@@ -23,7 +23,6 @@ import dynamic from 'next/dynamic'
 import {
   BrainCircuit,
   RotateCcw,
-  FileDown,
   AlertTriangle,
   Lightbulb,
   CheckCircle2,
@@ -31,13 +30,11 @@ import {
 import { format } from 'date-fns'
 import type { BusinessInsightsResponse, BusinessInsight } from '@/app/api/ai/business-insights/route'
 
-// PDF libs — client-only, loaded lazily after mount
-const PDFDownloadLink = dynamic(
-  () => import('@react-pdf/renderer').then((m) => m.PDFDownloadLink),
-  { ssr: false, loading: () => null }
-)
-const DailyReportPDF = dynamic(
-  () => import('@/components/pdf/daily-report-pdf').then((m) => m.DailyReportPDF),
+// PDF button — dynamically imported so @react-pdf/renderer (ESM-only, browser-only)
+// is never reachable by webpack's server-side build pass.
+// All @react-pdf/renderer imports live exclusively in pdf-download-button.tsx.
+const PdfDownloadButton = dynamic(
+  () => import('@/components/pdf/pdf-download-button'),
   { ssr: false, loading: () => null }
 )
 
@@ -151,7 +148,6 @@ export default function AiAdvisorCard({
     fetchInsights()
   }, [fetchInsights, hideWidget])
 
-  const now = new Date()
   const displayName = companyName || profileName
 
   if (hideWidget) return null
@@ -232,30 +228,13 @@ export default function AiAdvisorCard({
         {/* PDF download — only render after browser paint (pdfReady gate) */}
         {pdfReady && !aiLoading && aiData && (
           <div className="mt-4 pt-4 border-t border-[#2A2D35]">
-            <PDFDownloadLink
-              document={
-                <DailyReportPDF
-                  companyName={displayName}
-                  generatedAt={aiData.generatedAt}
-                  lang={lang as 'es' | 'en'}
-                  insights={aiData}
-                  jobs={activeJobsForPdf}
-                />
-              }
-              fileName={`roofback-reporte-${format(now, 'yyyy-MM-dd')}.pdf`}
-            >
-              {({ loading: pdfLoading }: { loading: boolean }) => (
-                <button
-                  className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-[#A8FF3E] bg-[#A8FF3E]/10 hover:bg-[#A8FF3E]/20 border border-[#A8FF3E]/30 rounded-lg py-3 transition-colors"
-                  disabled={pdfLoading}
-                >
-                  <FileDown className="h-4 w-4" />
-                  {pdfLoading
-                    ? (lang === 'es' ? 'Generando PDF…' : 'Generating PDF…')
-                    : (lang === 'es' ? 'Descargar Reporte del Día (PDF)' : 'Download Daily Report (PDF)')}
-                </button>
-              )}
-            </PDFDownloadLink>
+            <PdfDownloadButton
+              companyName={displayName}
+              generatedAt={aiData.generatedAt}
+              lang={lang as 'es' | 'en'}
+              insights={aiData}
+              jobs={activeJobsForPdf}
+            />
           </div>
         )}
       </div>
