@@ -236,7 +236,9 @@ export default function LoginPage() {
                   <Label htmlFor="email-forgot" className="text-[#6B7280] text-sm">Email</Label>
                   <Input
                     id="email-forgot"
+                    name="email"
                     type="email"
+                    autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="tu@email.com"
@@ -324,7 +326,9 @@ export default function LoginPage() {
                     </Label>
                     <Input
                       id="name"
+                      name="name"
                       type="text"
+                      autoComplete="name"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       placeholder="Juan Pérez"
@@ -340,7 +344,9 @@ export default function LoginPage() {
                   </Label>
                   <Input
                     id="email"
+                    name="email"
                     type="email"
+                    autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="tu@email.com"
@@ -367,7 +373,9 @@ export default function LoginPage() {
                   <div className="relative">
                     <Input
                       id="password"
+                      name="password"
                       type={showPassword ? 'text' : 'password'}
+                      autoComplete={isSignUp ? 'new-password' : 'current-password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
