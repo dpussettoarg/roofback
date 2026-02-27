@@ -1,5 +1,11 @@
 [build]
   command = "npm run build"
 
+[build.environment]
+  # Force Netlify to skip build cache and do a clean build every time.
+  # This prevents stale cached builds from being served when code changes.
+  NETLIFY_USE_YARN = "false"
+  NODE_VERSION = "22"
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"
