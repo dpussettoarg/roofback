@@ -3,17 +3,14 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { getURL } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n/context'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
-import Link from 'next/link'
 import { Loader2, Eye, EyeOff, Mail } from 'lucide-react'
 
-export default function LoginPage() {
+export default function LoginClient() {
   const [view, setView] = useState<'login' | 'signup' | 'forgot'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -22,13 +19,13 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [processingHash, setProcessingHash] = useState(false)
+
   const router = useRouter()
   const { t, lang, setLang } = useI18n()
   const supabase = createClient()
 
-  // Mostrar toast si hay error de auth (OAuth callback falló)
+  // Show toast if OAuth callback failed
   useEffect(() => {
-    if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
     if (params.get('error') === 'auth') {
       toast.error(
@@ -40,9 +37,9 @@ export default function LoginPage() {
     }
   }, [lang])
 
-  // Procesar hash de Supabase (#access_token, magic link) - el servidor NUNCA recibe el hash
+  // Process Supabase hash (#access_token) — server never receives the hash
   useEffect(() => {
-    if (typeof window === 'undefined' || processingHash) return
+    if (processingHash) return
     const hash = window.location.hash
     if (!hash || !hash.includes('access_token')) return
 
@@ -53,7 +50,10 @@ export default function LoginPage() {
         const accessToken = params.get('access_token')
         const refreshToken = params.get('refresh_token')
         if (accessToken) {
-          const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken || '' })
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken || '',
+          })
           if (!error) {
             window.history.replaceState(null, '', window.location.pathname)
             router.push('/dashboard')
@@ -62,7 +62,6 @@ export default function LoginPage() {
           }
         }
       } catch {
-        // Fallback: let Supabase client try to recover
         const { data: { session } } = await supabase.auth.getSession()
         if (session) {
           window.history.replaceState(null, '', window.location.pathname)
@@ -78,7 +77,6 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-
     try {
       if (view === 'signup') {
         const { error } = await supabase.auth.signUp({
@@ -86,7 +84,7 @@ export default function LoginPage() {
           password,
           options: {
             data: { full_name: fullName },
-            emailRedirectTo: getURL('/login'), // Magic links usan hash; /login los procesa
+            emailRedirectTo: getURL('/login'),
           },
         })
         if (error) throw error
@@ -112,21 +110,11 @@ export default function LoginPage() {
         return
       }
 
-      // Login
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) {
-        if (error.message.includes('Invalid API key')) {
-          throw new Error(
-            lang === 'es'
-              ? 'Error de configuración. Verificá las credenciales de Supabase en .env.local'
-              : 'Configuration error. Check Supabase credentials in .env.local'
-          )
-        }
         if (error.message.includes('Invalid login credentials')) {
           throw new Error(
-            lang === 'es'
-              ? 'Email o contraseña incorrectos'
-              : 'Invalid email or password'
+            lang === 'es' ? 'Email o contraseña incorrectos' : 'Invalid email or password'
           )
         }
         throw error
@@ -134,8 +122,7 @@ export default function LoginPage() {
       router.push('/dashboard')
       router.refresh()
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : t('common.error')
-      toast.error(message)
+      toast.error(err instanceof Error ? err.message : t('common.error'))
     } finally {
       setLoading(false)
     }
@@ -148,25 +135,12 @@ export default function LoginPage() {
         provider: 'google',
         options: {
           redirectTo: getURL('/auth/callback'),
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
+          queryParams: { access_type: 'offline', prompt: 'consent' },
         },
       })
-      if (error) {
-        if (error.message.includes('Invalid API key')) {
-          throw new Error(
-            lang === 'es'
-              ? 'Error de configuración. Verificá las credenciales de Supabase.'
-              : 'Configuration error. Check Supabase credentials.'
-          )
-        }
-        throw error
-      }
+      if (error) throw error
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : t('common.error')
-      toast.error(message)
+      toast.error(err instanceof Error ? err.message : t('common.error'))
       setGoogleLoading(false)
     }
   }
@@ -175,8 +149,11 @@ export default function LoginPage() {
   const isForgot = view === 'forgot'
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-4 sm:px-6 relative overflow-x-hidden" style={{ backgroundColor: '#0F1117' }}>
-      {/* Background blurred lime-green orbs */}
+    <div
+      className="min-h-screen flex flex-col items-center justify-center px-4 relative overflow-x-hidden"
+      style={{ backgroundColor: '#0F1117' }}
+    >
+      {/* Background orbs */}
       <div
         className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full blur-3xl pointer-events-none"
         style={{ background: 'radial-gradient(circle, rgba(168,255,62,0.08) 0%, rgba(168,255,62,0.02) 60%, transparent 80%)' }}
@@ -195,29 +172,30 @@ export default function LoginPage() {
       </button>
 
       {/* Logo */}
-      <div className="mb-8 text-center relative z-10">
-        <div className="flex items-center justify-center">
-          <Image
-            src="/LOGO/1.png"
-            alt="RoofBack"
-            width={280}
-            height={80}
-            priority
-            className="h-14 w-auto"
-          />
-        </div>
+      <div className="mb-8 relative z-10">
+        <Image
+          src="/LOGO/1.png"
+          alt="RoofBack"
+          width={280}
+          height={80}
+          priority
+          className="h-14 w-auto"
+        />
       </div>
 
       {/* Card */}
       <div className="w-full max-w-[400px] relative z-10">
-        <div className="rounded-2xl border border-[#2A2D35] p-8" style={{ backgroundColor: '#1E2228' }}>
+        <div
+          className="rounded-2xl border border-[#2A2D35] p-8"
+          style={{ backgroundColor: '#1E2228' }}
+        >
 
-          {/* ===== FORGOT PASSWORD VIEW ===== */}
+          {/* ── FORGOT PASSWORD ── */}
           {isForgot && (
             <>
               <div className="mb-6 text-center">
                 <div
-                  className="flex items-center justify-center w-12 h-12 mx-auto mb-3 rounded-full"
+                  className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center"
                   style={{ backgroundColor: 'rgba(168,255,62,0.1)' }}
                 >
                   <Mail className="h-5 w-5 text-[#A8FF3E]" />
@@ -231,10 +209,13 @@ export default function LoginPage() {
                     : "We'll send you a link to reset your password"}
                 </p>
               </div>
+
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email-forgot" className="text-[#6B7280] text-sm">Email</Label>
-                  <Input
+                  <label htmlFor="email-forgot" className="block text-sm text-[#6B7280]">
+                    Email
+                  </label>
+                  <input
                     id="email-forgot"
                     name="email"
                     type="email"
@@ -242,25 +223,22 @@ export default function LoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="tu@email.com"
-                    className="input-dark h-12 rounded-lg"
                     required
+                    className="input-dark w-full h-12 rounded-lg px-3 text-sm"
                   />
                 </div>
-                <Button
+                <button
                   type="submit"
                   disabled={loading}
-                  className="btn-lime w-full h-12 rounded-lg"
+                  className="btn-lime w-full h-12 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
                 >
-                  {loading ? (
-                    <span className="flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      {lang === 'es' ? 'Enviando...' : 'Sending...'}
-                    </span>
-                  ) : (
-                    lang === 'es' ? 'Enviar link de recuperación' : 'Send recovery link'
-                  )}
-                </Button>
+                  {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {loading
+                    ? (lang === 'es' ? 'Enviando...' : 'Sending...')
+                    : (lang === 'es' ? 'Enviar link de recuperación' : 'Send recovery link')}
+                </button>
               </form>
+
               <div className="mt-5 text-center">
                 <button
                   onClick={() => setView('login')}
@@ -272,7 +250,7 @@ export default function LoginPage() {
             </>
           )}
 
-          {/* ===== LOGIN / SIGNUP VIEW ===== */}
+          {/* ── LOGIN / SIGNUP ── */}
           {!isForgot && (
             <>
               <div className="mb-6">
@@ -281,26 +259,27 @@ export default function LoginPage() {
                 </h2>
                 <p className="text-[#6B7280] text-sm mt-1">
                   {isSignUp
-                    ? lang === 'es' ? 'Es gratis. Sin tarjeta.' : "It's free. No card needed."
-                    : lang === 'es' ? 'Ingresá con tu cuenta' : 'Sign in to your account'}
+                    ? (lang === 'es' ? 'Es gratis. Sin tarjeta.' : "It's free. No card needed.")
+                    : (lang === 'es' ? 'Ingresá con tu cuenta' : 'Sign in to your account')}
                 </p>
               </div>
 
-              {/* Google Sign In */}
+              {/* Google */}
               <button
+                type="button"
                 onClick={handleGoogleSignIn}
                 disabled={googleLoading}
-                className="w-full h-12 flex items-center justify-center gap-3 border border-[#2A2D35] rounded-lg text-sm font-medium text-white mb-5 disabled:opacity-50 transition-colors hover:bg-[#252830]"
+                className="w-full h-12 flex items-center justify-center gap-3 border border-[#2A2D35] rounded-lg text-sm font-medium text-white mb-5 hover:bg-[#252830] disabled:opacity-50 transition-colors"
                 style={{ backgroundColor: '#1E2228' }}
               >
                 {googleLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                   </svg>
                 )}
                 {lang === 'es' ? 'Continuar con Google' : 'Continue with Google'}
@@ -318,31 +297,32 @@ export default function LoginPage() {
                 </div>
               </div>
 
+              {/* Form */}
               <form onSubmit={handleSubmit} className="space-y-4">
                 {isSignUp && (
                   <div className="space-y-2">
-                    <Label htmlFor="name" className="text-[#6B7280] text-sm">
+                    <label htmlFor="fullname" className="block text-sm text-[#6B7280]">
                       {t('auth.name')}
-                    </Label>
-                    <Input
-                      id="name"
+                    </label>
+                    <input
+                      id="fullname"
                       name="name"
                       type="text"
                       autoComplete="name"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       placeholder="Juan Pérez"
-                      className="input-dark h-12 rounded-lg"
                       required
+                      className="input-dark w-full h-12 rounded-lg px-3 text-sm"
                     />
                   </div>
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-[#6B7280] text-sm">
+                  <label htmlFor="email" className="block text-sm text-[#6B7280]">
                     {t('auth.email')}
-                  </Label>
-                  <Input
+                  </label>
+                  <input
                     id="email"
                     name="email"
                     type="email"
@@ -350,16 +330,16 @@ export default function LoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="tu@email.com"
-                    className="input-dark h-12 rounded-lg"
                     required
+                    className="input-dark w-full h-12 rounded-lg px-3 text-sm"
                   />
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="password" className="text-[#6B7280] text-sm">
+                    <label htmlFor="password" className="block text-sm text-[#6B7280]">
                       {t('auth.password')}
-                    </Label>
+                    </label>
                     {!isSignUp && (
                       <button
                         type="button"
@@ -371,7 +351,7 @@ export default function LoginPage() {
                     )}
                   </div>
                   <div className="relative">
-                    <Input
+                    <input
                       id="password"
                       name="password"
                       type={showPassword ? 'text' : 'password'}
@@ -379,38 +359,36 @@ export default function LoginPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="input-dark h-12 rounded-lg pr-12"
                       minLength={6}
                       required
+                      className="input-dark w-full h-12 rounded-lg px-3 pr-12 text-sm"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-white transition-colors"
                       tabIndex={-1}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-white transition-colors"
                     >
-                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      {showPassword
+                        ? <EyeOff className="h-5 w-5" />
+                        : <Eye className="h-5 w-5" />}
                     </button>
                   </div>
                 </div>
 
-                <Button
+                <button
                   type="submit"
                   disabled={loading}
-                  className="btn-lime w-full h-12 rounded-lg"
+                  className="btn-lime w-full h-12 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
                 >
-                  {loading ? (
-                    <span className="flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      {isSignUp ? t('auth.signingUp') : t('auth.loggingIn')}
-                    </span>
-                  ) : (
-                    isSignUp ? t('auth.signupBtn') : t('auth.loginBtn')
-                  )}
-                </Button>
+                  {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {loading
+                    ? (isSignUp ? t('auth.signingUp') : t('auth.loggingIn'))
+                    : (isSignUp ? t('auth.signupBtn') : t('auth.loginBtn'))}
+                </button>
               </form>
 
-              {/* Legal disclaimer */}
+              {/* Legal */}
               <p className="mt-5 text-center text-xs text-[#9CA3AF] leading-relaxed px-1">
                 {lang === 'es' ? (
                   <>
@@ -439,9 +417,16 @@ export default function LoginPage() {
                 )}
               </p>
 
+              {/* Switch view */}
               <div className="mt-4 text-center">
                 <button
-                  onClick={() => setView(isSignUp ? 'login' : 'signup')}
+                  type="button"
+                  onClick={() => {
+                    setView(isSignUp ? 'login' : 'signup')
+                    setEmail('')
+                    setPassword('')
+                    setFullName('')
+                  }}
                   className="text-sm text-[#6B7280] hover:text-[#A8FF3E] transition-colors"
                 >
                   {isSignUp ? t('auth.switchToLogin') : t('auth.switchToSignup')}
@@ -453,10 +438,19 @@ export default function LoginPage() {
       </div>
 
       {/* Footer */}
-      <p className="mt-6 text-xs text-[#6B7280] text-center relative z-10 max-w-xs">
-        {lang === 'es'
-          ? 'Respaldado por 20 años de experiencia en roofing.'
-          : 'Backed by 20 years of roofing expertise.'}
+      <p className="mt-6 text-xs text-[#6B7280] text-center relative z-10">
+        © {new Date().getFullYear()} RoofBack ·{' '}
+        <Link href="/terms" className="hover:text-[#A8FF3E] transition-colors">
+          {lang === 'es' ? 'Términos' : 'Terms'}
+        </Link>
+        {' · '}
+        <Link href="/privacy" className="hover:text-[#A8FF3E] transition-colors">
+          {lang === 'es' ? 'Privacidad' : 'Privacy'}
+        </Link>
+        {' · '}
+        <a href="mailto:hello@roofback.app" className="hover:text-[#A8FF3E] transition-colors">
+          hello@roofback.app
+        </a>
       </p>
     </div>
   )
