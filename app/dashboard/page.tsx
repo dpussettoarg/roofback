@@ -1,7 +1,9 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useEffect, useState, useMemo } from 'react'
-import dynamic from 'next/dynamic'
+import dynamicImport from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -24,7 +26,7 @@ import { format } from 'date-fns'
 // Isolating it in a separate dynamic chunk prevents @react-pdf/renderer from
 // landing in the same module scope as the dashboard and triggering the
 // "ie is not a function" crash.
-const AiAdvisorCard = dynamic(
+const AiAdvisorCard = dynamicImport(
   () => import('@/components/app/ai-advisor-card'),
   {
     ssr: false,
@@ -50,7 +52,7 @@ const AiAdvisorCard = dynamic(
 )
 
 // ProfitChart: Recharts must be client-only to avoid width(-1) crash.
-const ProfitChart = dynamic(
+const ProfitChart = dynamicImport(
   () => import('@/components/app/profit-chart'),
   {
     ssr: false,

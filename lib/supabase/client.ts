@@ -3,6 +3,9 @@ import { logger } from '@/lib/logger'
 
 let client: ReturnType<typeof createBrowserClient> | null = null
 
+const PLACEHOLDER_URL = 'https://placeholder.supabase.co'
+const PLACEHOLDER_KEY = 'placeholder-anon-key-for-build'
+
 export function createClient() {
   if (client) return client
 
@@ -23,7 +26,13 @@ export function createClient() {
     )
   }
 
-  client = createBrowserClient(url, key)
+  // Use placeholder values during build/prerender so createBrowserClient
+  // doesn't throw — all real API calls will fail gracefully at runtime
+  // if the real env vars aren't set (they always are on Netlify).
+  client = createBrowserClient(
+    url || PLACEHOLDER_URL,
+    key || PLACEHOLDER_KEY
+  )
   return client
 }
 
