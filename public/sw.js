@@ -1,16 +1,22 @@
-const CACHE_NAME = 'roofback-v2'
+const CACHE_NAME = 'roofback-v3'
 
 self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting())
 })
 
 self.addEventListener('activate', (event) => {
+  // Delete ALL caches (not just old versions) to purge any stale HTML with wrong chunk hashes
   event.waitUntil(
-    caches.keys().then((names) =>
-      Promise.all(names.filter((n) => n !== CACHE_NAME).map((n) => caches.delete(n)))
-    )
+    caches.keys()
+      .then((names) => Promise.all(names.map((n) => caches.delete(n))))
+      .then(() => self.clients.claim())
+      .then(() =>
+        // Force all open tabs to reload so they get fresh HTML immediately
+        self.clients.matchAll({ type: 'window' }).then((clients) =>
+          clients.forEach((client) => client.navigate(client.url))
+        )
+      )
   )
-  self.clients.claim()
 })
 
 self.addEventListener('fetch', (event) => {
