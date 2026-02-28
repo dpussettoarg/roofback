@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useI18n } from '@/lib/i18n/context'
 import { MobileNav } from '@/components/app/mobile-nav'
@@ -25,6 +26,7 @@ const EMPTY_FORM = {
 export default function CustomersPage() {
   const { lang } = useI18n()
   const supabase = createClient()
+  const router = useRouter()
 
   const [customers, setCustomers] = useState<CustomerWithJobCount[]>([])
   const [loading, setLoading] = useState(true)
@@ -56,7 +58,7 @@ export default function CustomersPage() {
 
     if (!profile?.organization_id) {
       setLoading(false)
-      toast.error(lang === 'es' ? 'No se encontró tu organización. Cerrá sesión y volvé a entrar.' : 'Organization not found. Please sign out and sign back in.')
+      router.replace('/onboarding')
       return
     }
 

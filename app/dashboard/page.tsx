@@ -122,6 +122,12 @@ export default function DashboardPage() {
         return
       }
 
+      // If profile exists but has no organization, onboarding was never completed
+      if (prof && !prof.organization_id) {
+        router.replace('/onboarding')
+        return
+      }
+
       setProfileName(prof?.full_name || user.email?.split('@')[0] || '')
       setCompanyName(prof?.company_name || '')
       const oid = prof?.organization_id || null

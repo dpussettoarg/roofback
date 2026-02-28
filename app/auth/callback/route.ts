@@ -6,7 +6,7 @@ import { logger } from '@/lib/logger'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/dashboard'
+  const next = searchParams.get('next') ?? '/go'
 
   // En Netlify/Vercel, usamos headers para obtener el host real si existe
   const forwardedHost = request.headers.get('x-forwarded-host')
