@@ -8,11 +8,11 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# HTML: never cache — stale HTML causes wrong chunk hash references after deploy
+# HTML: no-store so Netlify CDN never caches stale HTML with wrong chunk hashes
 [[headers]]
   for = "/*"
   [headers.values]
-    Cache-Control = "public, max-age=0, must-revalidate"
+    Cache-Control = "no-store"
 
 # CSS chunks: force correct MIME type (Netlify serves them as text/plain by default)
 [[headers]]

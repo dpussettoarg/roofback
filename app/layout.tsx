@@ -4,6 +4,10 @@ import Link from 'next/link'
 import './globals.css'
 import { Providers } from '@/components/providers'
 
+// Prevent Netlify ISR/Durable Cache from serving stale HTML after deploys.
+// Must be on a Server Component (layout, not 'use client' pages).
+export const dynamic = 'force-dynamic'
+
 const SITE_URL = 'https://roofback.app'
 
 const inter = Inter({
