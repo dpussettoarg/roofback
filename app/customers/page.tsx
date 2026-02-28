@@ -56,6 +56,7 @@ export default function CustomersPage() {
 
     if (!profile?.organization_id) {
       setLoading(false)
+      toast.error(lang === 'es' ? 'No se encontró tu organización. Cerrá sesión y volvé a entrar.' : 'Organization not found. Please sign out and sign back in.')
       return
     }
 
@@ -112,7 +113,7 @@ export default function CustomersPage() {
 
   function openEdit(c: CustomerWithJobCount) {
     setEditCustomer(c)
-    setForm({ full_name: c.full_name, address: c.address, phone: c.phone, email: c.email, notes: c.notes })
+    setForm({ full_name: c.full_name, address: c.address ?? '', phone: c.phone ?? '', email: c.email ?? '', notes: c.notes ?? '' })
     setShowModal(true)
     setTimeout(() => firstInputRef.current?.focus(), 100)
   }
@@ -122,7 +123,10 @@ export default function CustomersPage() {
       toast.error(lang === 'es' ? 'El nombre es obligatorio' : 'Name is required')
       return
     }
-    if (!orgId) return
+    if (!orgId) {
+      toast.error(lang === 'es' ? 'Error de sesión. Recargá la página.' : 'Session error. Please reload the page.')
+      return
+    }
     setSaving(true)
     try {
       if (editCustomer) {
