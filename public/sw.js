@@ -1,4 +1,4 @@
-const CACHE_NAME = 'roofback-v1'
+const CACHE_NAME = 'roofback-v2'
 
 self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting())
@@ -16,6 +16,8 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return
   if (event.request.url.includes('/api/') || event.request.url.includes('supabase')) return
+  // Never cache HTML/navigation requests — stale HTML causes 404 chunk errors after new deployments
+  if (event.request.mode === 'navigate') return
 
   event.respondWith(
     fetch(event.request)
