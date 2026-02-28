@@ -5,18 +5,37 @@
 [build.environment]
   NODE_VERSION = "20"
 
-# Use the Next.js plugin
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# HTML pages must never be cached — stale HTML references wrong chunk hashes after each deploy
+# HTML: never cache — stale HTML causes wrong chunk hash references after deploy
 [[headers]]
   for = "/*"
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
 
-# Static assets are content-addressed (hash in filename) — safe to cache forever
+# CSS chunks: force correct MIME type (Netlify serves them as text/plain by default)
 [[headers]]
-  for = "/_next/static/*"
+  for = "/_next/static/chunks/*.css"
   [headers.values]
+    Content-Type = "text/css; charset=utf-8"
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/_next/static/css/*.css"
+  [headers.values]
+    Content-Type = "text/css; charset=utf-8"
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# JS chunks: force correct MIME type
+[[headers]]
+  for = "/_next/static/chunks/*.js"
+  [headers.values]
+    Content-Type = "application/javascript; charset=utf-8"
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/_next/static/chunks/pages/*.js"
+  [headers.values]
+    Content-Type = "application/javascript; charset=utf-8"
     Cache-Control = "public, max-age=31536000, immutable"
