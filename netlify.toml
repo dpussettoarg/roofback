@@ -4,11 +4,7 @@
 
 [build.environment]
   NODE_VERSION = "20"
-  # Force completely clean builds - disable all caching
-  NETLIFY_CACHE_ENABLED = "false"
-  # Add a timestamp to force rebuild
-  BUILD_TIMESTAMP = "20260228"
 
-# Use the official Next.js plugin
+# Use the Next.js plugin
 [[plugins]]
   package = "@netlify/plugin-nextjs"
