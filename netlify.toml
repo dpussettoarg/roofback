@@ -5,16 +5,17 @@
 [build.environment]
   NODE_VERSION = "20"
 
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
+# No @netlify/plugin-nextjs — the plugin has a cache invalidation bug with Next.js 16
+# that causes stale HTML (with old chunk hashes) to be served after every new deploy.
+# Netlify's built-in Next.js runtime handles this correctly.
 
-# HTML: no-store so Netlify CDN never caches stale HTML with wrong chunk hashes
+# HTML pages: never cache — prevents CDN from serving stale HTML after deploys
 [[headers]]
   for = "/*"
   [headers.values]
     Cache-Control = "no-store"
 
-# CSS chunks: force correct MIME type (Netlify serves them as text/plain by default)
+# CSS chunks: force correct MIME type
 [[headers]]
   for = "/_next/static/chunks/*.css"
   [headers.values]
