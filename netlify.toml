@@ -1,5 +1,6 @@
 [build]
   command = "npm run build"
+  publish = ".next"
 
 [build.environment]
   # Force Netlify to skip build cache and do a clean build every time.
@@ -7,5 +8,15 @@
   NETLIFY_USE_YARN = "false"
   NODE_VERSION = "22"
 
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
+# Use Next.js framework preset - lets Netlify handle it natively
+[context.production]
+  framework = "nextjs"
+
+[context.deploy-preview]
+  framework = "nextjs"
+
+[context.branch-deploy]
+  framework = "nextjs"
+
+# Disable the Next.js plugin - use native support instead
+# The plugin has issues with Next.js 16's new architecture
