@@ -4,17 +4,11 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  # Force completely clean builds - disable all caching
+  NETLIFY_CACHE_ENABLED = "false"
+  # Add a timestamp to force rebuild
+  BUILD_TIMESTAMP = "20260228"
 
-# Force no caching on ALL content
-[[headers]]
-  for = "/*"
-  [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
-    Pragma = "no-cache"
-    Expires = "0"
-
-# Also for _next/static - but allow browser cache since these are immutable
-[[headers]]
-  for = "/_next/static/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
+# Use the official Next.js plugin
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
