@@ -17,7 +17,7 @@ export default function PrivacyPage() {
 
         {/* Back link */}
         <Link
-          href="/login"
+          href="/access"
           className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800 mb-10 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />

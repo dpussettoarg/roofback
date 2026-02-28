@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     : `https://${forwardedHost || 'roofback.app'}`
 
   if (!code) {
-    return NextResponse.redirect(`${baseUrl}/login?error=auth`)
+    return NextResponse.redirect(`${baseUrl}/access?error=auth`)
   }
 
   const cookieStore = await cookies()
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
 
   if (error) {
     logger.error('[Auth callback] Error:', error.message)
-    return NextResponse.redirect(`${baseUrl}/login?error=auth`)
+    return NextResponse.redirect(`${baseUrl}/access?error=auth`)
   }
 
   return NextResponse.redirect(`${baseUrl}${next.startsWith('/') ? next : `/${next}`}`)

@@ -19,18 +19,18 @@ export default async function DebugPage({
 }) {
   // Block in production entirely
   if (process.env.NODE_ENV === 'production') {
-    redirect('/login')
+    redirect('/access')
   }
 
   // Require an explicitly set secret — no hardcoded default
   const SECRET = process.env.DEBUG_PAGE_SECRET
   if (!SECRET) {
-    redirect('/login')
+    redirect('/access')
   }
 
   const params = await searchParams
   if (params.secret !== SECRET) {
-    redirect('/login')
+    redirect('/access')
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()

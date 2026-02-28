@@ -50,7 +50,7 @@ export default function OnboardingPage() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        router.replace('/login')
+        router.replace('/access')
         return
       }
       setUserId(user.id)

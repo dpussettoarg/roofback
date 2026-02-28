@@ -34,6 +34,7 @@ export async function middleware(request: NextRequest) {
   // ── Public routes (no auth required) ──────────────────────────────────────
   const isPublicRoute =
     pathname === '/' ||
+    pathname.startsWith('/access') ||
     pathname.startsWith('/login') ||
     pathname.startsWith('/auth') ||
     pathname.startsWith('/proposal') ||
@@ -52,21 +53,21 @@ export async function middleware(request: NextRequest) {
 
   // ── OAuth code forwarding ──────────────────────────────────────────────────
   const code = request.nextUrl.searchParams.get('code')
-  if (!user && code && (pathname === '/' || pathname === '/login')) {
+  if (!user && code && (pathname === '/' || pathname === '/access' || pathname === '/login')) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/callback'
     return NextResponse.redirect(url)
   }
 
-  // ── Unauthenticated → login ────────────────────────────────────────────────
+  // ── Unauthenticated → /access ──────────────────────────────────────────────
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone()
-    url.pathname = '/login'
+    url.pathname = '/access'
     return NextResponse.redirect(url)
   }
 
-  // ── Authenticated + /login → dashboard ────────────────────────────────────
-  if (user && pathname === '/login') {
+  // ── Authenticated + /access or /login → dashboard ─────────────────────────
+  if (user && (pathname === '/access' || pathname === '/login')) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
