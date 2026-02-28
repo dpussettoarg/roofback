@@ -60,7 +60,7 @@ export function Navbar({ lang, onToggleLang }: NavbarProps) {
 
           {/* Login */}
           <Link
-            href="/login"
+            href="/access"
             className="hidden sm:inline-flex h-9 px-4 items-center text-sm font-medium text-[#9CA3AF] hover:text-white transition-colors"
           >
             {lt(t.nav.login, lang)}
@@ -68,7 +68,7 @@ export function Navbar({ lang, onToggleLang }: NavbarProps) {
 
           {/* CTA */}
           <Link
-            href="/login"
+            href="/access"
             className="group h-9 px-5 rounded-full bg-[#A8FF3E] text-[#0F1117] text-sm font-black inline-flex items-center gap-1.5 hover:bg-[#bfff6b] transition-colors shadow-lg shadow-[#A8FF3E]/20"
           >
             {lang === 'es' ? 'Probá Gratis' : 'Try Free'}

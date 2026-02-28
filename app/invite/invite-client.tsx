@@ -36,7 +36,7 @@ export default function InviteClient() {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
-      router.push(`/login?next=/invite?token=${token}`)
+      router.push(`/access?next=/invite?token=${token}`)
       return
     }
 

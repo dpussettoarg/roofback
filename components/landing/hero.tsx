@@ -95,7 +95,7 @@ export function Hero({ lang }: HeroProps) {
 
             <div className="flex flex-col sm:flex-row items-start gap-4">
               <Link
-                href="/login"
+                href="/access"
                 className="group inline-flex items-center gap-2.5 h-14 px-8 rounded-full bg-[#A8FF3E] text-[#0F1117] text-base font-black shadow-lg shadow-[#A8FF3E]/20 hover:bg-[#bfff6b] hover:shadow-[#A8FF3E]/30 transition-all"
               >
                 {isEs ? 'Probá la Bestia — 14 días gratis' : 'Try The Beast — 14 days free'}

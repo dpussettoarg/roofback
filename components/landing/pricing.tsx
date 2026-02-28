@@ -113,7 +113,7 @@ export function Pricing({ lang }: PricingProps) {
 
             <div className="px-8 pb-8">
               <Link
-                href="/login"
+                href="/access"
                 className="group w-full h-14 rounded-2xl bg-[#A8FF3E] text-[#0F1117] text-base font-black flex items-center justify-center gap-2 hover:bg-[#bfff6b] transition-colors shadow-lg shadow-[#A8FF3E]/20"
               >
                 {lang === 'es' ? 'Probá la Bestia — 14 días gratis' : 'Try The Beast — 14 days free'}

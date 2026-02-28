@@ -22,7 +22,7 @@ export function LandingClient() {
   useEffect(() => {
     const hash = window.location.hash
     if (hash && hash.includes('access_token')) {
-      window.location.href = '/login' + hash
+      window.location.href = '/access' + hash
       return
     }
 

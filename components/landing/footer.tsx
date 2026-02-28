@@ -59,7 +59,7 @@ export function Footer({ lang }: FooterProps) {
                 <Link href="/privacy" className="block text-[#9CA3AF] hover:text-white transition-colors">
                   {isEs ? 'Privacidad' : 'Privacy'}
                 </Link>
-                <Link href="/login" className="block text-[#9CA3AF] hover:text-white transition-colors">
+                <Link href="/access" className="block text-[#9CA3AF] hover:text-white transition-colors">
                   {isEs ? 'Iniciar Sesión' : 'Log In'}
                 </Link>
               </div>
