@@ -3,7 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   serverExternalPackages: ['@react-pdf/renderer'],
 
-  // Netlify handles caching natively - remove conflicting custom headers
+  // Standard Next.js output for Netlify
+  // No trailingSlash - let Next.js handle it
 
   images: {
     remotePatterns: [
