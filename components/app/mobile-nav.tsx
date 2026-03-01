@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LayoutDashboard, Hammer, Users, Settings } from 'lucide-react'
 import { useI18n } from '@/lib/i18n/context'
+import { OnboardingTour } from './onboarding-tour'
 
 // Order: Home | Customers | Jobs | Settings (workflow: create customer first, then job)
 const navItems = [
@@ -18,6 +19,8 @@ export function MobileNav() {
   const { t, lang } = useI18n()
 
   return (
+    <>
+    <OnboardingTour />
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-[#0F1117]/95 backdrop-blur-lg border-t border-[#2A2D35] pb-safe">
       <div className="flex items-center justify-around max-w-lg mx-auto">
         {navItems.map((item) => {
@@ -46,5 +49,6 @@ export function MobileNav() {
         })}
       </div>
     </nav>
+    </>
   )
 }
