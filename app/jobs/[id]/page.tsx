@@ -491,7 +491,15 @@ export default function JobDetailPage() {
         ═══════════════════════════════════════════ */}
         {isApproved && (
           <>
-            {/* ── Prominent "View Contract" CTA ── */}
+            {/* ── SECCIÓN: CONTRATO ── */}
+            <div className="flex items-center gap-2.5 pt-1">
+              <div className="w-[3px] h-[14px] rounded-full bg-[#F97316]" />
+              <span className="text-[10px] font-bold text-[#F97316] uppercase tracking-[0.14em]">
+                {lang === 'es' ? 'Contrato' : 'Contract'}
+              </span>
+            </div>
+
+            {/* View Contract CTA */}
             <div className="flex gap-2">
               <Link
                 href={job.public_token ? `/proposal/${job.public_token}` : `/jobs/${id}/estimate`}
@@ -520,11 +528,11 @@ export default function JobDetailPage() {
             </div>
 
             {/* Signed contract meta card */}
-            <div className="bg-[#1E2228] rounded-[12px] overflow-hidden border border-[#A8FF3E]/30">
-              <div className="h-1 bg-[#A8FF3E]" />
+            <div className="bg-[#1E2228] rounded-[12px] overflow-hidden border border-[#F97316]/20">
+              <div className="h-[3px] bg-[#F97316]" />
               <div className="p-4 space-y-3">
                 <div className="flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 text-[#A8FF3E]" />
+                  <ShieldCheck className="h-5 w-5 text-[#F97316]" />
                   <h3 className="text-sm font-bold text-white">{lang === 'es' ? 'Contrato Firmado' : 'Signed Contract'}</h3>
                   <span className="ml-auto text-xs text-[#6B7280]">
                     {job.approved_at ? new Date(job.approved_at).toLocaleDateString(lang === 'es' ? 'es' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
@@ -532,14 +540,14 @@ export default function JobDetailPage() {
                 </div>
                 {job.client_signature && (
                   <div className="flex items-center gap-2 text-xs text-[#9CA3AF] bg-[#0F1117] rounded-[8px] px-3 py-2">
-                    <CalendarCheck className="h-3.5 w-3.5 text-[#A8FF3E]" />
+                    <CalendarCheck className="h-3.5 w-3.5 text-[#F97316]" />
                     <span>{lang === 'es' ? 'Firmado por: ' : 'Signed by: '}{job.client_signature}</span>
                   </div>
                 )}
                 <div className="flex items-center gap-3">
                   <Link
                     href={`/jobs/${id}/estimate`}
-                    className="flex items-center gap-1.5 text-xs text-[#A8FF3E] hover:underline font-medium"
+                    className="flex items-center gap-1.5 text-xs text-[#F97316] hover:underline font-medium"
                   >
                     <Lock className="h-3 w-3" />
                     {lang === 'es' ? 'Vista interna (solo lectura)' : 'Internal view (read only)'}
@@ -549,7 +557,7 @@ export default function JobDetailPage() {
                       href={`/proposal/${job.public_token}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 text-xs text-[#6B7280] hover:text-[#A8FF3E] hover:underline font-medium transition-colors"
+                      className="flex items-center gap-1.5 text-xs text-[#6B7280] hover:text-[#F97316] hover:underline font-medium transition-colors"
                     >
                       <Link2 className="h-3 w-3" />
                       {lang === 'es' ? 'Link público' : 'Public link'}
@@ -559,64 +567,9 @@ export default function JobDetailPage() {
               </div>
             </div>
 
-            {/* ── Milestone Tracker Summary ── */}
-            {(() => {
-              const currentStage = job.workflow_stage || 'approved'
-              const STAGES = [
-                { key: 'contract',   label_es: 'Contrato',   label_en: 'Contract'  },
-                { key: 'materials',  label_es: 'Materiales', label_en: 'Materials' },
-                { key: 'jobsite',    label_es: 'En Obra',    label_en: 'Job Site'  },
-                { key: 'completed',  label_es: 'Finalizado', label_en: 'Finished'  },
-              ]
-              const stepIndex = currentStage === 'completed' || currentStage === 'invoiced' || currentStage === 'paid' ? 3
-                : currentStage === 'in_progress' ? 2
-                : currentStage === 'materials_ordered' ? 1
-                : 0
-              const nextStage = STAGES[stepIndex + 1]
-              const nextMd = nextStage ? (milestoneDates[nextStage.key] || {}) : null
-              const daysToNext = nextMd?.scheduled
-                ? Math.round((new Date(nextMd.scheduled + 'T12:00').getTime() - Date.now()) / 86400000)
-                : null
-
-              return (
-                <Link href={`/jobs/${id}/tracking`}>
-                  <div className="bg-[#1E2228] rounded-[14px] border border-[#2A2D35] p-4 flex items-center gap-3 hover:bg-[#252830] transition-all cursor-pointer">
-                    <CalendarDays className="h-5 w-5 text-[#A8FF3E] flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[11px] font-bold bg-[#A8FF3E] text-[#0F1117] px-2 py-0.5 rounded-full">
-                          {lang === 'es' ? STAGES[stepIndex].label_es : STAGES[stepIndex].label_en}
-                        </span>
-                        {nextStage && (
-                          <span className="text-[11px] text-[#6B7280]">
-                            → {lang === 'es' ? nextStage.label_es : nextStage.label_en}
-                            {nextMd?.scheduled && (
-                              <span className="ml-1 text-[#9CA3AF]">
-                                {new Date(nextMd.scheduled + 'T12:00').toLocaleDateString(lang === 'es' ? 'es' : 'en-US', { month: 'short', day: 'numeric' })}
-                              </span>
-                            )}
-                            {daysToNext !== null && daysToNext >= 0 && (
-                              <span className="ml-1 text-[#A8FF3E]">({daysToNext}d)</span>
-                            )}
-                            {daysToNext !== null && daysToNext < 0 && (
-                              <span className="ml-1 text-red-400">({lang === 'es' ? 'atrasado' : 'overdue'})</span>
-                            )}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-[#6B7280] mt-0.5">
-                        {lang === 'es' ? 'Ver cronograma completo' : 'View full tracking'}
-                      </p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-[#6B7280] flex-shrink-0" />
-                  </div>
-                </Link>
-              )
-            })()}
-
-            {/* Payment Checklist — 3 fixed checkpoints */}
+            {/* Payment Checkpoints */}
             <div className="flex flex-wrap items-center gap-2 py-3 px-4 rounded-xl bg-[#1E2228] border border-[#2A2D35]">
-              <DollarSign className="h-4 w-4 text-[#A8FF3E] flex-shrink-0" />
+              <DollarSign className="h-4 w-4 text-[#F97316] flex-shrink-0" />
               {[
                 { id: 'deposit' as const, label_es: 'Depósito', label_en: 'Deposit' },
                 { id: 'progress' as const, label_es: 'Progreso', label_en: 'Progress Payment' },
@@ -632,7 +585,7 @@ export default function JobDetailPage() {
                     disabled={savingPaymentCheckpoint === cpId}
                     className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
                       checked
-                        ? 'bg-[#A8FF3E]/20 text-[#A8FF3E] border border-[#A8FF3E]/40'
+                        ? 'bg-[#F97316]/20 text-[#F97316] border border-[#F97316]/40'
                         : 'bg-[#0F1117] text-[#6B7280] border border-[#2A2D35] hover:border-[#3A3D45]'
                     }`}
                   >
@@ -646,7 +599,7 @@ export default function JobDetailPage() {
               })}
             </div>
 
-            {/* Red banner when job finished + final payment not confirmed */}
+            {/* Red banner: final payment pending */}
             {job.workflow_stage === 'completed' && !paymentCheckpoints.find((p) => p.id === 'final')?.checked && (
               <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400">
                 <AlertCircle className="h-5 w-5 flex-shrink-0" />
@@ -660,10 +613,10 @@ export default function JobDetailPage() {
             <div className="bg-[#1E2228] rounded-[12px] border border-[#2A2D35] overflow-hidden">
               <div className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <FileEdit className="h-5 w-5 text-[#A8FF3E]" />
+                  <FileEdit className="h-5 w-5 text-[#F97316]" />
                   <h3 className="text-sm font-bold text-white">{lang === 'es' ? 'Órdenes de Cambio' : 'Change Orders'}</h3>
                 </div>
-                <button onClick={() => setShowChangeOrderModal(true)} className="flex items-center gap-1.5 text-xs font-semibold text-[#A8FF3E] hover:underline">
+                <button onClick={() => setShowChangeOrderModal(true)} className="flex items-center gap-1.5 text-xs font-semibold text-[#F97316] hover:underline">
                   <Plus className="h-3.5 w-3.5" /> {lang === 'es' ? 'Nueva' : 'New'}
                 </button>
               </div>
@@ -689,12 +642,18 @@ export default function JobDetailPage() {
               )}
             </div>
 
+            {/* ── SECCIÓN: MATERIALES ── */}
+            <div className="flex items-center gap-2.5 pt-3">
+              <div className="w-[3px] h-[14px] rounded-full bg-[#60A5FA]" />
+              <span className="text-[10px] font-bold text-[#60A5FA] uppercase tracking-[0.14em]">
+                {lang === 'es' ? 'Materiales' : 'Materials'}
+              </span>
+            </div>
+
             {/* Material checklist summary */}
             <Link href={`/jobs/${id}/checklist`}>
               <div className="bg-[#1E2228] rounded-[12px] border border-[#2A2D35] p-4 flex items-center gap-4 hover:bg-[#252830] transition-all cursor-pointer">
-                <div className="relative flex-shrink-0">
-                  <Package className="h-8 w-8 text-[#A8FF3E]" />
-                </div>
+                <Package className="h-8 w-8 text-[#60A5FA] flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-base font-bold text-white">{lang === 'es' ? 'Materiales' : 'Materials'}</p>
                   {checklistTotal > 0 ? (
@@ -703,7 +662,7 @@ export default function JobDetailPage() {
                         <span>{checklistDone}/{checklistTotal} {lang === 'es' ? 'comprados' : 'purchased'}</span>
                       </div>
                       <div className="h-1.5 bg-[#0F1117] rounded-full overflow-hidden">
-                        <div className="h-full rounded-full bg-[#A8FF3E] transition-all" style={{ width: `${pct(checklistDone, checklistTotal)}%` }} />
+                        <div className="h-full rounded-full bg-[#60A5FA] transition-all" style={{ width: `${pct(checklistDone, checklistTotal)}%` }} />
                       </div>
                     </div>
                   ) : (
@@ -714,20 +673,19 @@ export default function JobDetailPage() {
               </div>
             </Link>
 
-            {/* Budget vs Actual — use effective contract (incl change orders) for margin */}
+            {/* Budget vs Actual */}
             <div className="bg-[#1E2228] rounded-[12px] overflow-hidden border border-[#2A2D35]">
-              <div className="h-1 bg-[#A8FF3E]" />
+              <div className="h-[3px] bg-[#60A5FA]" />
               <div className="p-4 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-[#A8FF3E]" />
+                    <TrendingUp className="h-4 w-4 text-[#60A5FA]" />
                     <h3 className="text-sm font-bold text-white">{lang === 'es' ? 'Presupuesto vs Real' : 'Budget vs Actual'}</h3>
                   </div>
-                  <Link href={`/jobs/${id}/results`} className="text-[11px] text-[#A8FF3E] hover:underline">
+                  <Link href={`/jobs/${id}/results`} className="text-[11px] text-[#60A5FA] hover:underline">
                     {lang === 'es' ? 'Ver detalle' : 'View detail'}
                   </Link>
                 </div>
-
                 {totalBudget > 0 || totalActual > 0 ? (
                   <>
                     {canSeeProfit && (
@@ -796,17 +754,25 @@ export default function JobDetailPage() {
               </div>
             </div>
 
-            {/* Execution action cards */}
+            {/* ── SECCIÓN: SEGUIMIENTO DEL TRABAJO ── */}
+            <div className="flex items-center gap-2.5 pt-3">
+              <div className="w-[3px] h-[14px] rounded-full bg-[#A78BFA]" />
+              <span className="text-[10px] font-bold text-[#A78BFA] uppercase tracking-[0.14em]">
+                {lang === 'es' ? 'Seguimiento del Trabajo' : 'Job Tracking'}
+              </span>
+            </div>
+
+            {/* Tracking action cards */}
             <div className="space-y-2">
               {[
-                { href: `/jobs/${id}/tracking`, icon: CalendarDays, title_es: 'Cronograma', title_en: 'Tracking', desc_es: 'Fechas y etapas de la obra', desc_en: 'Milestones and stage dates' },
-                { href: `/jobs/${id}/timetrack`, icon: Clock, title_es: 'Horas y Gastos', title_en: 'Time & Expenses', desc_es: 'Registrar horas del crew y gastos', desc_en: 'Log crew hours and expenses' },
-                { href: `/jobs/${id}/log`, icon: BookOpen, title_es: 'Field Log', title_en: 'Field Log', desc_es: 'Bitácora de obra y notas de campo', desc_en: 'Field notes and project log' },
-                { href: `/jobs/${id}/results`, icon: BarChart3, title_es: 'Resultados', title_en: 'Results', desc_es: 'Ver análisis final del trabajo', desc_en: 'View final job analysis' },
+                { href: `/jobs/${id}/tracking`, icon: CalendarDays, title_es: 'Cronograma', title_en: 'Tracking', desc_es: 'Fechas y etapas de la obra', desc_en: 'Milestones and stage dates', color: '#A78BFA' },
+                { href: `/jobs/${id}/timetrack`, icon: Clock, title_es: 'Horas y Gastos', title_en: 'Time & Expenses', desc_es: 'Registrar horas del crew y gastos', desc_en: 'Log crew hours and expenses', color: '#A78BFA' },
+                { href: `/jobs/${id}/log`, icon: BookOpen, title_es: 'Field Log', title_en: 'Field Log', desc_es: 'Bitácora de obra y notas de campo', desc_en: 'Field notes and project log', color: '#A78BFA' },
+                { href: `/jobs/${id}/results`, icon: BarChart3, title_es: 'Resultados', title_en: 'Results', desc_es: 'Ver análisis final del trabajo', desc_en: 'View final job analysis', color: '#A78BFA' },
               ].map((s) => (
                 <Link key={s.href} href={s.href}>
                   <div className="bg-[#1E2228] border border-[#2A2D35] rounded-[12px] p-4 flex items-center gap-4 hover:bg-[#252830] transition-all cursor-pointer">
-                    <s.icon className="h-7 w-7 text-[#A8FF3E] flex-shrink-0" />
+                    <s.icon className="h-7 w-7 flex-shrink-0" style={{ color: s.color }} />
                     <div className="flex-1 min-w-0">
                       <p className="text-base font-bold text-white">{lang === 'es' ? s.title_es : s.title_en}</p>
                       <p className="text-[13px] text-[#6B7280]">{lang === 'es' ? s.desc_es : s.desc_en}</p>

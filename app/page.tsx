@@ -10,9 +10,9 @@ import { LandingClient } from '@/components/landing/landing-client'
 const SITE_URL = 'https://roofback.app'
 
 export const metadata: Metadata = {
-  title: 'RoofBack | Gestión de Roofing por Techistas con 20 años de Experiencia',
+  title: 'RoofBack | Software de Roofing con 30 años de Experiencia en Obra',
   description:
-    'Optimizá tus presupuestos, controlá gastos y organizá tu equipo con la herramienta diseñada en el techo. Basada en 20 años de experiencia en USA y Latam. Gratis 14 días.',
+    'Presupuestos con IA, control de gastos en tiempo real y cronograma de obra — construido por quien vivió el caos del campo. 30 años de experiencia en USA y Latam. Gratis 14 días.',
   alternates: {
     canonical: SITE_URL,
   },
@@ -42,7 +42,7 @@ const jsonLd = {
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'Web, Android, iOS',
   description:
-    'RoofBack es una herramienta de gestión de negocios de roofing (techado) diseñada por techistas con 20 años de experiencia en USA y Latinoamérica. Incluye presupuestos con IA, firma digital, control de gastos, cronograma visual de obra y AI Business Advisor.',
+    'RoofBack es una herramienta de gestión de negocios de roofing (techado) diseñada por techistas con 30 años de experiencia en USA y Latinoamérica. Incluye presupuestos con IA, firma digital, control de gastos, cronograma visual de obra y AI Business Advisor.',
   inLanguage: ['es', 'en'],
   offers: {
     '@type': 'Offer',
@@ -93,7 +93,7 @@ const faqJsonLd = {
       name: '¿Qué es RoofBack?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'RoofBack es un software de gestión para techistas que incluye presupuestos con IA, firma digital del cliente, control de gastos en tiempo real, cronograma de obra y un AI Business Advisor. Desarrollado por techistas con 20 años de experiencia en USA y Latinoamérica.',
+        text: 'RoofBack es un software de gestión para techistas que incluye presupuestos con IA, firma digital del cliente, control de gastos en tiempo real, cronograma de obra y un AI Business Advisor. Desarrollado por techistas con 30 años de experiencia en USA y Latinoamérica.',
       },
     },
     {
@@ -142,11 +142,11 @@ export default function HomePage() {
         Visually hidden — the interactive LandingClient below renders the actual UI.
       */}
       <div className="sr-only" aria-hidden="true">
-        <h1>RoofBack — Software de Roofing por Techistas con 20 años de Experiencia</h1>
-        <h2>Hecho por techistas, para techistas</h2>
+        <h1>RoofBack — Software de Roofing con 30 años de Experiencia en Obra</h1>
+        <h2>Orden, claridad y control para tu negocio de roofing</h2>
         <p>
-          Optimizá tus presupuestos, controlá gastos y organizá tu equipo con la herramienta
-          diseñada en el techo. Basada en 20 años de experiencia en USA y Latam.
+          Optimizá presupuestos, controlá gastos y organizá tu equipo con la herramienta
+          construida desde la obra. Basada en 30 años de experiencia en USA y Latam.
         </p>
         <h2>Presupuestos con IA en segundos</h2>
         <p>

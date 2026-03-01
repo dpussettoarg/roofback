@@ -31,41 +31,41 @@ export function Founder({ lang }: FounderProps) {
           <div className="relative pl-6">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#A8FF3E]/30 bg-[#A8FF3E]/10 text-[#A8FF3E] text-xs font-semibold uppercase tracking-widest mb-8">
               <span className="w-1.5 h-1.5 rounded-full bg-[#A8FF3E]" />
-              {isEs ? 'El origen de la bestia' : 'Where The Beast was born'}
+              {isEs ? 'Por qué existe RoofBack' : 'Why RoofBack exists'}
             </div>
 
             <p className="text-2xl sm:text-3xl lg:text-[32px] font-bold text-white leading-[1.4] mb-8">
               {isEs ? (
                 <>
                   Llevo{' '}
-                  <span className="text-[#A8FF3E]">20 años subiéndome a techos</span>{' '}
-                  en Latinoamérica y USA. Probé todos los sistemas: algunos son muy complejos,
-                  otros no te dicen nada.{' '}
-                  <span className="text-[#A8FF3E]">Por eso creamos esto.</span>
+                  <span className="text-[#A8FF3E]">30 años en obras de todo tipo</span>{' '}
+                  en Latinoamérica y USA. Probé todos los sistemas: algunos son demasiado complejos,
+                  otros no te dicen nada útil.{' '}
+                  <span className="text-[#A8FF3E]">Por eso construimos una herramienta simple que realmente ayuda.</span>
                 </>
               ) : (
                 <>
                   I&apos;ve spent{' '}
-                  <span className="text-[#A8FF3E]">20 years on rooftops</span>{' '}
+                  <span className="text-[#A8FF3E]">30 years on job sites of every kind</span>{' '}
                   across Latin America and the US. I tried every system out there: some are
-                  too complex, others tell you nothing.{' '}
-                  <span className="text-[#A8FF3E]">That&apos;s why we built this.</span>
+                  too complex, others tell you nothing useful.{' '}
+                  <span className="text-[#A8FF3E]">So we built a simple tool that actually helps.</span>
                 </>
               )}
             </p>
 
             <p className="text-lg text-[#9CA3AF] leading-relaxed max-w-2xl mb-10">
               {isEs
-                ? 'No te endulzamos la oreja; te damos el control real de tus gastos y tu agenda. Sin filtros corporativos, sin pantallas que nadie entiende. Un techista que ya vivió tu caos lo construyó pensando en vos.'
-                : 'We don\'t sugarcoat it — we give you real control over your costs and your schedule. No corporate filters, no screens nobody understands. A roofer who lived your chaos built this with you in mind.'}
+                ? 'RoofBack no es magia ni tecnología por la tecnología. Es orden, claridad y control — las mismas cosas que necesitás en una obra. Lo construimos porque lo necesitábamos, y no existía.'
+                : 'RoofBack isn\'t magic or tech for tech\'s sake. It\'s order, clarity, and control — the same things you need on any job site. We built it because we needed it, and nothing like it existed.'}
             </p>
 
             {/* Stat callouts */}
             <div className="grid grid-cols-3 gap-4">
               {[
                 {
-                  value: '20+',
-                  label: isEs ? 'Años en el techo' : 'Years on the roof',
+                  value: '30+',
+                  label: isEs ? 'Años en obras' : 'Years on job sites',
                 },
                 {
                   value: '5 min',

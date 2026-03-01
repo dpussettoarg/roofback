@@ -116,7 +116,7 @@ export function Pricing({ lang }: PricingProps) {
                 href="/access"
                 className="group w-full h-14 rounded-2xl bg-[#A8FF3E] text-[#0F1117] text-base font-black flex items-center justify-center gap-2 hover:bg-[#bfff6b] transition-colors shadow-lg shadow-[#A8FF3E]/20"
               >
-                {lang === 'es' ? 'Probá la Bestia — 14 días gratis' : 'Try The Beast — 14 days free'}
+                {lang === 'es' ? 'Empezá gratis — 14 días sin tarjeta' : 'Start free — 14 days, no card needed'}
                 <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
               </Link>
               <p className="text-center text-xs text-[#6B7280] mt-3">

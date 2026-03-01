@@ -89,7 +89,7 @@ export function Features({ lang }: FeaturesProps) {
           className="text-center mb-14"
         >
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#A8FF3E]/30 bg-[#A8FF3E]/10 text-[#A8FF3E] text-xs font-semibold uppercase tracking-widest mb-5">
-            {isEs ? 'Herramientas de la Bestia' : 'The Beast\'s Arsenal'}
+            {isEs ? 'Lo que hace RoofBack' : 'What RoofBack does'}
           </div>
           <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
             {isEs

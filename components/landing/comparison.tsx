@@ -75,7 +75,7 @@ export function Comparison({ lang }: ComparisonProps) {
           className="text-center mb-14"
         >
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#A8FF3E]/30 bg-[#A8FF3E]/10 text-[#A8FF3E] text-xs font-semibold uppercase tracking-widest mb-5">
-            {isEs ? '🦁 La Bestia vs. El Resto' : '🦁 The Beast vs. The Rest'}
+            {isEs ? 'RoofBack vs. El Resto' : 'RoofBack vs. The Rest'}
           </div>
           <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
             {isEs
@@ -130,7 +130,7 @@ export function Comparison({ lang }: ComparisonProps) {
                 <th className="pb-4 text-center w-[26%]">
                   <div className="inline-block bg-[#A8FF3E]/10 border-2 border-[#A8FF3E] rounded-xl px-4 py-2.5 relative">
                     <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#A8FF3E] text-[#0F1117] text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest whitespace-nowrap">
-                      {isEs ? '🦁 La Bestia' : '🦁 The Beast'}
+                      {isEs ? '✓ RoofBack' : '✓ RoofBack'}
                     </span>
                     <span className="text-xs font-black text-[#A8FF3E] uppercase tracking-wider block mt-1">
                       RoofBack

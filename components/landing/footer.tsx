@@ -22,8 +22,8 @@ export function Footer({ lang }: FooterProps) {
             </Link>
             <p className="text-[#6B7280] text-sm leading-relaxed">
               {isEs
-                ? 'Hecho por techistas, para techistas. 20 años de experiencia en el techo, ahora en tu bolsillo.'
-                : 'Built by roofers, for roofers. 20 years of roofing experience, now in your pocket.'}
+                ? 'Construido desde la obra. 30 años de experiencia en el campo, ahora en tu celular.'
+                : 'Built from the job site. 30 years of field experience, now in your pocket.'}
             </p>
             <p className="text-xs text-[#6B7280]">
               {isEs ? 'Soporte:' : 'Support:'}{' '}

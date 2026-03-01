@@ -70,27 +70,23 @@ export function Hero({ lang }: HeroProps) {
             <h1 className="text-4xl sm:text-5xl lg:text-[54px] font-black text-white leading-[1.06] tracking-tight">
               {isEs ? (
                 <>
-                  No te dejamos ahogar<br />
-                  en la organización.<br />
-                  <span className="text-[#A8FF3E]">Controlá tu negocio</span>{' '}
-                  con la experiencia de{' '}
-                  <span className="text-[#A8FF3E]">20 años</span> en el techo.
+                  Pará de apagar incendios.<br />
+                  <span className="text-[#A8FF3E]">Manejá tu negocio</span><br />
+                  como el profesional que sos.
                 </>
               ) : (
                 <>
-                  We won&apos;t let you drown<br />
-                  in the paperwork.<br />
-                  <span className="text-[#A8FF3E]">Take control</span>{' '}
-                  with{' '}
-                  <span className="text-[#A8FF3E]">20 years</span> of roofing experience.
+                  Stop putting out fires.<br />
+                  <span className="text-[#A8FF3E]">Run your business</span><br />
+                  like the pro you are.
                 </>
               )}
             </h1>
 
             <p className="text-lg text-[#9CA3AF] leading-relaxed max-w-lg">
               {isEs
-                ? 'Desarrollamos la herramienta que nosotros mismos necesitábamos. Sin vueltas, sin datos innecesarios. Solo lo que necesitás para que el trabajo rinda y el equipo funcione.'
-                : 'We built the tool we always needed ourselves. No fluff, no bloat. Just what you need to run the job right and keep your crew moving.'}
+                ? 'Construimos la herramienta que necesitábamos y no encontrábamos. Sin vueltas, sin pantallas que nadie entiende. Solo lo que hace falta para que el trabajo rinda y el equipo funcione.'
+                : 'We built the tool we needed and couldn\'t find. No fluff, no screens nobody understands. Just what it takes to run the job right and keep your crew moving.'}
             </p>
 
             <div className="flex flex-col sm:flex-row items-start gap-4">
@@ -98,7 +94,7 @@ export function Hero({ lang }: HeroProps) {
                 href="/access"
                 className="group inline-flex items-center gap-2.5 h-14 px-8 rounded-full bg-[#A8FF3E] text-[#0F1117] text-base font-black shadow-lg shadow-[#A8FF3E]/20 hover:bg-[#bfff6b] hover:shadow-[#A8FF3E]/30 transition-all"
               >
-                {isEs ? 'Probá la Bestia — 14 días gratis' : 'Try The Beast — 14 days free'}
+                {isEs ? 'Probá RoofBack — 14 días gratis' : 'Try RoofBack — 14 days free'}
                 <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
               </Link>
               <p className="text-sm text-[#6B7280] sm:self-center">
