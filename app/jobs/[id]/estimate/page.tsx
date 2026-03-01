@@ -298,6 +298,16 @@ export default function EstimatePage() {
           roofType: job.roof_type,
           squareFootage: Number(job.square_footage) || 0,
           language: languageOutput,
+          clientName: job.client_name,
+          clientAddress: job.client_address,
+          jobNotes: job.notes || '',
+          estimateItems: items.slice(0, 20).map((i) => ({
+            category: i.category,
+            name: i.name,
+            qty: i.quantity,
+            unit: i.unit,
+            price: i.unit_price,
+          })),
         }),
       })
       const data = await res.json()
@@ -869,6 +879,18 @@ export default function EstimatePage() {
                 : 'E.g.: 2000 sqft reroof, architectural shingles, include tear-off...'}
               className="input-dark min-h-[80px] text-sm resize-none"
             />
+            {/* Context info line */}
+            {job && (
+              <p className="text-[11px] text-[#4B5563] flex flex-wrap gap-x-2 gap-y-0.5">
+                <span className="text-[#6B7280]">{lang === 'es' ? 'Usando:' : 'Using:'}</span>
+                {Number(job.square_footage) > 0 && <span>{Number(job.square_footage)}sqft</span>}
+                {job.roof_type && <span>· {job.roof_type}</span>}
+                {job.client_name && <span>· {job.client_name}</span>}
+                {items.length > 0 && (
+                  <span>· {items.length} {lang === 'es' ? 'ítems del presupuesto' : 'estimate items'}</span>
+                )}
+              </p>
+            )}
             <button
               onClick={handleGenerateAiProposal}
               disabled={generatingAi || !aiNotes.trim()}

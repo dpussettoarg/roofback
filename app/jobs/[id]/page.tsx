@@ -14,8 +14,8 @@ import {
   MapPin, Phone, Send, CheckCircle, Link2, Copy, ChevronRight,
   ShieldCheck, CalendarCheck, Lock, HardHat, CalendarDays,
   MessageSquare, Package, TrendingUp, TrendingDown, AlertCircle,
-  Smartphone, MessageCircle, ChevronDown, ChevronUp,
-  ClipboardList, Wrench, HardDriveDownload, Flag, BookOpen, DollarSign, FileEdit, Plus,
+  Smartphone, MessageCircle,
+  BookOpen, DollarSign, FileEdit, Plus,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { JOB_TYPE_OPTIONS, ROOF_TYPE_OPTIONS } from '@/lib/templates'
@@ -62,14 +62,11 @@ export default function JobDetailPage() {
   const [loading, setLoading] = useState(true)
   const [showSendDialog, setShowSendDialog] = useState(false)
   const [showContactModal, setShowContactModal] = useState(false)
-  const [showTimeline, setShowTimeline] = useState(true)
-  const [expandedStage, setExpandedStage] = useState<number | null>(null)
   const [clientEmail, setClientEmail] = useState('')
   const [startDate, setStartDate] = useState('')
 
-  // Milestone dates per stage
+  // Milestone dates per stage (summary only — full tracker is at /tracking)
   const [milestoneDates, setMilestoneDates] = useState<Record<string, { scheduled?: string; completed?: string }>>({})
-  const [savingMilestone, setSavingMilestone] = useState<string | null>(null)
 
   // Live financial data for execution dashboard
   const [budgetMat, setBudgetMat] = useState(0)
@@ -182,23 +179,6 @@ export default function JobDetailPage() {
     await supabase.from('jobs').delete().eq('id', id)
     toast.success(lang === 'es' ? 'Trabajo borrado' : 'Job deleted')
     router.push('/jobs')
-  }
-
-  async function saveMilestone(stage: string, field: 'scheduled_date' | 'completed_date', value: string, orgId: string | null) {
-    setSavingMilestone(stage)
-    try {
-      const payload = { job_id: id, organization_id: orgId, stage, [field]: value || null, updated_at: new Date().toISOString() }
-      const { error } = await supabase
-        .from('job_milestones')
-        .upsert(payload, { onConflict: 'job_id,stage' })
-      if (error) throw error
-      setMilestoneDates((prev) => ({ ...prev, [stage]: { ...prev[stage], [field === 'scheduled_date' ? 'scheduled' : 'completed']: value } }))
-      toast.success(lang === 'es' ? 'Fecha guardada' : 'Date saved')
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Error')
-    } finally {
-      setSavingMilestone(null)
-    }
   }
 
   async function togglePaymentCheckpoint(cpId: PaymentCheckpoint['id']) {
@@ -579,282 +559,58 @@ export default function JobDetailPage() {
               </div>
             </div>
 
-            {/* ── Unified Milestone Tracker ── */}
+            {/* ── Milestone Tracker Summary ── */}
             {(() => {
               const currentStage = job.workflow_stage || 'approved'
               const STAGES = [
-                { key: 'contract',   wfKey: 'approved',          icon: ClipboardList,    label_es: 'Contrato',   label_en: 'Contract'  },
-                { key: 'materials',  wfKey: 'materials_ordered',  icon: HardDriveDownload, label_es: 'Materiales', label_en: 'Materials' },
-                { key: 'jobsite',    wfKey: 'in_progress',       icon: Wrench,           label_es: 'En Obra',    label_en: 'Job Site'  },
-                { key: 'completed',  wfKey: 'completed',         icon: Flag,             label_es: 'Finalizado', label_en: 'Finished'  },
+                { key: 'contract',   label_es: 'Contrato',   label_en: 'Contract'  },
+                { key: 'materials',  label_es: 'Materiales', label_en: 'Materials' },
+                { key: 'jobsite',    label_es: 'En Obra',    label_en: 'Job Site'  },
+                { key: 'completed',  label_es: 'Finalizado', label_en: 'Finished'  },
               ]
               const stepIndex = currentStage === 'completed' || currentStage === 'invoiced' || currentStage === 'paid' ? 3
                 : currentStage === 'in_progress' ? 2
                 : currentStage === 'materials_ordered' ? 1
                 : 0
+              const nextStage = STAGES[stepIndex + 1]
+              const nextMd = nextStage ? (milestoneDates[nextStage.key] || {}) : null
+              const daysToNext = nextMd?.scheduled
+                ? Math.round((new Date(nextMd.scheduled + 'T12:00').getTime() - Date.now()) / 86400000)
+                : null
 
               return (
-                <div className="bg-[#1E2228] rounded-[14px] border border-[#2A2D35] overflow-hidden">
-                  {/* Collapsible header */}
-                  <button
-                    onClick={() => setShowTimeline(!showTimeline)}
-                    className="w-full flex items-center justify-between px-4 py-3.5 text-left hover:bg-[#252830] transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <CalendarDays className="h-4 w-4 text-[#A8FF3E]" />
-                      <span className="text-sm font-bold text-white">
-                        {lang === 'es' ? 'Cronograma de Obra' : 'Milestone Tracker'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-[#A8FF3E] font-semibold">
-                        {lang === 'es' ? STAGES[stepIndex].label_es : STAGES[stepIndex].label_en}
-                      </span>
-                      {showTimeline ? <ChevronUp className="h-4 w-4 text-[#6B7280]" /> : <ChevronDown className="h-4 w-4 text-[#6B7280]" />}
-                    </div>
-                  </button>
-
-                  {/* Always-visible progress bar — flex-col on mobile to prevent text overlap */}
-                  <div className="px-4 pb-5">
-                    <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-0 sm:items-center">
-                      {STAGES.map((s, i) => {
-                        const done = i < stepIndex
-                        const active = i === stepIndex
-                        const Icon = s.icon
-                        return (
-                          <div key={s.key} className="flex sm:flex-1 sm:min-w-0 items-center gap-2 sm:justify-center">
-                            <div className="flex flex-col items-center flex-shrink-0 min-w-0">
-                              <button
-                                onClick={() => setExpandedStage(showTimeline && expandedStage === i ? null : i)}
-                                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
-                                  active  ? 'bg-[#A8FF3E] text-[#0F1117] ring-2 ring-[#A8FF3E]/40'
-                                  : done  ? 'bg-[#A8FF3E]/20 text-[#A8FF3E]'
-                                  :         'bg-[#0F1117] text-[#4B5563] border border-[#2A2D35]'
-                                }`}
-                              >
-                                <Icon className="h-4 w-4" />
-                              </button>
-                              <span className={`mt-1.5 text-[10px] font-semibold text-center leading-tight max-w-[70px] break-words ${
-                                active ? 'text-[#A8FF3E]' : done ? 'text-[#9CA3AF]' : 'text-[#4B5563]'
-                              }`}>
-                                {lang === 'es' ? s.label_es : s.label_en}
+                <Link href={`/jobs/${id}/tracking`}>
+                  <div className="bg-[#1E2228] rounded-[14px] border border-[#2A2D35] p-4 flex items-center gap-3 hover:bg-[#252830] transition-all cursor-pointer">
+                    <CalendarDays className="h-5 w-5 text-[#A8FF3E] flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[11px] font-bold bg-[#A8FF3E] text-[#0F1117] px-2 py-0.5 rounded-full">
+                          {lang === 'es' ? STAGES[stepIndex].label_es : STAGES[stepIndex].label_en}
+                        </span>
+                        {nextStage && (
+                          <span className="text-[11px] text-[#6B7280]">
+                            → {lang === 'es' ? nextStage.label_es : nextStage.label_en}
+                            {nextMd?.scheduled && (
+                              <span className="ml-1 text-[#9CA3AF]">
+                                {new Date(nextMd.scheduled + 'T12:00').toLocaleDateString(lang === 'es' ? 'es' : 'en-US', { month: 'short', day: 'numeric' })}
                               </span>
-                            </div>
-                            {i < STAGES.length - 1 && (
-                              <div className={`hidden sm:block flex-1 h-0.5 mx-1 mb-6 self-center rounded-full transition-all ${
-                                i < stepIndex ? 'bg-[#A8FF3E]' : 'bg-[#2A2D35]'
-                              }`} />
                             )}
-                          </div>
-                        )
-                      })}
+                            {daysToNext !== null && daysToNext >= 0 && (
+                              <span className="ml-1 text-[#A8FF3E]">({daysToNext}d)</span>
+                            )}
+                            {daysToNext !== null && daysToNext < 0 && (
+                              <span className="ml-1 text-red-400">({lang === 'es' ? 'atrasado' : 'overdue'})</span>
+                            )}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-[#6B7280] mt-0.5">
+                        {lang === 'es' ? 'Ver cronograma completo' : 'View full tracking'}
+                      </p>
                     </div>
+                    <ChevronRight className="h-4 w-4 text-[#6B7280] flex-shrink-0" />
                   </div>
-
-                  {/* Accordion detail rows */}
-                  {showTimeline && (
-                    <div className="border-t border-[#2A2D35]">
-                      {STAGES.map((s, i) => {
-                        const isActive = i === stepIndex
-                        const isFinished = i < stepIndex
-                        const md = milestoneDates[s.key] || {}
-                        const open = expandedStage === i
-
-                        return (
-                          <div key={s.key} className={`border-b border-[#2A2D35] last:border-b-0 ${isActive ? 'bg-[#A8FF3E]/5' : ''}`}>
-                            <button
-                              onClick={() => setExpandedStage(open ? null : i)}
-                              className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#252830] transition-colors"
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                  isActive ? 'bg-[#A8FF3E] text-[#0F1117]'
-                                  : isFinished ? 'bg-[#A8FF3E]/20 text-[#A8FF3E]'
-                                  : 'bg-[#0F1117] text-[#4B5563] border border-[#2A2D35]'
-                                }`}>
-                                  <s.icon className="h-3 w-3" />
-                                </div>
-                                <div className="text-left">
-                                  <p className={`text-sm font-semibold ${isActive ? 'text-[#A8FF3E]' : 'text-white'}`}>
-                                    {lang === 'es' ? s.label_es : s.label_en}
-                                  </p>
-                                  {md.scheduled && (
-                                    <p className="text-[11px] text-[#6B7280]">
-                                      {lang === 'es' ? 'Planificado: ' : 'Planned: '}
-                                      {new Date(md.scheduled + 'T12:00').toLocaleDateString(lang === 'es' ? 'es' : 'en-US', { month: 'short', day: 'numeric' })}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {isActive && (
-                                  <span className="text-[10px] bg-[#A8FF3E] text-[#0F1117] font-bold px-2 py-0.5 rounded-full">
-                                    {lang === 'es' ? 'ACTUAL' : 'CURRENT'}
-                                  </span>
-                                )}
-                                {open ? <ChevronUp className="h-4 w-4 text-[#6B7280]" /> : <ChevronDown className="h-4 w-4 text-[#6B7280]" />}
-                              </div>
-                            </button>
-
-                            {open && (
-                              <div className="px-4 pb-4 space-y-3">
-                                {isFinished ? (
-                                  /* Finished stage — show completion info */
-                                  <div className="flex items-center gap-2 text-sm text-[#9CA3AF] bg-[#0F1117] rounded-xl px-3 py-2.5">
-                                    <CheckCircle className="h-4 w-4 text-[#A8FF3E]" />
-                                    {md.completed
-                                      ? `${lang === 'es' ? 'Completado el' : 'Completed on'} ${new Date(md.completed + 'T12:00').toLocaleDateString(lang === 'es' ? 'es' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`
-                                      : (lang === 'es' ? 'Etapa completada' : 'Stage completed')}
-                                  </div>
-                                ) : (
-                                  /* Not finished — show date pickers + notify button */
-                                  <>
-                                    <div className="space-y-4">
-                                      {/* Planned date (when you expect to do this stage) */}
-                                      <div className="space-y-2">
-                                        <p className="text-xs font-medium text-white">
-                                          {lang === 'es' ? 'Fecha planificada' : 'Planned date'}
-                                        </p>
-                                        <p className="text-[11px] text-[#6B7280] -mt-1">
-                                          {lang === 'es' ? 'Cuándo tenés previsto hacer esta etapa' : 'When you plan to do this stage'}
-                                        </p>
-                                        <div className="flex gap-2 items-center">
-                                          <input
-                                            type="date"
-                                            defaultValue={md.scheduled || ''}
-                                            onChange={(e) => setMilestoneDates(prev => ({
-                                              ...prev, [s.key]: { ...prev[s.key], scheduled: e.target.value }
-                                            }))}
-                                            aria-label={lang === 'es' ? 'Fecha planificada' : 'Planned date'}
-                                            className="flex-1 min-h-[44px] rounded-lg bg-[#0F1117] border border-[#2A2D35] px-3 text-white text-sm focus:outline-none focus:border-[#A8FF3E] transition-colors [color-scheme:dark]"
-                                            style={{ colorScheme: 'dark' }}
-                                          />
-                                          <button
-                                            type="button"
-                                            onClick={() => saveMilestone(s.key, 'scheduled_date', md.scheduled || '', job.organization_id)}
-                                            disabled={savingMilestone === s.key}
-                                            aria-label={lang === 'es' ? 'Guardar fecha planificada' : 'Save planned date'}
-                                            className="h-11 min-w-[44px] px-3 rounded-lg bg-[#A8FF3E] text-[#0F1117] text-sm font-bold disabled:opacity-50 shrink-0"
-                                          >
-                                            {savingMilestone === s.key ? '…' : '✓'}
-                                          </button>
-                                        </div>
-                                      </div>
-                                      {/* Actual completion date (when you really finished) */}
-                                      <div className="space-y-2">
-                                        <p className="text-xs font-medium text-white">
-                                          {lang === 'es' ? 'Fecha real de finalización' : 'Actual completion date'}
-                                        </p>
-                                        <p className="text-[11px] text-[#6B7280] -mt-1">
-                                          {lang === 'es' ? 'Cuándo se completó realmente esta etapa' : 'When this stage was actually completed'}
-                                        </p>
-                                        <div className="flex gap-2 items-center">
-                                          <input
-                                            type="date"
-                                            defaultValue={md.completed || ''}
-                                            onChange={(e) => setMilestoneDates(prev => ({
-                                              ...prev, [s.key]: { ...prev[s.key], completed: e.target.value }
-                                            }))}
-                                            aria-label={lang === 'es' ? 'Fecha real de finalización' : 'Actual completion date'}
-                                            className="flex-1 min-h-[44px] rounded-lg bg-[#0F1117] border border-[#2A2D35] px-3 text-white text-sm focus:outline-none focus:border-[#A8FF3E] transition-colors [color-scheme:dark]"
-                                            style={{ colorScheme: 'dark' }}
-                                          />
-                                          <button
-                                            type="button"
-                                            onClick={() => saveMilestone(s.key, 'completed_date', md.completed || '', job.organization_id)}
-                                            disabled={savingMilestone === s.key}
-                                            aria-label={lang === 'es' ? 'Guardar fecha de finalización' : 'Save completion date'}
-                                            className="h-11 min-w-[44px] px-3 rounded-lg border border-[#2A2D35] text-[#6B7280] text-sm font-bold disabled:opacity-50 hover:bg-[#252830] shrink-0"
-                                          >
-                                            {savingMilestone === s.key ? '…' : '✓'}
-                                          </button>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Notify client button */}
-                                    <button
-                                      onClick={() => {
-                                        const dateStr = md.scheduled
-                                          ? new Date(md.scheduled + 'T12:00').toLocaleDateString(lang === 'es' ? 'es' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-                                          : ''
-                                        const stageLabel = lang === 'es' ? s.label_es : s.label_en
-                                        const msg = lang === 'es'
-                                          ? `Hola ${job.client_name}, te informamos que la etapa "${stageLabel}" está programada para el ${dateStr}. ¡Gracias!`
-                                          : `Hi ${job.client_name}, we're letting you know the "${stageLabel}" milestone is scheduled for ${dateStr}. Thank you!`
-                                        const phone = job.client_phone?.replace(/\D/g, '') || ''
-                                        if (phone) {
-                                          window.open(`sms:${phone}?body=${encodeURIComponent(msg)}`, '_blank')
-                                        } else {
-                                          window.open(`mailto:${job.client_email}?subject=${encodeURIComponent(stageLabel)}&body=${encodeURIComponent(msg)}`, '_blank')
-                                        }
-                                      }}
-                                      disabled={!md.scheduled}
-                                      className="w-full h-10 rounded-xl border border-[#2A2D35] bg-transparent text-sm text-white flex items-center justify-center gap-2 hover:bg-[#252830] disabled:opacity-40 transition-colors"
-                                    >
-                                      <MessageCircle className="h-4 w-4 text-[#A8FF3E]" />
-                                      {lang === 'es' ? 'Notificar cliente' : 'Notify client'}
-                                    </button>
-
-                                    {/* Move project to this stage — only next stage is unlockable (sequential) */}
-                                    {(() => {
-                                      const alreadyCurrent = isActive
-                                      const alreadyPast    = isFinished
-                                      const isNextStage    = i === stepIndex + 1
-                                      const canAdvance     = !alreadyCurrent && !alreadyPast && isNextStage
-                                      return (
-                                        <button
-                                          onClick={async () => {
-                                            if (!canAdvance) return
-                                            const newStage = s.wfKey as import('@/lib/types').WorkflowStage
-                                            const { error } = await supabase
-                                              .from('jobs')
-                                              .update({ workflow_stage: newStage, updated_at: new Date().toISOString() })
-                                              .eq('id', id)
-                                            if (!error) {
-                                              setJob(j => j ? { ...j, workflow_stage: newStage } : j)
-                                              toast.success(lang === 'es' ? '¡Etapa avanzada!' : 'Stage advanced!')
-                                              setExpandedStage(null)
-                                            } else {
-                                              toast.error(error.message)
-                                            }
-                                          }}
-                                          disabled={alreadyCurrent || alreadyPast}
-                                          title={
-                                            alreadyCurrent
-                                              ? (lang === 'es' ? 'Esta es la etapa actual' : 'This is already the current stage')
-                                              : alreadyPast
-                                              ? (lang === 'es' ? 'Esta etapa ya fue completada' : 'This stage is already completed')
-                                              : undefined
-                                          }
-                                          className={`w-full h-10 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors
-                                            ${alreadyCurrent
-                                              ? 'bg-[#A8FF3E]/10 border border-[#A8FF3E]/30 text-[#A8FF3E] cursor-default opacity-60'
-                                              : alreadyPast
-                                              ? 'border border-[#2A2D35] text-[#4B5563] cursor-not-allowed opacity-40'
-                                              : 'border border-[#A8FF3E]/40 text-[#A8FF3E] hover:bg-[#A8FF3E]/5'
-                                            }`}
-                                        >
-                                          {alreadyCurrent
-                                            ? (lang === 'es' ? '✓ Etapa actual' : '✓ Current stage')
-                                            : alreadyPast
-                                            ? (lang === 'es' ? 'Etapa completada' : 'Stage completed')
-                                            : (lang === 'es'
-                                                ? `Mover proyecto a "${s.label_es}"`
-                                                : `Move project to "${s.label_en}"`)}
-                                        </button>
-                                      )
-                                    })()}
-                                  </>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
+                </Link>
               )
             })()}
 
@@ -1043,6 +799,7 @@ export default function JobDetailPage() {
             {/* Execution action cards */}
             <div className="space-y-2">
               {[
+                { href: `/jobs/${id}/tracking`, icon: CalendarDays, title_es: 'Cronograma', title_en: 'Tracking', desc_es: 'Fechas y etapas de la obra', desc_en: 'Milestones and stage dates' },
                 { href: `/jobs/${id}/timetrack`, icon: Clock, title_es: 'Horas y Gastos', title_en: 'Time & Expenses', desc_es: 'Registrar horas del crew y gastos', desc_en: 'Log crew hours and expenses' },
                 { href: `/jobs/${id}/log`, icon: BookOpen, title_es: 'Field Log', title_en: 'Field Log', desc_es: 'Bitácora de obra y notas de campo', desc_en: 'Field notes and project log' },
                 { href: `/jobs/${id}/results`, icon: BarChart3, title_es: 'Resultados', title_en: 'Results', desc_es: 'Ver análisis final del trabajo', desc_en: 'View final job analysis' },

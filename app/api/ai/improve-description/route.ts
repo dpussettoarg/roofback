@@ -39,12 +39,24 @@ function sanitizeForPrompt(input: string, maxLen = 1000): string {
 const VALID_JOB_TYPES = new Set(['repair', 'reroof', 'new_roof', 'gutters', 'waterproofing', 'other'])
 const VALID_ROOF_TYPES = new Set(['shingle', 'tile', 'metal', 'flat', 'other'])
 
+interface EstimateItemInput {
+  category: string
+  name: string
+  qty: number
+  unit: string
+  price: number
+}
+
 interface RequestBody {
   description: string
   jobType: string
   roofType: string
   squareFootage: number
   language: 'es' | 'en'
+  clientName?: string
+  clientAddress?: string
+  jobNotes?: string
+  estimateItems?: EstimateItemInput[]
 }
 
 export async function POST(req: NextRequest) {
@@ -93,6 +105,20 @@ export async function POST(req: NextRequest) {
     const sqft = typeof squareFootage === 'number' && squareFootage >= 0 && squareFootage <= 100000
       ? squareFootage : 0
 
+    // New context fields
+    const clientName = body.clientName ? sanitizeForPrompt(body.clientName, 200) : ''
+    const clientAddress = body.clientAddress ? sanitizeForPrompt(body.clientAddress, 200) : ''
+    const jobNotes = body.jobNotes ? sanitizeForPrompt(body.jobNotes, 500) : ''
+    const estimateItems = Array.isArray(body.estimateItems)
+      ? body.estimateItems.slice(0, 20).map((item) => ({
+          category: sanitizeForPrompt(String(item.category || ''), 50),
+          name: sanitizeForPrompt(String(item.name || ''), 100),
+          qty: Number(item.qty) || 0,
+          unit: sanitizeForPrompt(String(item.unit || ''), 30),
+          price: Number(item.price) || 0,
+        }))
+      : []
+
     if (!description || description.length < 5) {
       return NextResponse.json(
         { error: language === 'es' ? 'Escribí al menos una descripción breve' : 'Write at least a brief description first' },
@@ -107,12 +133,35 @@ export async function POST(req: NextRequest) {
         : 'IMPORTANT: Write the entire proposal in English. Do NOT include any Spanish text.'
 
       const systemPrompt = language === 'es'
-        ? `Sos un presupuestista profesional de techos en Estados Unidos. Mejorá y completá la siguiente descripción de trabajo para que suene profesional, clara y detallada para el cliente. Mantené el español pero usá terminología técnica de roofing. Incluí detalles como materiales, proceso de trabajo y garantía si corresponde. No inventes precios. Mantené un tono profesional pero accesible. Máximo 200 palabras.\n\n${langInstruction}`
-        : `You are a professional roofing estimator in the United States. Improve and complete the following job description to sound professional, clear, and detailed for the client. Use proper roofing terminology. Include details about materials, work process, and warranty if applicable. Do not invent prices. Keep a professional but approachable tone. Maximum 200 words.\n\n${langInstruction}`
+        ? `Sos un presupuestista profesional de techados en Estados Unidos. Usando los detalles del trabajo provistos, escribí una carta de propuesta clara y específica dirigida al cliente. Usá su nombre y dirección. Mencioná los materiales e ítems de trabajo específicos listados. NO inventes precios. Estructura: 1) Intro breve dirigida al cliente, 2) Alcance del trabajo (usá bullets referenciando materiales/ítems reales), 3) Qué incluye, 4) Próximos pasos. Máximo 250 palabras. Tono: profesional pero directo.\n\n${langInstruction}`
+        : `You are a professional roofing estimator in the United States. Using the job details provided, write a clear, specific proposal letter addressed to the client. Use their name and address. Reference the specific materials and work items listed. Do NOT invent prices. Structure: 1) Brief intro addressing the client, 2) Scope of work (use bullet points referencing actual materials/items), 3) What's included, 4) Next steps. Max 250 words. Tone: professional but direct.\n\n${langInstruction}`
+
+      // Build items list for prompt
+      const itemsText = estimateItems.length > 0
+        ? estimateItems
+            .map((it) => `  • ${it.name} (${it.qty} ${it.unit})`)
+            .join('\n')
+        : ''
 
       const userPrompt = language === 'es'
-        ? `Tipo de trabajo: ${jobType}\nTipo de techo: ${roofType}\nSuperficie: ${sqft} sqft\n\nDescripción original del techista:\n"${description}"\n\nMejorá esta descripción (respondé SOLO en español):`
-        : `Job type: ${jobType}\nRoof type: ${roofType}\nArea: ${sqft} sqft\n\nOriginal roofer description:\n"${description}"\n\nImprove this description (respond ONLY in English):`
+        ? [
+            clientName ? `Cliente: ${clientName}` : '',
+            clientAddress ? `Dirección: ${clientAddress}` : '',
+            `Trabajo: ${jobType} / ${roofType} / ${sqft} sqft`,
+            `Notas del techista: "${description}"`,
+            jobNotes ? `Contexto adicional: ${jobNotes}` : '',
+            itemsText ? `Ítems del presupuesto ya cargados:\n${itemsText}` : '',
+            '\nEscribí la propuesta (SOLO en español):',
+          ].filter(Boolean).join('\n')
+        : [
+            clientName ? `Client: ${clientName}` : '',
+            clientAddress ? `Address: ${clientAddress}` : '',
+            `Job: ${jobType} / ${roofType} / ${sqft} sqft`,
+            `Roofer's notes: "${description}"`,
+            jobNotes ? `Additional context: ${jobNotes}` : '',
+            itemsText ? `Estimate items already added:\n${itemsText}` : '',
+            '\nWrite the proposal (ONLY in English):',
+          ].filter(Boolean).join('\n')
 
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
