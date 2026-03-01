@@ -505,9 +505,9 @@ export default function JobDetailPage() {
                 href={job.public_token ? `/proposal/${job.public_token}` : `/jobs/${id}/estimate`}
                 target={job.public_token ? '_blank' : undefined}
                 rel={job.public_token ? 'noopener noreferrer' : undefined}
-                className="flex-1"
+                className="flex-1 sm:flex-none"
               >
-                <button className="w-full h-12 rounded-[10px] bg-[#A8FF3E] text-[#0F1117] font-bold text-sm flex items-center justify-center gap-2 hover:brightness-110 transition-all">
+                <button className="w-full sm:w-auto sm:px-6 h-10 rounded-[10px] bg-[#A8FF3E] text-[#0F1117] font-bold text-sm flex items-center justify-center gap-2 hover:brightness-110 transition-all">
                   <FileText className="h-4 w-4" />
                   {lang === 'es' ? 'Ver Contrato Aprobado' : 'View Approved Contract'}
                 </button>
